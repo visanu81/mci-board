@@ -1740,7 +1740,17 @@ function renderDisplayPicker() {
 }
 
 function renderDisplayMain() {
-  const inc = state.incident || {};
+  // 인덱스(state.incidents)에서 재난 메타(title, type, agencyId, startedAt)를 우선 사용.
+  // state.incident는 "사고 개요" 폼이 입력된 경우에만 값이 있어 보조로만 활용.
+  const incMeta   = state.incidents.find(i => i._key === state.currentIncidentId) || {};
+  const incDetail = state.incident || {};
+  const inc = {
+    title:     incMeta.title    || incDetail.location || '미정',
+    type:      incMeta.type     || incDetail.target   || '',
+    agencyId:  incMeta.agencyId,
+    location:  incDetail.location || '',
+    startedAt: incMeta.startedAt,
+  };
   const totalCount = state.mciCasualties.length;
 
   // 트리아지 합계
