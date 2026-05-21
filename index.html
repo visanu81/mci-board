@@ -397,6 +397,24 @@
   body[data-view="display"] #outdoor-toggle {
     display: none !important;
   }
+
+  /* ── 표출 모드 병원 그리드 — 화면 폭에 따라 열 개수 자동 조정 ──
+       - 최소 폭 240px 보장 (모바일에서도 가독)
+       - HD(1280px): 4~5열, FHD(1920px): 6~7열, 4K: 12+열
+       - 병원 많을 때 max-height + 스크롤로 화면 밖 잘림 방지 */
+  .display-hospital-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 0.875rem;
+    max-height: 55vh;        /* 1080p TV 기준 ~590px → 4행 정도 보임 */
+    overflow-y: auto;
+    padding-right: 4px;      /* 스크롤바 공간 */
+  }
+  /* 스크롤바 — 어두운 톤에 맞게 */
+  .display-hospital-grid::-webkit-scrollbar { width: 8px; }
+  .display-hospital-grid::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
+  .display-hospital-grid::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+  .display-hospital-grid::-webkit-scrollbar-thumb:hover { background: #64748b; }
 </style>
 </head>
 <body>
@@ -1884,18 +1902,20 @@ function renderDisplayMain() {
         ${hospitals.length === 0 ? `
           <div class="bg-slate-900 border-2 border-slate-800 rounded-2xl p-12 text-center text-2xl text-slate-500">아직 이송된 환자가 없습니다</div>
         ` : `
-          <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- display-hospital-grid: auto-fit minmax → 화면 폭에 따라 열 개수 자동 조정
+               많은 병원(20+) 시 max-height + 스크롤로 다른 섹션 보호 -->
+          <div class="display-hospital-grid">
             ${hospitals.map(h => `
-              <button data-display-hospital="${escapeHtml(h.name)}" class="display-card text-left rounded-2xl p-5 bg-slate-900 hover:bg-slate-800 border-2 border-slate-700 hover:border-blue-500 transition-all cursor-pointer">
-                <div class="text-xl font-bold mb-2 truncate" title="${escapeHtml(h.name)}">${escapeHtml(h.name)}</div>
-                <div class="flex items-baseline gap-2 mb-3">
-                  <span class="text-5xl font-black mono">${h.total}</span>
-                  <span class="text-base text-slate-400">명</span>
-                  <span class="ml-auto text-base text-emerald-400 font-bold">도착 ${h.arrived}</span>
+              <button data-display-hospital="${escapeHtml(h.name)}" class="display-card text-left rounded-2xl p-4 bg-slate-900 hover:bg-slate-800 border-2 border-slate-700 hover:border-blue-500 transition-all cursor-pointer">
+                <div class="text-lg font-bold mb-1.5 truncate" title="${escapeHtml(h.name)}">${escapeHtml(h.name)}</div>
+                <div class="flex items-baseline gap-2 mb-2">
+                  <span class="text-4xl font-black mono leading-none">${h.total}</span>
+                  <span class="text-sm text-slate-400">명</span>
+                  <span class="ml-auto text-sm text-emerald-400 font-bold">도착 ${h.arrived}</span>
                 </div>
                 <div class="flex flex-wrap gap-1">
                   ${MCI_TRIAGE.map(tr => h.byTriage[tr.id] ? `
-                    <span class="text-sm px-2 py-0.5 rounded font-bold" style="background:${tr.bg};color:${tr.color}">
+                    <span class="text-xs px-1.5 py-0.5 rounded font-bold" style="background:${tr.bg};color:${tr.color}">
                       ${tr.shortName} ${h.byTriage[tr.id]}
                     </span>
                   ` : '').join('')}
