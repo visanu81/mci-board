@@ -3,7 +3,20 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-<title>재난현장 통합 상황판</title>
+<title>MCI 통합 상황판</title>
+
+<!-- ==================== PWA 메타데이터 ==================== -->
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#dc2626" />
+<link rel="icon" type="image/svg+xml" href="/icon.svg" />
+<link rel="apple-touch-icon" href="/icon.svg" />
+<!-- iOS: 홈 화면에 추가 시 풀스크린·앱처럼 동작 -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="MCI 상황판" />
+<meta name="mobile-web-app-capable" content="yes" />
+<!-- ======================================================== -->
+
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
@@ -4926,6 +4939,20 @@ function boot() {
 }
 
 boot();
+</script>
+
+<!-- ==================== Service Worker 등록 ====================
+     PWA 오프라인 캐싱 + "앱 설치" 알림. 같은 출처(HTTPS)에서만 작동.
+     로컬 file:// 환경에서는 자동 비활성화됨.
+================================================================ -->
+<script>
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('[PWA] Service Worker 등록 완료:', reg.scope))
+        .catch(err => console.warn('[PWA] Service Worker 등록 실패:', err));
+    });
+  }
 </script>
 
 </body>

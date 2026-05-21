@@ -1,0 +1,27 @@
+{
+  "name": "MCI 다수사상자 통합 상황판",
+  "short_name": "MCI 상황판",
+  "description": "재난 발생 직후부터 현장지휘통제단 가동 전까지의 초기 현장 상황 공유 도구",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#020617",
+  "theme_color": "#dc2626",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["medical", "utilities", "productivity"]
+}

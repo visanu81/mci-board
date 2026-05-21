@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <!--
+    MCI 통합 상황판 — 앱 아이콘 (any purpose)
+    트리아지 4색(긴급/응급/비응급/사망) + 중앙 EKG 라인
+    192×192 viewBox · 둥근 모서리 적용
+  -->
+  <defs>
+    <clipPath id="rounded">
+      <rect width="192" height="192" rx="40"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#rounded)">
+    <!-- 트리아지 4분할 배경 -->
+    <rect x="0"  y="0"  width="96" height="96" fill="#dc2626"/>  <!-- 긴급(red-600) -->
+    <rect x="96" y="0"  width="96" height="96" fill="#facc15"/>  <!-- 응급(yellow-400) -->
+    <rect x="0"  y="96" width="96" height="96" fill="#22c55e"/>  <!-- 비응급(green-500) -->
+    <rect x="96" y="96" width="96" height="96" fill="#64748b"/>  <!-- 사망(slate-500) -->
+    <!-- 중앙 흰색 원 -->
+    <circle cx="96" cy="96" r="44" fill="white"/>
+    <!-- EKG 하트박동 라인 -->
+    <path d="M 66 96 L 78 96 L 84 76 L 96 116 L 108 76 L 114 96 L 126 96"
+          stroke="#dc2626" stroke-width="6" fill="none"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
