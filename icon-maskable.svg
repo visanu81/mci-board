@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <!--
+    MCI 통합 상황판 — 앱 아이콘 (maskable purpose)
+    Android adaptive icon용. OS가 자체적으로 원/스쿼클 등 모양을 적용하므로
+    둥근 모서리 없이 풀블리드(full bleed) 4분할 배경, 안전 영역(중앙 80%) 안에 EKG.
+  -->
+  <!-- 트리아지 4분할 배경 (모서리 처리 X) -->
+  <rect x="0"  y="0"  width="96" height="96" fill="#dc2626"/>
+  <rect x="96" y="0"  width="96" height="96" fill="#facc15"/>
+  <rect x="0"  y="96" width="96" height="96" fill="#22c55e"/>
+  <rect x="96" y="96" width="96" height="96" fill="#64748b"/>
+  <!-- 중앙 흰색 원 (안전 영역 내 — Android가 어떤 모양으로 자르든 보존됨) -->
+  <circle cx="96" cy="96" r="44" fill="white"/>
+  <!-- EKG 하트박동 라인 -->
+  <path d="M 66 96 L 78 96 L 84 76 L 96 116 L 108 76 L 114 96 L 126 96"
+        stroke="#dc2626" stroke-width="6" fill="none"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
