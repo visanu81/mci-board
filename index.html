@@ -391,6 +391,12 @@
     color: #fbbf24 !important;
   }
   body.outdoor-mode #outdoor-toggle:hover { background-color: #334155 !important; }
+
+  /* ── 표출(TV) 모드 — 설치 배너·외부모드 토글 숨김 (상황실 화면에 불필요) ── */
+  body[data-view="display"] #install-banner,
+  body[data-view="display"] #outdoor-toggle {
+    display: none !important;
+  }
 </style>
 </head>
 <body>
@@ -400,6 +406,20 @@
 <button id="outdoor-toggle" class="fixed bottom-4 left-4 z-[100] w-12 h-12 rounded-full bg-amber-500 hover:bg-amber-400 shadow-2xl shadow-amber-900/30 flex items-center justify-center text-white border-2 border-amber-300 transition-all" title="외부 모드 켜기 (시인성 강화)" aria-label="외부 모드 전환">
   <i data-lucide="sun" class="w-5 h-5"></i>
 </button>
+
+<!-- PWA 앱 설치 배너 — 설치 가능한 브라우저에서만 표시
+     beforeinstallprompt 이벤트 받으면 자동으로 노출. 거부 시 localStorage에 저장 후 재노출 X. -->
+<div id="install-banner" class="fixed bottom-20 inset-x-4 z-[99] items-center gap-3 max-w-md mx-auto bg-gradient-to-r from-pink-600 to-rose-600 rounded-xl shadow-2xl shadow-pink-900/40 px-4 py-3 border-2 border-pink-300" style="display:none">
+  <i data-lucide="download-cloud" class="w-5 h-5 text-white flex-shrink-0"></i>
+  <div class="flex-1 min-w-0 text-white">
+    <div class="text-sm font-bold">앱으로 설치하기</div>
+    <div class="text-[11px] opacity-90 leading-tight" id="install-banner-desc">홈 화면에서 즉시 실행 · 오프라인 사용 가능</div>
+  </div>
+  <button id="install-btn" class="px-3 py-1.5 rounded-lg bg-white text-pink-700 text-xs font-extrabold whitespace-nowrap hover:bg-pink-50 shadow-md">설치</button>
+  <button id="install-dismiss" class="text-white/80 hover:text-white p-1 flex-shrink-0" aria-label="닫기">
+    <i data-lucide="x" class="w-4 h-4"></i>
+  </button>
+</div>
 
 <div id="app"></div>
 
@@ -440,6 +460,7 @@ const DEFAULT_AGENCY_CODES_SEED = [
   { code: "파주119",   id: 'paju',        name: '파주',   role: 'normal'   },
   { code: "구리119",   id: 'guri',        name: '구리',   role: 'normal'   },
   { code: "본부119",   id: 'headquarter', name: '본부',   role: 'observer' },
+  { code: "표출119",   id: 'display',     name: '표출',   role: 'display'  },
   { code: "한경승",    id: 'admin',       name: '관리자', role: 'admin'    },
 ];
 // 초기값 (Firebase 응답 전 로그인 가능하도록 SEED 기반)
@@ -504,10 +525,11 @@ const TEAMS = [
 ];
 
 // 권한 헬퍼 (V2)
-// V2 역할: 'normal'(일반 관서) / 'observer'(본부, 읽기만) / 'admin'(한경승, 전권)
-const isObserver = () => state.session?.role === 'observer';
+// V2 역할: 'normal'(일반 관서) / 'observer'(본부, 읽기만) / 'display'(표출, TV 전시) / 'admin'(한경승, 전권)
+const isObserver = () => state.session?.role === 'observer' || state.session?.role === 'display';
 const isAdmin    = () => state.session?.role === 'admin';
-const canWrite   = () => !isObserver();   // 본부119는 모든 쓰기 차단
+const isDisplay  = () => state.session?.role === 'display';
+const canWrite   = () => !isObserver();   // 본부119/표출119는 모든 쓰기 차단
 // 모든 직책이 풀 카드 입력 가능. 다만 카드 수정은 자기가 만든 카드만 가능 (현장대원 한정).
 // 구급팀장·구급팀원·지휘관은 모든 카드 수정 가능. 본부는 차단. 관리자는 전권.
 const isFieldOnly = (teamId) => teamId === 'safety';
@@ -605,6 +627,8 @@ let state = {
   expandedTriage: null,             // 트리아지 합계 — 펼쳐서 환자 목록을 보고 있는 트리아지 id (null = 접힘)
   expandedTransport: null,          // 트리아지 합계 — 이송 상태 펼침: 'pending' | 'in-transit' | 'arrived' | null
   outdoorMode: false,               // 외부(야외) 모드 — true면 흰 배경 + 진한 글씨로 햇빛에서도 시인성 확보
+  // 표출(TV) 모드 — view2='display' 일 때 사용
+  displayModal: null,               // { type: 'triage'|'transport'|'hospital'|'patient', value: ... }
   // V5: 관서 코드 관리 (admin 콘솔)
   agencyCodesList: [],              // Firebase /config/agencyCodes 동기화 결과 ([{_key, code, id, name, role}])
   adminCodeEditKey: null,           // 인라인 수정 중인 코드의 push key
@@ -717,7 +741,7 @@ async function saveAgencyCode(key, data) {
     if (!code) throw new Error('진입 코드를 입력하세요');
     if (code.length > 30) throw new Error('진입 코드는 30자 이하로 입력하세요');
     if (!name) throw new Error('표시명을 입력하세요');
-    if (!['normal', 'observer', 'admin'].includes(role)) throw new Error('역할이 잘못되었습니다');
+    if (!['normal', 'observer', 'display', 'admin'].includes(role)) throw new Error('역할이 잘못되었습니다');
 
     // 코드 중복 체크 (다른 entry에 이미 같은 code가 있으면 차단)
     const dupCode = state.agencyCodesList.find(e => e.code === code && e._key !== key);
@@ -1358,6 +1382,9 @@ function getTotals() {
 function render() {
   const root = document.getElementById('app');
 
+  // 현재 view2를 body에 노출 → CSS에서 view별 처리 가능 (예: 표출 모드에서 설치 배너 숨김)
+  document.body.dataset.view = state.view2 || 'auth';
+
   // 미인증 → 로그인
   if (!state.session) {
     root.innerHTML = renderAuth();
@@ -1375,6 +1402,12 @@ function render() {
   if (state.view2 === 'observer') {
     root.innerHTML = renderObserverLobby();
     bindObserverLobbyEvents();
+    if (window.lucide) window.lucide.createIcons();
+    return;
+  }
+  if (state.view2 === 'display') {
+    root.innerHTML = renderDisplayView();
+    bindDisplayEvents();
     if (window.lucide) window.lucide.createIcons();
     return;
   }
@@ -1445,6 +1478,7 @@ function bindAuthEvents() {
       // 진입 후 기본 뷰 결정
       if      (agency.role === 'admin')    state.view2 = 'admin';
       else if (agency.role === 'observer') state.view2 = 'observer';
+      else if (agency.role === 'display')  state.view2 = 'display';
       else                                 state.view2 = 'lobby';
       sessionStorage.setItem('disaster_session', JSON.stringify(state.session));
       sessionStorage.setItem('disaster_view2',   state.view2);
@@ -1544,6 +1578,7 @@ function renderV2Header(title, subtitle, opts = {}) {
   const agencyName = sess?.agency?.name || '';
   const roleBadge = sess?.role === 'admin'    ? '<span class="px-2 py-0.5 rounded bg-purple-900/40 text-purple-300 text-[10px] mono">ADMIN</span>'
                   : sess?.role === 'observer' ? '<span class="px-2 py-0.5 rounded bg-sky-900/40 text-sky-300 text-[10px] mono">OBSERVER</span>'
+                  : sess?.role === 'display'  ? '<span class="px-2 py-0.5 rounded bg-rose-900/40 text-rose-300 text-[10px] mono">DISPLAY</span>'
                   :                              '<span class="px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300 text-[10px] mono">' + agencyName + '</span>';
   return `
     <div class="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-20">
@@ -1661,6 +1696,515 @@ function bindObserverLobbyEvents() {
   document.querySelectorAll('.v2-incident-item').forEach(el => {
     el.onclick = () => joinIncident(el.dataset.id);  // observer는 자동으로 읽기 전용
   });
+}
+
+// ===================================================================
+// 표출(TV) 모드 — view2='display'
+// 읽기 전용. 큰 글씨·고대비로 상황실 모니터/TV에 풀스크린 표출.
+// 트리아지 합계 + 이송 상태 + 병원별 이송현황을 한눈에 보여주고,
+// 클릭 시 해당 환자 목록·카드 상세를 큰 모달로 표시.
+// ===================================================================
+function renderDisplayView() {
+  // 재난방 미선택 → 피커 화면
+  if (!state.currentIncidentId) return renderDisplayPicker();
+  // 선택된 재난방의 메인 표출 화면
+  return renderDisplayMain();
+}
+
+function renderDisplayPicker() {
+  const all = state.incidents.filter(inc => !inc.closedAt);
+  return `
+    <div class="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center px-8">
+      <div class="text-center mb-12">
+        <h1 class="text-6xl font-black tracking-tight mb-3">MCI 통합 상황판</h1>
+        <p class="text-2xl text-slate-400">표출 모드 — 전시할 재난을 선택하세요</p>
+      </div>
+      <div class="w-full max-w-4xl">
+        ${all.length === 0 ? `
+          <div class="text-center text-2xl text-slate-500 py-20">진행 중인 재난이 없습니다.</div>
+        ` : all.map(inc => {
+          const agencyName = Object.values(AGENCY_CODES).find(a => a.id === inc.agencyId)?.name || inc.agencyId;
+          return `
+            <button class="display-pick-incident w-full text-left bg-slate-900 hover:bg-slate-800 border-2 border-slate-700 hover:border-pink-500 rounded-2xl p-6 mb-4 transition-all" data-id="${inc._key}">
+              <div class="text-3xl font-bold mb-2">${escapeHtml(inc.title || '제목 없음')}</div>
+              <div class="text-lg text-slate-400">
+                ${escapeHtml(agencyName)} · ${escapeHtml(inc.type || '재난')} · 시작 ${fmtTime(new Date(inc.startedAt))}
+              </div>
+            </button>
+          `;
+        }).join('')}
+      </div>
+      <button id="display-logout-picker" class="mt-12 text-slate-500 hover:text-slate-200 text-sm">로그아웃</button>
+    </div>
+  `;
+}
+
+function renderDisplayMain() {
+  const inc = state.incident || {};
+  const totalCount = state.mciCasualties.length;
+
+  // 트리아지 합계
+  const triageTotals = MCI_TRIAGE.map(tr => ({
+    ...tr,
+    count: state.mciCasualties.filter(c => c.triage === tr.id).length,
+    pediatricCount: state.mciCasualties.filter(c => c.triage === tr.id && c.isPediatric).length,
+  }));
+
+  // 이송 상태
+  const notTransported = state.mciCasualties.filter(c => c.notTransported);
+  const transported    = state.mciCasualties.filter(c => c.hospital && !c.notTransported);
+  const pending        = state.mciCasualties.filter(c => !c.hospital && !c.notTransported && c.triage !== 'dead');
+  const arrived        = state.mciCasualties.filter(c => c.arriveTime && !c.notTransported);
+  const inTransit      = transported.length - arrived.length;
+
+  // 병원별
+  const hospitalMap = {};
+  transported.forEach(c => {
+    const h = c.hospital;
+    if (!hospitalMap[h]) hospitalMap[h] = { total: 0, byTriage: {}, arrived: 0 };
+    hospitalMap[h].total++;
+    hospitalMap[h].byTriage[c.triage] = (hospitalMap[h].byTriage[c.triage] || 0) + 1;
+    if (c.arriveTime) hospitalMap[h].arrived++;
+  });
+  const hospitals = Object.entries(hospitalMap)
+    .map(([name, d]) => ({ name, ...d }))
+    .sort((a, b) => b.total - a.total);
+
+  return `
+    <div class="min-h-screen bg-slate-950 text-slate-100 p-6 select-none">
+
+      <!-- 헤더 -->
+      <header class="flex items-center justify-between mb-6 pb-4 border-b-2 border-slate-800">
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-rose-600 to-pink-700 flex items-center justify-center shadow-lg shadow-pink-900/50">
+            <i data-lucide="heart-pulse" class="w-8 h-8 text-white"></i>
+          </div>
+          <div>
+            <div class="text-3xl font-black tracking-tight">MCI 통합 상황판</div>
+            <div class="text-sm text-slate-400 tracking-widest uppercase">Mass Casualty Incident · 표출 모드</div>
+          </div>
+        </div>
+        <div class="flex-1 text-center">
+          <div class="text-3xl font-bold">${escapeHtml(inc.title || inc.location || '진행 중 재난')}</div>
+          <div class="text-base text-slate-400 mt-1">총 사상자 <span class="text-pink-300 font-black mono">${totalCount}</span>명</div>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-right">
+            <div id="display-clock" class="text-4xl font-black mono leading-none">--:--:--</div>
+            <div id="display-date" class="text-xs text-slate-500 mt-1">----</div>
+          </div>
+          <button id="display-change-incident" class="text-xs text-slate-400 hover:text-slate-200 px-3 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-700 ml-2" title="다른 재난 선택">
+            <i data-lucide="repeat" class="w-3.5 h-3.5 inline mr-1"></i>재난 변경
+          </button>
+          <button id="display-logout" class="text-xs text-slate-500 hover:text-slate-200 px-3 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-700" title="로그아웃">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- 트리아지 합계 (초대형) -->
+      <section class="mb-6">
+        <h2 class="text-2xl font-bold mb-3 flex items-center gap-2">
+          <div class="w-1.5 h-7 bg-pink-500 rounded-full"></div>
+          트리아지 합계
+        </h2>
+        <div class="grid grid-cols-4 gap-4">
+          ${triageTotals.map(tr => `
+            <button data-display-triage="${tr.id}" class="display-card triage-card-clickable rounded-2xl px-4 py-8 text-center transition-all cursor-pointer hover:brightness-125"
+              data-triage-card="${tr.id}"
+              style="background:${tr.bg}50; border:2px solid ${tr.color};">
+              <div class="text-2xl font-black tracking-wider mb-2" style="color:${tr.color}">${tr.shortName}·${tr.name}</div>
+              <div class="text-8xl font-black mono leading-none" style="color:${tr.color}">${tr.count}</div>
+              ${tr.pediatricCount > 0 ? `
+                <div class="text-base font-bold text-cyan-300 mt-3 flex items-center justify-center gap-1">
+                  <i data-lucide="baby" class="w-4 h-4"></i>소아 ${tr.pediatricCount}
+                </div>
+              ` : '<div class="mt-3 text-base">&nbsp;</div>'}
+            </button>
+          `).join('')}
+        </div>
+      </section>
+
+      <!-- 이송 상태 -->
+      <section class="mb-6">
+        <h2 class="text-2xl font-bold mb-3 flex items-center gap-2">
+          <div class="w-1.5 h-7 bg-blue-500 rounded-full"></div>
+          이송 상태
+        </h2>
+        <div class="grid grid-cols-4 gap-4">
+          <button data-display-transport="pending" class="display-card rounded-2xl px-4 py-6 text-center bg-slate-900 border-2 border-amber-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
+            <div class="text-xl font-bold tracking-wider text-amber-300">미배정</div>
+            <div class="text-7xl font-black mono mt-2 leading-none text-amber-400">${pending.length}</div>
+          </button>
+          <button data-display-transport="in-transit" class="display-card rounded-2xl px-4 py-6 text-center bg-slate-900 border-2 border-blue-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
+            <div class="text-xl font-bold tracking-wider text-blue-300">이송중</div>
+            <div class="text-7xl font-black mono mt-2 leading-none text-blue-400">${inTransit}</div>
+          </button>
+          <button data-display-transport="arrived" class="display-card rounded-2xl px-4 py-6 text-center bg-slate-900 border-2 border-emerald-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
+            <div class="text-xl font-bold tracking-wider text-emerald-300">병원 도착</div>
+            <div class="text-7xl font-black mono mt-2 leading-none text-emerald-400">${arrived.length}</div>
+          </button>
+          <button data-display-transport="not-transported" class="display-card rounded-2xl px-4 py-6 text-center bg-slate-900 border-2 border-violet-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
+            <div class="text-xl font-bold tracking-wider text-violet-300">미이송</div>
+            <div class="text-7xl font-black mono mt-2 leading-none text-violet-400">${notTransported.length}</div>
+          </button>
+        </div>
+      </section>
+
+      <!-- 병원별 이송 현황 -->
+      <section class="mb-6">
+        <h2 class="text-2xl font-bold mb-3 flex items-center gap-2">
+          <div class="w-1.5 h-7 bg-blue-500 rounded-full"></div>
+          병원별 이송 현황
+          <span class="ml-auto text-base text-slate-400 font-normal">${hospitals.length}개 병원</span>
+        </h2>
+        ${hospitals.length === 0 ? `
+          <div class="bg-slate-900 border-2 border-slate-800 rounded-2xl p-12 text-center text-2xl text-slate-500">아직 이송된 환자가 없습니다</div>
+        ` : `
+          <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            ${hospitals.map(h => `
+              <button data-display-hospital="${escapeHtml(h.name)}" class="display-card text-left rounded-2xl p-5 bg-slate-900 hover:bg-slate-800 border-2 border-slate-700 hover:border-blue-500 transition-all cursor-pointer">
+                <div class="text-xl font-bold mb-2 truncate" title="${escapeHtml(h.name)}">${escapeHtml(h.name)}</div>
+                <div class="flex items-baseline gap-2 mb-3">
+                  <span class="text-5xl font-black mono">${h.total}</span>
+                  <span class="text-base text-slate-400">명</span>
+                  <span class="ml-auto text-base text-emerald-400 font-bold">도착 ${h.arrived}</span>
+                </div>
+                <div class="flex flex-wrap gap-1">
+                  ${MCI_TRIAGE.map(tr => h.byTriage[tr.id] ? `
+                    <span class="text-sm px-2 py-0.5 rounded font-bold" style="background:${tr.bg};color:${tr.color}">
+                      ${tr.shortName} ${h.byTriage[tr.id]}
+                    </span>
+                  ` : '').join('')}
+                </div>
+              </button>
+            `).join('')}
+          </div>
+        `}
+      </section>
+
+      <!-- 푸터 -->
+      <footer class="text-center text-sm text-slate-600 mt-8">
+        실시간 동기화 · 카드를 클릭하면 상세 환자 정보를 확인할 수 있습니다.
+      </footer>
+
+      <!-- 드릴다운 모달 -->
+      ${state.displayModal ? renderDisplayModal() : ''}
+    </div>
+  `;
+}
+
+// 표출 모드 드릴다운 모달 — 트리아지/이송상태/병원별 클릭 시 환자 목록 또는 카드 상세
+function renderDisplayModal() {
+  const m = state.displayModal;
+  if (!m) return '';
+
+  // 환자 카드 상세
+  if (m.type === 'patient') {
+    const c = state.mciCasualties.find(x => x._key === m.value);
+    if (!c) { state.displayModal = null; return ''; }
+    return renderDisplayPatientCard(c);
+  }
+
+  // 환자 목록 (트리아지/이송상태/병원)
+  let title = '', subtitle = '', color = '#94a3b8', patients = [];
+  if (m.type === 'triage') {
+    const tr = MCI_TRIAGE.find(t => t.id === m.value);
+    if (!tr) { state.displayModal = null; return ''; }
+    title = `${tr.shortName} · ${tr.name}`;
+    color = tr.color;
+    patients = state.mciCasualties.filter(c => c.triage === m.value)
+      .sort((a, b) => (a.cardNo || 0) - (b.cardNo || 0));
+  } else if (m.type === 'transport') {
+    if (m.value === 'pending') {
+      title = '미배정'; color = '#f59e0b';
+      patients = state.mciCasualties.filter(c => !c.hospital && !c.notTransported && c.triage !== 'dead');
+    } else if (m.value === 'in-transit') {
+      title = '이송중'; color = '#60a5fa';
+      patients = state.mciCasualties.filter(c => c.hospital && !c.arriveTime && !c.notTransported);
+    } else if (m.value === 'arrived') {
+      title = '병원 도착'; color = '#34d399';
+      patients = state.mciCasualties.filter(c => c.arriveTime && !c.notTransported);
+    } else if (m.value === 'not-transported') {
+      title = '미이송'; color = '#a78bfa';
+      patients = state.mciCasualties.filter(c => c.notTransported);
+    }
+    const triageOrder = { emergency: 0, urgent: 1, nonurgent: 2, dead: 3 };
+    patients = patients.sort((a, b) => {
+      const oa = triageOrder[a.triage] ?? 9, ob = triageOrder[b.triage] ?? 9;
+      if (oa !== ob) return oa - ob;
+      return (a.cardNo || 0) - (b.cardNo || 0);
+    });
+  } else if (m.type === 'hospital') {
+    title = m.value; color = '#60a5fa';
+    subtitle = '이송 환자 목록';
+    const triageOrder = { emergency: 0, urgent: 1, nonurgent: 2, dead: 3 };
+    patients = state.mciCasualties.filter(c => c.hospital === m.value)
+      .sort((a, b) => {
+        const oa = triageOrder[a.triage] ?? 9, ob = triageOrder[b.triage] ?? 9;
+        if (oa !== ob) return oa - ob;
+        return (a.cardNo || 0) - (b.cardNo || 0);
+      });
+  }
+
+  return `
+    <div id="display-modal-bg" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-6">
+      <div class="bg-slate-900 border-2 rounded-3xl w-full max-w-6xl max-h-[92vh] flex flex-col shadow-2xl" style="border-color:${color}">
+        <div class="px-6 py-4 border-b-2 border-slate-800 flex items-center gap-4">
+          <div class="px-3 py-1 rounded-lg font-black text-lg" style="background:${color}30;color:${color}">${escapeHtml(title)}</div>
+          ${subtitle ? `<div class="text-lg text-slate-400">${escapeHtml(subtitle)}</div>` : ''}
+          <div class="text-lg text-slate-400">총 <span class="text-slate-100 font-bold mono">${patients.length}</span>명</div>
+          <button id="display-modal-close" class="ml-auto text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800">
+            <i data-lucide="x" class="w-7 h-7"></i>
+          </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4">
+          ${patients.length === 0 ? `
+            <div class="text-center text-2xl text-slate-500 py-20">해당하는 환자가 없습니다</div>
+          ` : `
+            <div class="divide-y-2 divide-slate-800">
+              ${patients.map(c => {
+                const tr = MCI_TRIAGE.find(t => t.id === c.triage);
+                const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '';
+                return `
+                  <button data-display-patient="${c._key}" class="w-full text-left px-4 py-3 hover:bg-slate-800 transition-colors flex items-center gap-3 text-lg">
+                    <span class="text-base text-slate-500 mono font-bold w-14 flex-shrink-0">${cardNo}</span>
+                    <span class="text-base px-2 py-1 rounded font-black flex-shrink-0" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.shortName || '?'}</span>
+                    ${c.isPediatric ? '<i data-lucide="baby" class="w-5 h-5 text-cyan-400 flex-shrink-0"></i>' : ''}
+                    <span class="font-bold ${c._autoNamed ? 'italic text-slate-400' : 'text-slate-100'} flex-shrink-0">${escapeHtml(c.name || '-')}</span>
+                    <span class="text-base text-slate-400 mono flex-shrink-0">${escapeHtml(c.age || '?')}/${c.gender || '?'}</span>
+                    ${c.location ? `<span class="text-base text-pink-300 truncate max-w-[260px] flex-shrink-0"><i data-lucide="map-pin" class="w-4 h-4 inline"></i>${escapeHtml(c.location)}</span>` : ''}
+                    <span class="flex-1 min-w-0 text-base text-slate-300 truncate">${escapeHtml(c.symptom || '')}</span>
+                    <div class="flex items-center gap-3 flex-shrink-0 text-base">
+                      ${c.notTransported
+                        ? '<span class="text-violet-400 font-bold">미이송</span>'
+                        : (c.hospital
+                            ? `<span class="text-emerald-300 truncate max-w-[160px]">${escapeHtml(c.hospital)}</span>`
+                            : '<span class="text-amber-400">미배정</span>')}
+                      ${c.arriveTime
+                        ? `<span class="text-emerald-400 mono">${c.arriveTime}</span>`
+                        : (c.departTime && !c.notTransported ? `<span class="text-amber-400 mono">${c.departTime}</span>` : '')}
+                    </div>
+                    <i data-lucide="chevron-right" class="w-5 h-5 text-slate-600 flex-shrink-0"></i>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          `}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderDisplayPatientCard(c) {
+  const tr = MCI_TRIAGE.find(t => t.id === c.triage);
+  const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '-';
+  const vital = [
+    c.rr ? `RR ${c.rr}` : '',
+    c.pulse ? `P ${c.pulse}` : '',
+    (c.bpSys && c.bpDia) ? `BP ${c.bpSys}/${c.bpDia}` : '',
+    c.spo2 ? `SpO₂ ${c.spo2}` : '',
+  ].filter(Boolean).join(' · ');
+
+  return `
+    <div id="display-modal-bg" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-6">
+      <div class="bg-slate-900 border-2 rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl" style="border-color:${tr?.color || '#94a3b8'}">
+        <!-- 헤더 -->
+        <div class="px-6 py-4 border-b-2 border-slate-800 flex items-center gap-3 flex-wrap">
+          <span class="text-2xl mono font-bold text-slate-300">${cardNo}</span>
+          <span class="text-xl px-3 py-1 rounded-lg font-black" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.shortName || '?'} · ${tr?.name || '미분류'}</span>
+          ${c.isPediatric ? '<span class="text-cyan-300 text-base px-2 py-1 rounded bg-cyan-950/50 flex items-center gap-1"><i data-lucide="baby" class="w-4 h-4"></i>소아</span>' : ''}
+          <span class="text-2xl font-bold ${c._autoNamed ? 'italic text-slate-400' : 'text-slate-100'}">${escapeHtml(c.name || '-')}</span>
+          <button id="display-modal-close" class="ml-auto text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800">
+            <i data-lucide="x" class="w-7 h-7"></i>
+          </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6 space-y-4 text-base">
+          <!-- 기본 정보 -->
+          <div class="grid grid-cols-3 gap-4">
+            <div class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+              <div class="text-xs text-slate-500 tracking-wider uppercase mb-1">연령 / 성별</div>
+              <div class="text-2xl mono text-slate-100">${escapeHtml(c.age || '-')} / ${c.gender || '-'}</div>
+            </div>
+            <div class="col-span-2 bg-slate-950 rounded-xl p-4 border border-slate-800">
+              <div class="text-xs text-slate-500 tracking-wider uppercase mb-1 flex items-center gap-1"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-pink-400"></i>발견장소</div>
+              <div class="text-xl ${c.location ? 'text-pink-200' : 'text-slate-600'}">${escapeHtml(c.location || '미입력')}</div>
+            </div>
+          </div>
+          <!-- 의식 + 생체징후 -->
+          <div class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+            <div class="text-xs text-slate-500 tracking-wider uppercase mb-2">의식 · 생체징후</div>
+            <div class="flex items-center gap-4 flex-wrap">
+              <div>
+                <span class="text-xs text-slate-500">AVPU</span>
+                ${c.consciousness ? `<span class="text-xl ml-2 px-3 py-1 rounded bg-slate-800 text-slate-100 font-bold">${c.consciousness}</span>` : '<span class="text-slate-600 ml-2">미입력</span>'}
+              </div>
+              <div class="text-xl mono text-slate-200">${vital || '<span class="text-slate-600">생체징후 미입력</span>'}</div>
+            </div>
+          </div>
+          <!-- 주증상 / 손상 / 처치 -->
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+              <div class="text-xs text-slate-500 tracking-wider uppercase mb-1">주증상</div>
+              <div class="text-xl ${c.symptom ? 'text-slate-100' : 'text-slate-600'}">${escapeHtml(c.symptom || '미입력')}</div>
+            </div>
+            <div class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+              <div class="text-xs text-slate-500 tracking-wider uppercase mb-1">손상기전 / 부위</div>
+              <div class="text-lg text-slate-100">${escapeHtml(c.mechanism || '-')}</div>
+              <div class="flex flex-wrap gap-1 mt-1">
+                ${(Array.isArray(c.injuryParts) ? c.injuryParts : []).map(p => `
+                  <span class="text-sm px-2 py-0.5 rounded bg-amber-950/40 border border-amber-700/40 text-amber-200">${escapeHtml(p)}</span>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+          <div class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+            <div class="text-xs text-slate-500 tracking-wider uppercase mb-2">처치 내용</div>
+            <div class="flex flex-wrap gap-2">
+              ${(Array.isArray(c.treatments) && c.treatments.length ? c.treatments : []).map(t => `
+                <span class="text-base px-3 py-1 rounded-lg bg-emerald-950/50 border border-emerald-700/50 text-emerald-200 font-bold">${escapeHtml(t)}</span>
+              `).join('') || '<span class="text-slate-600 text-base">미입력</span>'}
+            </div>
+            ${c.drugs ? `<div class="text-sm text-slate-400 mt-2">투여 약물: <span class="text-slate-200">${escapeHtml(c.drugs)}</span></div>` : ''}
+          </div>
+          <!-- 이송 -->
+          <div class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+            <div class="text-xs text-slate-500 tracking-wider uppercase mb-2 flex items-center gap-1"><i data-lucide="ambulance" class="w-3.5 h-3.5 text-blue-400"></i>이송 정보</div>
+            ${c.notTransported ? `
+              <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-violet-950/40 border border-violet-700/50 text-violet-200 text-lg font-bold mb-2">
+                <i data-lucide="home" class="w-5 h-5"></i>미이송 (자체귀가) — 병원 이송 없음
+              </div>
+            ` : ''}
+            <div class="grid grid-cols-3 gap-3">
+              <div>
+                <div class="text-xs text-slate-500">병원</div>
+                <div class="text-lg ${c.hospital ? 'text-slate-100 font-medium' : 'text-slate-600'}">${escapeHtml(c.hospital || (c.notTransported ? '해당없음' : '미배정'))}</div>
+              </div>
+              <div>
+                <div class="text-xs text-slate-500">출발</div>
+                <div class="text-lg mono ${c.departTime ? 'text-slate-200' : 'text-slate-600'}">${c.departTime || '-'}</div>
+              </div>
+              <div>
+                <div class="text-xs text-slate-500">도착</div>
+                <div class="text-lg mono ${c.arriveTime ? 'text-emerald-400 font-bold' : 'text-slate-600'}">${c.arriveTime || '-'}</div>
+              </div>
+            </div>
+          </div>
+          ${c.notes ? `
+            <div class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+              <div class="text-xs text-slate-500 tracking-wider uppercase mb-1">기타 메모</div>
+              <div class="text-lg text-slate-200 whitespace-pre-wrap">${escapeHtml(c.notes)}</div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// 표출 모드 이벤트 바인딩 — picker / main / modal
+function bindDisplayEvents() {
+  // 로그아웃 (picker · main 공통)
+  ['display-logout', 'display-logout-picker'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.onclick = () => {
+      sessionStorage.removeItem('disaster_session');
+      sessionStorage.removeItem('disaster_view2');
+      sessionStorage.removeItem('disaster_currentIncidentId');
+      state.session = null;
+      state.view2 = 'auth';
+      state.currentIncidentId = null;
+      rebindIncidentRealtime();
+      render();
+    };
+  });
+
+  // picker — 재난 선택
+  document.querySelectorAll('.display-pick-incident').forEach(btn => {
+    btn.onclick = () => {
+      state.currentIncidentId = btn.dataset.id;
+      sessionStorage.setItem('disaster_currentIncidentId', btn.dataset.id);
+      rebindIncidentRealtime();
+      render();
+    };
+  });
+
+  // main — 재난 변경 (picker로 복귀)
+  const changeBtn = document.getElementById('display-change-incident');
+  if (changeBtn) changeBtn.onclick = () => {
+    state.currentIncidentId = null;
+    state.displayModal = null;
+    sessionStorage.removeItem('disaster_currentIncidentId');
+    rebindIncidentRealtime();
+    render();
+  };
+
+  // 트리아지 카드 → 환자 목록 모달
+  document.querySelectorAll('[data-display-triage]').forEach(btn => {
+    btn.onclick = () => {
+      state.displayModal = { type: 'triage', value: btn.dataset.displayTriage };
+      render();
+    };
+  });
+
+  // 이송 상태 카드 → 환자 목록 모달
+  document.querySelectorAll('[data-display-transport]').forEach(btn => {
+    btn.onclick = () => {
+      state.displayModal = { type: 'transport', value: btn.dataset.displayTransport };
+      render();
+    };
+  });
+
+  // 병원 카드 → 환자 목록 모달
+  document.querySelectorAll('[data-display-hospital]').forEach(btn => {
+    btn.onclick = () => {
+      state.displayModal = { type: 'hospital', value: btn.dataset.displayHospital };
+      render();
+    };
+  });
+
+  // 환자 목록 행 → 카드 상세
+  document.querySelectorAll('[data-display-patient]').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      state.displayModal = { type: 'patient', value: btn.dataset.displayPatient };
+      render();
+    };
+  });
+
+  // 모달 닫기 (X / 배경)
+  const closeBtn = document.getElementById('display-modal-close');
+  if (closeBtn) closeBtn.onclick = () => { state.displayModal = null; render(); };
+  const bg = document.getElementById('display-modal-bg');
+  if (bg) bg.onclick = (e) => { if (e.target.id === 'display-modal-bg') { state.displayModal = null; render(); } };
+
+  // 시계 (1초마다 갱신)
+  startDisplayClock();
+}
+
+// 표출 모드 시계 — 한 인스턴스만 동작하도록 관리
+let _displayClockTimer = null;
+function startDisplayClock() {
+  if (_displayClockTimer) clearInterval(_displayClockTimer);
+  const tick = () => {
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const clockEl = document.getElementById('display-clock');
+    const dateEl = document.getElementById('display-date');
+    if (clockEl) clockEl.textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    if (dateEl) {
+      const weekdays = ['일','월','화','수','목','금','토'];
+      dateEl.textContent = `${now.getFullYear()}.${pad(now.getMonth()+1)}.${pad(now.getDate())} (${weekdays[now.getDay()]})`;
+    }
+    // 표출 모드 벗어났으면 정지
+    if (state.view2 !== 'display') {
+      clearInterval(_displayClockTimer);
+      _displayClockTimer = null;
+    }
+  };
+  tick();
+  _displayClockTimer = setInterval(tick, 1000);
 }
 
 // ----- 관리자 콘솔 — 시스템 통계 패널 -----
@@ -1856,8 +2400,8 @@ function renderAdminConsole() {
 // ----- 관리자 콘솔 — 관서 코드 관리 패널 (CRUD) -----
 function renderAdminAgencyCodesPanel() {
   const list = [...state.agencyCodesList].sort((a, b) => {
-    // admin → observer → normal 순 + 가나다순
-    const order = { admin: 0, observer: 1, normal: 2 };
+    // admin → observer → display → normal 순 + 가나다순
+    const order = { admin: 0, observer: 1, display: 2, normal: 3 };
     const oa = order[a.role] ?? 9, ob = order[b.role] ?? 9;
     if (oa !== ob) return oa - ob;
     return (a.name || '').localeCompare(b.name || '', 'ko');
@@ -1891,6 +2435,7 @@ function renderAdminAgencyCodesPanel() {
             <select id="admin-code-add-role" class="bg-slate-900 border border-slate-800 rounded-md px-2 py-1.5 text-xs">
               <option value="normal">normal · 일반관서</option>
               <option value="observer">observer · 읽기전용</option>
+              <option value="display">display · TV 표출</option>
               <option value="admin">admin · 전권</option>
             </select>
           </div>
@@ -1915,6 +2460,7 @@ function renderAdminAgencyCodesPanel() {
           const roleColor =
               e.role === 'admin'    ? 'bg-purple-900/40 text-purple-200 border-purple-700/50'
             : e.role === 'observer' ? 'bg-sky-900/40 text-sky-200 border-sky-700/50'
+            : e.role === 'display'  ? 'bg-rose-900/40 text-rose-200 border-rose-700/50'
             :                          'bg-emerald-900/40 text-emerald-200 border-emerald-700/50';
 
           return isEditing ? `
@@ -1926,6 +2472,7 @@ function renderAdminAgencyCodesPanel() {
                 <select data-edit-role class="bg-slate-900 border border-slate-800 rounded-md px-2 py-1 text-xs">
                   <option value="normal"   ${e.role === 'normal'   ? 'selected' : ''}>normal</option>
                   <option value="observer" ${e.role === 'observer' ? 'selected' : ''}>observer</option>
+                  <option value="display"  ${e.role === 'display'  ? 'selected' : ''}>display</option>
                   <option value="admin"    ${e.role === 'admin'    ? 'selected' : ''}>admin</option>
                 </select>
                 <div class="flex gap-1">
@@ -4953,6 +5500,99 @@ boot();
         .catch(err => console.warn('[PWA] Service Worker 등록 실패:', err));
     });
   }
+</script>
+
+<!-- ==================== "앱 설치" 배너 제어 ====================
+     - Android Chrome/삼성인터넷 등: beforeinstallprompt 이벤트 받으면 배너 노출
+     - iOS Safari: beforeinstallprompt 미지원 → 별도 안내 문구
+     - 이미 설치(standalone) 상태 또는 사용자가 ✕로 닫은 적 있으면 노출 안 함
+================================================================ -->
+<script>
+  (function () {
+    let deferredInstallPrompt = null;
+    const STORAGE_KEY = 'mci_install_dismissed';
+
+    function $(id) { return document.getElementById(id); }
+
+    // 이미 설치된 상태(standalone)인지 체크
+    function isInstalled() {
+      return window.matchMedia('(display-mode: standalone)').matches
+          || window.navigator.standalone === true;
+    }
+
+    // 사용자가 이전에 ✕로 닫았는지
+    function wasDismissed() {
+      try { return localStorage.getItem(STORAGE_KEY) === '1'; } catch { return false; }
+    }
+
+    function showBanner() {
+      const banner = $('install-banner');
+      if (banner) {
+        banner.style.display = 'flex';
+        if (window.lucide) window.lucide.createIcons();
+      }
+    }
+
+    function hideBanner() {
+      const banner = $('install-banner');
+      if (banner) banner.style.display = 'none';
+    }
+
+    // ── 1) Android/Chrome/삼성인터넷: beforeinstallprompt 처리 ──
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();              // 기본 미니 인포바 차단 → 우리 배너로 대체
+      deferredInstallPrompt = e;
+      if (isInstalled() || wasDismissed()) return;
+      showBanner();
+    });
+
+    // 설치 완료 이벤트 → 배너 영구 숨김
+    window.addEventListener('appinstalled', () => {
+      hideBanner();
+      deferredInstallPrompt = null;
+      try { localStorage.setItem(STORAGE_KEY, '1'); } catch {}
+      console.log('[PWA] 앱 설치 완료');
+    });
+
+    // ── 2) DOM 준비 후 버튼 이벤트 바인딩 + iOS Safari 별도 처리 ──
+    function bindBannerEvents() {
+      const installBtn  = $('install-btn');
+      const dismissBtn  = $('install-dismiss');
+      const desc        = $('install-banner-desc');
+
+      if (installBtn) {
+        installBtn.onclick = async () => {
+          if (!deferredInstallPrompt) return;
+          deferredInstallPrompt.prompt();
+          try { await deferredInstallPrompt.userChoice; } catch {}
+          deferredInstallPrompt = null;
+          hideBanner();
+        };
+      }
+      if (dismissBtn) {
+        dismissBtn.onclick = () => {
+          hideBanner();
+          try { localStorage.setItem(STORAGE_KEY, '1'); } catch {}
+        };
+      }
+
+      // iOS Safari 별도 안내 (beforeinstallprompt 미지원)
+      const ua = navigator.userAgent;
+      const isIOS = /iPhone|iPad|iPod/.test(ua);
+      const isIOSSafari = isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+      if (isIOSSafari && !isInstalled() && !wasDismissed()) {
+        if (desc) desc.textContent = '하단 공유 ⬆️ → "홈 화면에 추가" 선택';
+        if (installBtn) installBtn.style.display = 'none';
+        showBanner();
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', bindBannerEvents);
+    } else {
+      bindBannerEvents();
+    }
+  })();
 </script>
 
 </body>
