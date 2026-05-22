@@ -392,26 +392,50 @@
   }
   body.outdoor-mode #outdoor-toggle:hover { background-color: #334155 !important; }
 
-  /* ── 표출(TV) 모드 — 설치 배너·외부모드 토글 숨김 (상황실 화면에 불필요) ── */
-  body[data-view="display"] #install-banner,
-  body[data-view="display"] #outdoor-toggle {
+  /* ── 표출(TV) 모드 — 설치 배너만 숨김 (외부 모드 토글은 사용 가능하도록 유지) ── */
+  body[data-view="display"] #install-banner {
     display: none !important;
   }
+  /* 표출 모드에서 외부 모드 토글은 좌하단에 표시되지만 크기 약간 축소 */
+  body[data-view="display"] #outdoor-toggle {
+    width: 2.5rem;
+    height: 2.5rem;
+    opacity: 0.7;
+  }
+  body[data-view="display"] #outdoor-toggle:hover {
+    opacity: 1;
+  }
 
-  /* ── 표출 모드 병원 그리드 — 화면 폭에 따라 열 개수 자동 조정 ──
-       - 최소 폭 240px 보장 (모바일에서도 가독)
-       - HD(1280px): 4~5열, FHD(1920px): 6~7열, 4K: 12+열
-       - 부모 섹션이 flex-1 min-h-0 → 남는 세로 공간 자동으로 차지
-       - 카드가 공간 넘치면 내부 스크롤 (페이지 자체는 항상 100vh 고정) */
+  /* ── 표출 모드 병원 그리드 — 한 줄 강제 배치 + 가로 폭 자동 분할 ──
+       grid-template-columns는 인라인 style로 동적 지정 (병원 수 = N → repeat(N, 1fr))
+       전체 그리드 폭을 N등분하여 빈 공간 없이 카드들이 가로로 펼쳐짐 */
   .display-hospital-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 0.875rem;
+    gap: 0.75rem;
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding-right: 4px;      /* 스크롤바 공간 */
-    align-content: start;    /* 카드 수가 적을 때 위로 정렬 */
+    padding-right: 4px;
+    align-content: start;
+  }
+
+  /* ── 표출 모드 외부(밝은) 모드 — 라이트 톤 배경 + 카드 흰 배경 + 그림자 ── */
+  body.outdoor-mode[data-view="display"] > #app > div[style*="radial-gradient"] {
+    background: radial-gradient(ellipse at top, #ffffff 0%, #f1f5f9 50%, #e2e8f0 100%) !important;
+  }
+  body.outdoor-mode[data-view="display"] .display-card {
+    background: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+  }
+  body.outdoor-mode[data-view="display"] .display-card:hover {
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15) !important;
+  }
+  /* 표출 모드 라이트 - 시계 색상 더 진하게 */
+  body.outdoor-mode[data-view="display"] #display-clock {
+    color: #047857 !important;          /* emerald-700 — 라이트 배경에서 또렷 */
+  }
+  body.outdoor-mode[data-view="display"] [class*="border-emerald-700"] {
+    border-color: #059669 !important;
   }
   /* 스크롤바 — 어두운 톤에 맞게 */
   .display-hospital-grid::-webkit-scrollbar { width: 8px; }
@@ -1802,7 +1826,7 @@ function renderDisplayMain() {
     .sort((a, b) => b.total - a.total);
 
   return `
-    <div class="h-screen bg-slate-950 text-slate-100 p-6 select-none flex flex-col overflow-hidden">
+    <div class="h-screen text-slate-100 p-6 select-none flex flex-col overflow-hidden" style="background: radial-gradient(ellipse at top, #1e293b 0%, #020617 50%, #020617 100%);">
 
       <!-- 헤더 -->
       <header class="flex-shrink-0 flex items-center justify-between mb-6 pb-4 border-b-2 border-slate-800 gap-4">
@@ -1844,53 +1868,53 @@ function renderDisplayMain() {
       </header>
 
       <!-- 트리아지 합계 (초대형) -->
-      <section class="flex-shrink-0 mb-6">
+      <section class="flex-shrink-0 mb-5">
         <h2 class="mb-3 flex items-baseline gap-3">
-          <div class="w-1.5 h-7 bg-pink-500 rounded-full self-center"></div>
+          <div class="w-1.5 h-7 bg-pink-500 rounded-full self-center shadow-lg shadow-pink-500/50"></div>
           <span class="text-2xl font-bold">트리아지 합계</span>
           <span class="text-base text-slate-400 font-normal">— 총</span>
           <span class="text-3xl font-black mono text-pink-300 leading-none">${totalCount}</span>
           <span class="text-base text-slate-400 font-normal">명</span>
         </h2>
-        <div class="grid grid-cols-4 gap-4">
+        <div class="grid grid-cols-4 gap-3">
           ${triageTotals.map(tr => `
-            <button data-display-triage="${tr.id}" class="display-card triage-card-clickable rounded-2xl px-4 py-8 text-center transition-all cursor-pointer hover:brightness-125"
+            <button data-display-triage="${tr.id}" class="display-card triage-card-clickable rounded-2xl px-3 py-6 text-center transition-all cursor-pointer hover:brightness-110 hover:scale-[1.02]"
               data-triage-card="${tr.id}"
-              style="background:${tr.bg}50; border:2px solid ${tr.color};">
-              <div class="text-2xl font-black tracking-wider mb-2" style="color:${tr.color}">${tr.shortName}·${tr.name}</div>
-              <div class="text-8xl font-black mono leading-none" style="color:${tr.color}">${tr.count}</div>
+              style="background: linear-gradient(135deg, ${tr.bg}70, ${tr.bg}40); border:2px solid ${tr.color}; box-shadow: 0 6px 20px ${tr.color}25, inset 0 1px 0 ${tr.color}30;">
+              <div class="text-xl font-black tracking-wider mb-2" style="color:${tr.color}">${tr.shortName}·${tr.name}</div>
+              <div class="text-7xl font-black mono leading-none drop-shadow-lg" style="color:${tr.color}">${tr.count}</div>
               ${tr.pediatricCount > 0 ? `
-                <div class="text-base font-bold text-cyan-300 mt-3 flex items-center justify-center gap-1">
+                <div class="text-sm font-bold text-cyan-300 mt-2 flex items-center justify-center gap-1">
                   <i data-lucide="baby" class="w-4 h-4"></i>소아 ${tr.pediatricCount}
                 </div>
-              ` : '<div class="mt-3 text-base">&nbsp;</div>'}
+              ` : '<div class="mt-2 text-sm">&nbsp;</div>'}
             </button>
           `).join('')}
         </div>
       </section>
 
       <!-- 이송 상태 -->
-      <section class="flex-shrink-0 mb-6">
+      <section class="flex-shrink-0 mb-5">
         <h2 class="text-2xl font-bold mb-3 flex items-center gap-2">
-          <div class="w-1.5 h-7 bg-blue-500 rounded-full"></div>
+          <div class="w-1.5 h-7 bg-blue-500 rounded-full shadow-lg shadow-blue-500/50"></div>
           이송 상태
         </h2>
-        <div class="grid grid-cols-4 gap-4">
-          <button data-display-transport="pending" class="display-card rounded-2xl px-4 py-6 text-center bg-slate-900 border-2 border-amber-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
-            <div class="text-xl font-bold tracking-wider text-amber-300">미배정</div>
-            <div class="text-7xl font-black mono mt-2 leading-none text-amber-400">${pending.length}</div>
+        <div class="grid grid-cols-4 gap-3">
+          <button data-display-transport="pending" class="display-card rounded-2xl px-4 py-5 text-center bg-gradient-to-br from-amber-950/50 to-slate-900 border-2 border-amber-700/60 cursor-pointer hover:from-amber-900/60 transition-all hover:scale-[1.02] shadow-lg shadow-amber-950/40">
+            <div class="text-lg font-bold tracking-wider text-amber-300">미배정</div>
+            <div class="text-6xl font-black mono mt-1.5 leading-none text-amber-400 drop-shadow-lg">${pending.length}</div>
           </button>
-          <button data-display-transport="in-transit" class="display-card rounded-2xl px-4 py-6 text-center bg-slate-900 border-2 border-blue-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
-            <div class="text-xl font-bold tracking-wider text-blue-300">이송중</div>
-            <div class="text-7xl font-black mono mt-2 leading-none text-blue-400">${inTransit}</div>
+          <button data-display-transport="in-transit" class="display-card rounded-2xl px-4 py-5 text-center bg-gradient-to-br from-blue-950/50 to-slate-900 border-2 border-blue-700/60 cursor-pointer hover:from-blue-900/60 transition-all hover:scale-[1.02] shadow-lg shadow-blue-950/40">
+            <div class="text-lg font-bold tracking-wider text-blue-300">이송중</div>
+            <div class="text-6xl font-black mono mt-1.5 leading-none text-blue-400 drop-shadow-lg">${inTransit}</div>
           </button>
-          <button data-display-transport="arrived" class="display-card rounded-2xl px-4 py-6 text-center bg-slate-900 border-2 border-emerald-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
-            <div class="text-xl font-bold tracking-wider text-emerald-300">병원 도착</div>
-            <div class="text-7xl font-black mono mt-2 leading-none text-emerald-400">${arrived.length}</div>
+          <button data-display-transport="arrived" class="display-card rounded-2xl px-4 py-5 text-center bg-gradient-to-br from-emerald-950/50 to-slate-900 border-2 border-emerald-700/60 cursor-pointer hover:from-emerald-900/60 transition-all hover:scale-[1.02] shadow-lg shadow-emerald-950/40">
+            <div class="text-lg font-bold tracking-wider text-emerald-300">병원 도착</div>
+            <div class="text-6xl font-black mono mt-1.5 leading-none text-emerald-400 drop-shadow-lg">${arrived.length}</div>
           </button>
-          <button data-display-transport="not-transported" class="display-card rounded-2xl px-4 py-6 text-center bg-slate-900 border-2 border-violet-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
-            <div class="text-xl font-bold tracking-wider text-violet-300">미이송</div>
-            <div class="text-7xl font-black mono mt-2 leading-none text-violet-400">${notTransported.length}</div>
+          <button data-display-transport="not-transported" class="display-card rounded-2xl px-4 py-5 text-center bg-gradient-to-br from-violet-950/50 to-slate-900 border-2 border-violet-700/60 cursor-pointer hover:from-violet-900/60 transition-all hover:scale-[1.02] shadow-lg shadow-violet-950/40">
+            <div class="text-lg font-bold tracking-wider text-violet-300">미이송</div>
+            <div class="text-6xl font-black mono mt-1.5 leading-none text-violet-400 drop-shadow-lg">${notTransported.length}</div>
           </button>
         </div>
       </section>
@@ -1905,20 +1929,27 @@ function renderDisplayMain() {
         ${hospitals.length === 0 ? `
           <div class="bg-slate-900 border-2 border-slate-800 rounded-2xl p-12 text-center text-2xl text-slate-500">아직 이송된 환자가 없습니다</div>
         ` : `
-          <!-- display-hospital-grid: auto-fit minmax → 화면 폭에 따라 열 개수 자동 조정
-               많은 병원(20+) 시 max-height + 스크롤로 다른 섹션 보호 -->
-          <div class="display-hospital-grid">
+          <!-- display-hospital-grid:
+               병원 수에 맞춰 정확히 N개 컬럼으로 한 줄 분할 (inline style로 동적 지정).
+               병원이 매우 많을 때(15+)는 자동 줄바꿈으로 폴백. -->
+          <div class="display-hospital-grid" style="grid-template-columns: repeat(${Math.min(hospitals.length, 15)}, minmax(0, 1fr));">
             ${hospitals.map(h => `
-              <button data-display-hospital="${escapeHtml(h.name)}" class="display-card text-left rounded-2xl p-4 bg-slate-900 hover:bg-slate-800 border-2 border-slate-700 hover:border-blue-500 transition-all cursor-pointer">
-                <div class="text-lg font-bold mb-1.5 truncate" title="${escapeHtml(h.name)}">${escapeHtml(h.name)}</div>
-                <div class="flex items-baseline gap-2 mb-2">
-                  <span class="text-4xl font-black mono leading-none">${h.total}</span>
-                  <span class="text-sm text-slate-400">명</span>
-                  <span class="ml-auto text-sm text-emerald-400 font-bold">도착 ${h.arrived}</span>
+              <button data-display-hospital="${escapeHtml(h.name)}" class="display-card group flex flex-col items-center justify-between rounded-2xl p-3 bg-gradient-to-br from-slate-900 to-slate-800/80 hover:from-slate-800 hover:to-slate-700 border-2 border-slate-700 hover:border-blue-500 transition-all cursor-pointer shadow-lg shadow-slate-950/30 min-w-0">
+                <!-- 병원명 -->
+                <div class="text-base font-bold text-center mb-2 truncate w-full" title="${escapeHtml(h.name)}">${escapeHtml(h.name)}</div>
+                <!-- 인원수 (메인) -->
+                <div class="flex items-baseline justify-center gap-1.5 mb-1">
+                  <span class="text-4xl font-black mono leading-none text-slate-100">${h.total}</span>
+                  <span class="text-sm text-slate-400 font-medium">명</span>
                 </div>
-                <div class="flex flex-wrap gap-1">
+                <!-- 도착 표시 -->
+                <div class="text-xs text-emerald-400 font-bold mb-2 flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>도착 ${h.arrived}
+                </div>
+                <!-- 트리아지별 환자 분포 -->
+                <div class="flex flex-wrap justify-center gap-1 w-full">
                   ${MCI_TRIAGE.map(tr => h.byTriage[tr.id] ? `
-                    <span class="text-xs px-1.5 py-0.5 rounded font-bold" style="background:${tr.bg};color:${tr.color}">
+                    <span class="text-[11px] px-1.5 py-0.5 rounded font-black" style="background:${tr.bg};color:${tr.color}">
                       ${tr.shortName} ${h.byTriage[tr.id]}
                     </span>
                   ` : '').join('')}
