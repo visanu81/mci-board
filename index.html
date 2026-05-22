@@ -420,49 +420,57 @@
   }
 
   /* ── 표출 모드 외부(밝은) 모드 ──
-       페이지 배경: 부드러운 라이트 톤 라디얼 그라데이션
-       단, 트리아지·이송 상태 카드는 솔리드 컬러 유지 (인라인 스타일이 둘 다 모드에서 보임)
-       흰 배경 적용은 병원 카드와 헤더 시계 패널에만 한정. */
-  body.outdoor-mode[data-view="display"] > #app > div[style*="radial-gradient"] {
-    background: radial-gradient(ellipse at top, #ffffff 0%, #f1f5f9 50%, #cbd5e1 100%) !important;
+       페이지 배경: 솔리드 라이트
+       트리아지 카드: 솔리드 컬러 그대로 (인라인 스타일이 둘 다 모드에서 보임)
+       이송 상태 카드: 어두운 슬레이트 → 라이트 톤으로 (반투명 톤 유지)
+       병원 카드: 흰 배경 */
+  body.outdoor-mode[data-view="display"] > #app > div.h-screen.bg-slate-950 {
+    background: #f1f5f9 !important;
   }
-  /* 병원 카드만 흰 배경 + 그림자 (트리아지/이송 상태는 솔리드 컬러 그대로) */
+  /* 이송 상태 카드 — 라이트 모드: 거의 흰 배경 + 색상 보더 + 진한 텍스트 */
+  body.outdoor-mode[data-view="display"] [data-display-transport] {
+    background: #ffffff !important;
+  }
+  body.outdoor-mode[data-view="display"] [data-display-transport].border-amber-700\/60 { border-color: #d97706 !important; }
+  body.outdoor-mode[data-view="display"] [data-display-transport].border-blue-700\/60   { border-color: #2563eb !important; }
+  body.outdoor-mode[data-view="display"] [data-display-transport].border-emerald-700\/60 { border-color: #059669 !important; }
+  body.outdoor-mode[data-view="display"] [data-display-transport].border-violet-700\/60  { border-color: #7c3aed !important; }
+  body.outdoor-mode[data-view="display"] [data-display-transport] .text-amber-300   { color: #b45309 !important; }
+  body.outdoor-mode[data-view="display"] [data-display-transport] .text-amber-400   { color: #d97706 !important; }
+  body.outdoor-mode[data-view="display"] [data-display-transport] .text-blue-300    { color: #1d4ed8 !important; }
+  body.outdoor-mode[data-view="display"] [data-display-transport] .text-blue-400    { color: #2563eb !important; }
+  body.outdoor-mode[data-view="display"] [data-display-transport] .text-emerald-300 { color: #047857 !important; }
+  body.outdoor-mode[data-view="display"] [data-display-transport] .text-emerald-400 { color: #059669 !important; }
+  body.outdoor-mode[data-view="display"] [data-display-transport] .text-violet-300  { color: #6d28d9 !important; }
+  body.outdoor-mode[data-view="display"] [data-display-transport] .text-violet-400  { color: #7c3aed !important; }
+  body.outdoor-mode[data-view="display"] [data-display-transport]:hover {
+    background: #f8fafc !important;
+  }
+  /* 병원 카드 — 라이트 모드: 흰 배경 + 진한 텍스트 */
   body.outdoor-mode[data-view="display"] [data-display-hospital] {
     background: #ffffff !important;
     border-color: #cbd5e1 !important;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1) !important;
   }
   body.outdoor-mode[data-view="display"] [data-display-hospital]:hover {
-    border-color: #3b82f6 !important;
-    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18) !important;
+    border-color: #06b6d4 !important;
+    background: #f8fafc !important;
   }
-  /* 병원 카드 안 텍스트 — 라이트 배경 위 진한 슬레이트 */
-  body.outdoor-mode[data-view="display"] [data-display-hospital] > div {
-    color: #0f172a !important;
-  }
-  body.outdoor-mode[data-view="display"] [data-display-hospital] .text-slate-100 {
-    color: #0f172a !important;
-  }
-  body.outdoor-mode[data-view="display"] [data-display-hospital] .text-slate-400 {
-    color: #475569 !important;
-  }
-  body.outdoor-mode[data-view="display"] [data-display-hospital] .text-emerald-400 {
-    color: #059669 !important;
-  }
+  body.outdoor-mode[data-view="display"] [data-display-hospital] > div { color: #0f172a !important; }
+  body.outdoor-mode[data-view="display"] [data-display-hospital] .text-slate-100 { color: #0f172a !important; }
+  body.outdoor-mode[data-view="display"] [data-display-hospital] .text-slate-400 { color: #475569 !important; }
+  body.outdoor-mode[data-view="display"] [data-display-hospital] .text-emerald-400 { color: #059669 !important; }
   /* 시계 패널 — 라이트 모드 톤 */
   body.outdoor-mode[data-view="display"] #display-clock {
     color: #047857 !important;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.05);
   }
   body.outdoor-mode[data-view="display"] [class*="border-emerald-700"] {
     border-color: #10b981 !important;
   }
-  /* 진행 중 재난 라벨 + 재난 이름 색상 */
+  /* 진행 중 재난 라벨 색상 */
   body.outdoor-mode[data-view="display"] .text-pink-300\/80 {
     color: #be185d !important;
   }
-  /* 섹션 헤더 색상 바는 그대로 유지 (이미 진한 색) */
-  /* 푸터 텍스트 */
+  /* 푸터 */
   body.outdoor-mode[data-view="display"] footer {
     color: #475569 !important;
   }
@@ -1858,7 +1866,7 @@ function renderDisplayMain() {
     .sort((a, b) => b.total - a.total);
 
   return `
-    <div class="h-screen text-slate-100 p-6 select-none flex flex-col overflow-hidden" style="background: radial-gradient(ellipse at top, #1e293b 0%, #020617 50%, #020617 100%);">
+    <div class="h-screen bg-slate-950 text-slate-100 p-6 select-none flex flex-col overflow-hidden">
 
       <!-- 헤더 -->
       <header class="flex-shrink-0 flex items-center justify-between mb-6 pb-4 border-b-2 border-slate-800 gap-4">
@@ -1899,10 +1907,10 @@ function renderDisplayMain() {
         </div>
       </header>
 
-      <!-- 트리아지 합계 (초대형) -->
+      <!-- 트리아지 합계 (초대형, 솔리드 컬러) -->
       <section class="flex-shrink-0 mb-5">
         <h2 class="mb-3 flex items-baseline gap-3">
-          <div class="w-1.5 h-7 bg-pink-500 rounded-full self-center shadow-lg shadow-pink-500/50"></div>
+          <div class="w-1.5 h-7 bg-pink-500 rounded-full self-center"></div>
           <span class="text-2xl font-bold">트리아지 합계</span>
           <span class="text-base text-slate-400 font-normal">— 총</span>
           <span class="text-3xl font-black mono text-pink-300 leading-none">${totalCount}</span>
@@ -1913,11 +1921,11 @@ function renderDisplayMain() {
             // 트리아지별 텍스트 색: 응급(노랑)만 진한 갈색, 나머지는 흰색
             const txt = tr.id === 'urgent' ? '#451a03' : '#ffffff';
             return `
-            <button data-display-triage="${tr.id}" class="display-card triage-card-clickable rounded-2xl px-3 py-6 text-center transition-all cursor-pointer hover:brightness-110 hover:scale-[1.02]"
+            <button data-display-triage="${tr.id}" class="display-card triage-card-clickable rounded-2xl px-3 py-6 text-center transition-all cursor-pointer hover:brightness-110"
               data-triage-card="${tr.id}"
-              style="background: linear-gradient(135deg, ${tr.color}, ${tr.bg}); border:2px solid ${tr.bg}; box-shadow: 0 8px 24px ${tr.color}50, inset 0 1px 0 rgba(255,255,255,0.15);">
-              <div class="text-xl font-black tracking-wider mb-2" style="color:${txt}; text-shadow: 0 1px 2px rgba(0,0,0,0.3);">${tr.shortName}·${tr.name}</div>
-              <div class="text-7xl font-black mono leading-none" style="color:${txt}; text-shadow: 0 2px 8px rgba(0,0,0,0.4);">${tr.count}</div>
+              style="background: linear-gradient(135deg, ${tr.color}, ${tr.bg}); border:2px solid ${tr.bg};">
+              <div class="text-xl font-black tracking-wider mb-2" style="color:${txt};">${tr.shortName}·${tr.name}</div>
+              <div class="text-7xl font-black mono leading-none" style="color:${txt};">${tr.count}</div>
               ${tr.pediatricCount > 0 ? `
                 <div class="text-sm font-bold mt-2 flex items-center justify-center gap-1" style="color:${txt}; opacity:0.85;">
                   <i data-lucide="baby" class="w-4 h-4"></i>소아 ${tr.pediatricCount}
@@ -1929,32 +1937,28 @@ function renderDisplayMain() {
         </div>
       </section>
 
-      <!-- 이송 상태 -->
+      <!-- 이송 상태 (반투명 톤) -->
       <section class="flex-shrink-0 mb-5">
         <h2 class="text-2xl font-bold mb-3 flex items-center gap-2">
-          <div class="w-1.5 h-7 bg-blue-500 rounded-full shadow-lg shadow-blue-500/50"></div>
+          <div class="w-1.5 h-7 bg-blue-500 rounded-full"></div>
           이송 상태
         </h2>
         <div class="grid grid-cols-4 gap-3">
-          <button data-display-transport="pending" class="display-card rounded-2xl px-4 py-5 text-center cursor-pointer transition-all hover:scale-[1.02] hover:brightness-110"
-            style="background: linear-gradient(135deg, #f59e0b, #b45309); border:2px solid #78350f; box-shadow: 0 8px 24px rgba(245, 158, 11, 0.4);">
-            <div class="text-lg font-black tracking-wider" style="color:#451a03; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">미배정</div>
-            <div class="text-6xl font-black mono mt-1.5 leading-none" style="color:#451a03; text-shadow: 0 2px 8px rgba(0,0,0,0.25);">${pending.length}</div>
+          <button data-display-transport="pending" class="display-card rounded-2xl px-4 py-5 text-center bg-slate-900 border-2 border-amber-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
+            <div class="text-lg font-bold tracking-wider text-amber-300">미배정</div>
+            <div class="text-6xl font-black mono mt-1.5 leading-none text-amber-400">${pending.length}</div>
           </button>
-          <button data-display-transport="in-transit" class="display-card rounded-2xl px-4 py-5 text-center cursor-pointer transition-all hover:scale-[1.02] hover:brightness-110"
-            style="background: linear-gradient(135deg, #3b82f6, #1e40af); border:2px solid #1e3a8a; box-shadow: 0 8px 24px rgba(59, 130, 246, 0.45);">
-            <div class="text-lg font-black tracking-wider text-white" style="text-shadow: 0 1px 2px rgba(0,0,0,0.3);">이송중</div>
-            <div class="text-6xl font-black mono mt-1.5 leading-none text-white" style="text-shadow: 0 2px 8px rgba(0,0,0,0.4);">${inTransit}</div>
+          <button data-display-transport="in-transit" class="display-card rounded-2xl px-4 py-5 text-center bg-slate-900 border-2 border-blue-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
+            <div class="text-lg font-bold tracking-wider text-blue-300">이송중</div>
+            <div class="text-6xl font-black mono mt-1.5 leading-none text-blue-400">${inTransit}</div>
           </button>
-          <button data-display-transport="arrived" class="display-card rounded-2xl px-4 py-5 text-center cursor-pointer transition-all hover:scale-[1.02] hover:brightness-110"
-            style="background: linear-gradient(135deg, #10b981, #047857); border:2px solid #064e3b; box-shadow: 0 8px 24px rgba(16, 185, 129, 0.45);">
-            <div class="text-lg font-black tracking-wider text-white" style="text-shadow: 0 1px 2px rgba(0,0,0,0.3);">병원 도착</div>
-            <div class="text-6xl font-black mono mt-1.5 leading-none text-white" style="text-shadow: 0 2px 8px rgba(0,0,0,0.4);">${arrived.length}</div>
+          <button data-display-transport="arrived" class="display-card rounded-2xl px-4 py-5 text-center bg-slate-900 border-2 border-emerald-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
+            <div class="text-lg font-bold tracking-wider text-emerald-300">병원 도착</div>
+            <div class="text-6xl font-black mono mt-1.5 leading-none text-emerald-400">${arrived.length}</div>
           </button>
-          <button data-display-transport="not-transported" class="display-card rounded-2xl px-4 py-5 text-center cursor-pointer transition-all hover:scale-[1.02] hover:brightness-110"
-            style="background: linear-gradient(135deg, #8b5cf6, #6d28d9); border:2px solid #5b21b6; box-shadow: 0 8px 24px rgba(139, 92, 246, 0.45);">
-            <div class="text-lg font-black tracking-wider text-white" style="text-shadow: 0 1px 2px rgba(0,0,0,0.3);">미이송</div>
-            <div class="text-6xl font-black mono mt-1.5 leading-none text-white" style="text-shadow: 0 2px 8px rgba(0,0,0,0.4);">${notTransported.length}</div>
+          <button data-display-transport="not-transported" class="display-card rounded-2xl px-4 py-5 text-center bg-slate-900 border-2 border-violet-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
+            <div class="text-lg font-bold tracking-wider text-violet-300">미이송</div>
+            <div class="text-6xl font-black mono mt-1.5 leading-none text-violet-400">${notTransported.length}</div>
           </button>
         </div>
       </section>
@@ -1962,7 +1966,7 @@ function renderDisplayMain() {
       <!-- 병원별 이송 현황 — 남는 공간 자동으로 채움 (flex-1) -->
       <section class="flex-1 min-h-0 mb-4 flex flex-col">
         <h2 class="flex-shrink-0 text-2xl font-bold mb-3 flex items-center gap-2">
-          <div class="w-1.5 h-7 bg-blue-500 rounded-full"></div>
+          <div class="w-1.5 h-7 bg-cyan-500 rounded-full"></div>
           병원별 이송 현황
           <span class="ml-auto text-base text-slate-400 font-normal">${hospitals.length}개 병원</span>
         </h2>
@@ -1974,7 +1978,7 @@ function renderDisplayMain() {
                병원이 매우 많을 때(15+)는 자동 줄바꿈으로 폴백. -->
           <div class="display-hospital-grid" style="grid-template-columns: repeat(${Math.min(hospitals.length, 15)}, minmax(0, 1fr));">
             ${hospitals.map(h => `
-              <button data-display-hospital="${escapeHtml(h.name)}" class="display-card group flex flex-col items-center justify-between rounded-2xl p-3 bg-gradient-to-br from-slate-900 to-slate-800/80 hover:from-slate-800 hover:to-slate-700 border-2 border-slate-700 hover:border-blue-500 transition-all cursor-pointer shadow-lg shadow-slate-950/30 min-w-0">
+              <button data-display-hospital="${escapeHtml(h.name)}" class="display-card flex flex-col items-center justify-between rounded-2xl p-3 bg-slate-900 hover:bg-slate-800 border-2 border-slate-700 hover:border-cyan-500 transition-colors cursor-pointer min-w-0">
                 <!-- 병원명 -->
                 <div class="text-base font-bold text-center mb-2 truncate w-full" title="${escapeHtml(h.name)}">${escapeHtml(h.name)}</div>
                 <!-- 인원수 (메인) -->
