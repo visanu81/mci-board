@@ -1918,12 +1918,14 @@ function renderDisplayMain() {
         </h2>
         <div class="grid grid-cols-4 gap-3">
           ${triageTotals.map(tr => {
-            // 트리아지별 텍스트 색: 응급(노랑)만 진한 갈색, 나머지는 흰색
+            // 솔리드 단색. 사망은 tr.color가 너무 옅은 회색(slate-400)이라 slate-600 사용.
+            const cardBg = tr.id === 'dead' ? '#475569' : tr.color;
+            // 응급(노랑)만 진한 갈색 글씨. 나머지는 흰색.
             const txt = tr.id === 'urgent' ? '#451a03' : '#ffffff';
             return `
             <button data-display-triage="${tr.id}" class="display-card triage-card-clickable rounded-2xl px-3 py-6 text-center transition-all cursor-pointer hover:brightness-110"
               data-triage-card="${tr.id}"
-              style="background: linear-gradient(135deg, ${tr.color}, ${tr.bg}); border:2px solid ${tr.bg};">
+              style="background: ${cardBg}; border:2px solid ${tr.bg};">
               <div class="text-xl font-black tracking-wider mb-2" style="color:${txt};">${tr.shortName}·${tr.name}</div>
               <div class="text-7xl font-black mono leading-none" style="color:${txt};">${tr.count}</div>
               ${tr.pediatricCount > 0 ? `
