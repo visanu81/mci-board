@@ -401,14 +401,17 @@
   /* ── 표출 모드 병원 그리드 — 화면 폭에 따라 열 개수 자동 조정 ──
        - 최소 폭 240px 보장 (모바일에서도 가독)
        - HD(1280px): 4~5열, FHD(1920px): 6~7열, 4K: 12+열
-       - 병원 많을 때 max-height + 스크롤로 화면 밖 잘림 방지 */
+       - 부모 섹션이 flex-1 min-h-0 → 남는 세로 공간 자동으로 차지
+       - 카드가 공간 넘치면 내부 스크롤 (페이지 자체는 항상 100vh 고정) */
   .display-hospital-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 0.875rem;
-    max-height: 55vh;        /* 1080p TV 기준 ~590px → 4행 정도 보임 */
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
     padding-right: 4px;      /* 스크롤바 공간 */
+    align-content: start;    /* 카드 수가 적을 때 위로 정렬 */
   }
   /* 스크롤바 — 어두운 톤에 맞게 */
   .display-hospital-grid::-webkit-scrollbar { width: 8px; }
@@ -1799,10 +1802,10 @@ function renderDisplayMain() {
     .sort((a, b) => b.total - a.total);
 
   return `
-    <div class="min-h-screen bg-slate-950 text-slate-100 p-6 select-none">
+    <div class="h-screen bg-slate-950 text-slate-100 p-6 select-none flex flex-col overflow-hidden">
 
       <!-- 헤더 -->
-      <header class="flex items-center justify-between mb-6 pb-4 border-b-2 border-slate-800 gap-4">
+      <header class="flex-shrink-0 flex items-center justify-between mb-6 pb-4 border-b-2 border-slate-800 gap-4">
         <!-- 좌: 로고 + 시스템 이름 -->
         <div class="flex items-center gap-4 flex-shrink-0">
           <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-rose-600 to-pink-700 flex items-center justify-center shadow-lg shadow-pink-900/50">
@@ -1841,7 +1844,7 @@ function renderDisplayMain() {
       </header>
 
       <!-- 트리아지 합계 (초대형) -->
-      <section class="mb-6">
+      <section class="flex-shrink-0 mb-6">
         <h2 class="mb-3 flex items-baseline gap-3">
           <div class="w-1.5 h-7 bg-pink-500 rounded-full self-center"></div>
           <span class="text-2xl font-bold">트리아지 합계</span>
@@ -1867,7 +1870,7 @@ function renderDisplayMain() {
       </section>
 
       <!-- 이송 상태 -->
-      <section class="mb-6">
+      <section class="flex-shrink-0 mb-6">
         <h2 class="text-2xl font-bold mb-3 flex items-center gap-2">
           <div class="w-1.5 h-7 bg-blue-500 rounded-full"></div>
           이송 상태
@@ -1892,9 +1895,9 @@ function renderDisplayMain() {
         </div>
       </section>
 
-      <!-- 병원별 이송 현황 -->
-      <section class="mb-6">
-        <h2 class="text-2xl font-bold mb-3 flex items-center gap-2">
+      <!-- 병원별 이송 현황 — 남는 공간 자동으로 채움 (flex-1) -->
+      <section class="flex-1 min-h-0 mb-4 flex flex-col">
+        <h2 class="flex-shrink-0 text-2xl font-bold mb-3 flex items-center gap-2">
           <div class="w-1.5 h-7 bg-blue-500 rounded-full"></div>
           병원별 이송 현황
           <span class="ml-auto text-base text-slate-400 font-normal">${hospitals.length}개 병원</span>
@@ -1927,7 +1930,7 @@ function renderDisplayMain() {
       </section>
 
       <!-- 푸터 -->
-      <footer class="text-center text-sm text-slate-600 mt-8">
+      <footer class="flex-shrink-0 text-center text-sm text-slate-600 mt-2 pt-2 border-t border-slate-800/50">
         실시간 동기화 · 카드를 클릭하면 상세 환자 정보를 확인할 수 있습니다.
       </footer>
 
