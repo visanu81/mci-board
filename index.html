@@ -419,23 +419,55 @@
     align-content: start;
   }
 
-  /* ── 표출 모드 외부(밝은) 모드 — 라이트 톤 배경 + 카드 흰 배경 + 그림자 ── */
+  /* ── 표출 모드 외부(밝은) 모드 ──
+       페이지 배경: 부드러운 라이트 톤 라디얼 그라데이션
+       단, 트리아지·이송 상태 카드는 솔리드 컬러 유지 (인라인 스타일이 둘 다 모드에서 보임)
+       흰 배경 적용은 병원 카드와 헤더 시계 패널에만 한정. */
   body.outdoor-mode[data-view="display"] > #app > div[style*="radial-gradient"] {
-    background: radial-gradient(ellipse at top, #ffffff 0%, #f1f5f9 50%, #e2e8f0 100%) !important;
+    background: radial-gradient(ellipse at top, #ffffff 0%, #f1f5f9 50%, #cbd5e1 100%) !important;
   }
-  body.outdoor-mode[data-view="display"] .display-card {
+  /* 병원 카드만 흰 배경 + 그림자 (트리아지/이송 상태는 솔리드 컬러 그대로) */
+  body.outdoor-mode[data-view="display"] [data-display-hospital] {
     background: #ffffff !important;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1) !important;
   }
-  body.outdoor-mode[data-view="display"] .display-card:hover {
-    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15) !important;
+  body.outdoor-mode[data-view="display"] [data-display-hospital]:hover {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18) !important;
   }
-  /* 표출 모드 라이트 - 시계 색상 더 진하게 */
+  /* 병원 카드 안 텍스트 — 라이트 배경 위 진한 슬레이트 */
+  body.outdoor-mode[data-view="display"] [data-display-hospital] > div {
+    color: #0f172a !important;
+  }
+  body.outdoor-mode[data-view="display"] [data-display-hospital] .text-slate-100 {
+    color: #0f172a !important;
+  }
+  body.outdoor-mode[data-view="display"] [data-display-hospital] .text-slate-400 {
+    color: #475569 !important;
+  }
+  body.outdoor-mode[data-view="display"] [data-display-hospital] .text-emerald-400 {
+    color: #059669 !important;
+  }
+  /* 시계 패널 — 라이트 모드 톤 */
   body.outdoor-mode[data-view="display"] #display-clock {
-    color: #047857 !important;          /* emerald-700 — 라이트 배경에서 또렷 */
+    color: #047857 !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.05);
   }
   body.outdoor-mode[data-view="display"] [class*="border-emerald-700"] {
-    border-color: #059669 !important;
+    border-color: #10b981 !important;
+  }
+  /* 진행 중 재난 라벨 + 재난 이름 색상 */
+  body.outdoor-mode[data-view="display"] .text-pink-300\/80 {
+    color: #be185d !important;
+  }
+  /* 섹션 헤더 색상 바는 그대로 유지 (이미 진한 색) */
+  /* 푸터 텍스트 */
+  body.outdoor-mode[data-view="display"] footer {
+    color: #475569 !important;
+  }
+  body.outdoor-mode[data-view="display"] footer.border-t {
+    border-color: #cbd5e1 !important;
   }
   /* 스크롤바 — 어두운 톤에 맞게 */
   .display-hospital-grid::-webkit-scrollbar { width: 8px; }
@@ -1877,19 +1909,23 @@ function renderDisplayMain() {
           <span class="text-base text-slate-400 font-normal">명</span>
         </h2>
         <div class="grid grid-cols-4 gap-3">
-          ${triageTotals.map(tr => `
+          ${triageTotals.map(tr => {
+            // 트리아지별 텍스트 색: 응급(노랑)만 진한 갈색, 나머지는 흰색
+            const txt = tr.id === 'urgent' ? '#451a03' : '#ffffff';
+            return `
             <button data-display-triage="${tr.id}" class="display-card triage-card-clickable rounded-2xl px-3 py-6 text-center transition-all cursor-pointer hover:brightness-110 hover:scale-[1.02]"
               data-triage-card="${tr.id}"
-              style="background: linear-gradient(135deg, ${tr.bg}70, ${tr.bg}40); border:2px solid ${tr.color}; box-shadow: 0 6px 20px ${tr.color}25, inset 0 1px 0 ${tr.color}30;">
-              <div class="text-xl font-black tracking-wider mb-2" style="color:${tr.color}">${tr.shortName}·${tr.name}</div>
-              <div class="text-7xl font-black mono leading-none drop-shadow-lg" style="color:${tr.color}">${tr.count}</div>
+              style="background: linear-gradient(135deg, ${tr.color}, ${tr.bg}); border:2px solid ${tr.bg}; box-shadow: 0 8px 24px ${tr.color}50, inset 0 1px 0 rgba(255,255,255,0.15);">
+              <div class="text-xl font-black tracking-wider mb-2" style="color:${txt}; text-shadow: 0 1px 2px rgba(0,0,0,0.3);">${tr.shortName}·${tr.name}</div>
+              <div class="text-7xl font-black mono leading-none" style="color:${txt}; text-shadow: 0 2px 8px rgba(0,0,0,0.4);">${tr.count}</div>
               ${tr.pediatricCount > 0 ? `
-                <div class="text-sm font-bold text-cyan-300 mt-2 flex items-center justify-center gap-1">
+                <div class="text-sm font-bold mt-2 flex items-center justify-center gap-1" style="color:${txt}; opacity:0.85;">
                   <i data-lucide="baby" class="w-4 h-4"></i>소아 ${tr.pediatricCount}
                 </div>
               ` : '<div class="mt-2 text-sm">&nbsp;</div>'}
             </button>
-          `).join('')}
+            `;
+          }).join('')}
         </div>
       </section>
 
@@ -1900,21 +1936,25 @@ function renderDisplayMain() {
           이송 상태
         </h2>
         <div class="grid grid-cols-4 gap-3">
-          <button data-display-transport="pending" class="display-card rounded-2xl px-4 py-5 text-center bg-gradient-to-br from-amber-950/50 to-slate-900 border-2 border-amber-700/60 cursor-pointer hover:from-amber-900/60 transition-all hover:scale-[1.02] shadow-lg shadow-amber-950/40">
-            <div class="text-lg font-bold tracking-wider text-amber-300">미배정</div>
-            <div class="text-6xl font-black mono mt-1.5 leading-none text-amber-400 drop-shadow-lg">${pending.length}</div>
+          <button data-display-transport="pending" class="display-card rounded-2xl px-4 py-5 text-center cursor-pointer transition-all hover:scale-[1.02] hover:brightness-110"
+            style="background: linear-gradient(135deg, #f59e0b, #b45309); border:2px solid #78350f; box-shadow: 0 8px 24px rgba(245, 158, 11, 0.4);">
+            <div class="text-lg font-black tracking-wider" style="color:#451a03; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">미배정</div>
+            <div class="text-6xl font-black mono mt-1.5 leading-none" style="color:#451a03; text-shadow: 0 2px 8px rgba(0,0,0,0.25);">${pending.length}</div>
           </button>
-          <button data-display-transport="in-transit" class="display-card rounded-2xl px-4 py-5 text-center bg-gradient-to-br from-blue-950/50 to-slate-900 border-2 border-blue-700/60 cursor-pointer hover:from-blue-900/60 transition-all hover:scale-[1.02] shadow-lg shadow-blue-950/40">
-            <div class="text-lg font-bold tracking-wider text-blue-300">이송중</div>
-            <div class="text-6xl font-black mono mt-1.5 leading-none text-blue-400 drop-shadow-lg">${inTransit}</div>
+          <button data-display-transport="in-transit" class="display-card rounded-2xl px-4 py-5 text-center cursor-pointer transition-all hover:scale-[1.02] hover:brightness-110"
+            style="background: linear-gradient(135deg, #3b82f6, #1e40af); border:2px solid #1e3a8a; box-shadow: 0 8px 24px rgba(59, 130, 246, 0.45);">
+            <div class="text-lg font-black tracking-wider text-white" style="text-shadow: 0 1px 2px rgba(0,0,0,0.3);">이송중</div>
+            <div class="text-6xl font-black mono mt-1.5 leading-none text-white" style="text-shadow: 0 2px 8px rgba(0,0,0,0.4);">${inTransit}</div>
           </button>
-          <button data-display-transport="arrived" class="display-card rounded-2xl px-4 py-5 text-center bg-gradient-to-br from-emerald-950/50 to-slate-900 border-2 border-emerald-700/60 cursor-pointer hover:from-emerald-900/60 transition-all hover:scale-[1.02] shadow-lg shadow-emerald-950/40">
-            <div class="text-lg font-bold tracking-wider text-emerald-300">병원 도착</div>
-            <div class="text-6xl font-black mono mt-1.5 leading-none text-emerald-400 drop-shadow-lg">${arrived.length}</div>
+          <button data-display-transport="arrived" class="display-card rounded-2xl px-4 py-5 text-center cursor-pointer transition-all hover:scale-[1.02] hover:brightness-110"
+            style="background: linear-gradient(135deg, #10b981, #047857); border:2px solid #064e3b; box-shadow: 0 8px 24px rgba(16, 185, 129, 0.45);">
+            <div class="text-lg font-black tracking-wider text-white" style="text-shadow: 0 1px 2px rgba(0,0,0,0.3);">병원 도착</div>
+            <div class="text-6xl font-black mono mt-1.5 leading-none text-white" style="text-shadow: 0 2px 8px rgba(0,0,0,0.4);">${arrived.length}</div>
           </button>
-          <button data-display-transport="not-transported" class="display-card rounded-2xl px-4 py-5 text-center bg-gradient-to-br from-violet-950/50 to-slate-900 border-2 border-violet-700/60 cursor-pointer hover:from-violet-900/60 transition-all hover:scale-[1.02] shadow-lg shadow-violet-950/40">
-            <div class="text-lg font-bold tracking-wider text-violet-300">미이송</div>
-            <div class="text-6xl font-black mono mt-1.5 leading-none text-violet-400 drop-shadow-lg">${notTransported.length}</div>
+          <button data-display-transport="not-transported" class="display-card rounded-2xl px-4 py-5 text-center cursor-pointer transition-all hover:scale-[1.02] hover:brightness-110"
+            style="background: linear-gradient(135deg, #8b5cf6, #6d28d9); border:2px solid #5b21b6; box-shadow: 0 8px 24px rgba(139, 92, 246, 0.45);">
+            <div class="text-lg font-black tracking-wider text-white" style="text-shadow: 0 1px 2px rgba(0,0,0,0.3);">미이송</div>
+            <div class="text-6xl font-black mono mt-1.5 leading-none text-white" style="text-shadow: 0 2px 8px rgba(0,0,0,0.4);">${notTransported.length}</div>
           </button>
         </div>
       </section>
