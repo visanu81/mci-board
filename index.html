@@ -5665,12 +5665,12 @@ const HELP_CONTENT = {
             <tbody class="text-slate-300">
               <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300 text-[10px] mono font-bold">NORMAL</span></td><td class="py-2 px-2 mono">동두천119, 양주119, 의정부119 등</td><td class="py-2 px-2">소속 관서 재난 입력·조회</td></tr>
               <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-sky-900/40 text-sky-300 text-[10px] mono font-bold">OBSERVER</span></td><td class="py-2 px-2 mono">본부119</td><td class="py-2 px-2">모든 재난 읽기 전용</td></tr>
-              <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-300 text-[10px] mono font-bold">ADMIN</span></td><td class="py-2 px-2 mono">한경승</td><td class="py-2 px-2">시스템 전권 (관서코드·강제종료·백업)</td></tr>
+              <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-300 text-[10px] mono font-bold">ADMIN</span></td><td class="py-2 px-2 mono">*** (관리자 별도 안내)</td><td class="py-2 px-2">시스템 전권 (관서코드·강제종료·백업)</td></tr>
               <tr><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-violet-900/40 text-violet-300 text-[10px] mono font-bold">DISPLAY</span></td><td class="py-2 px-2 mono">상황판119</td><td class="py-2 px-2">TV/모니터용 표출 화면</td></tr>
             </tbody>
           </table>
         </div>
-        <p class="text-[11px] text-slate-500 mt-2">⚠ 코드는 관리자가 관리합니다. 추가/변경이 필요하면 한경승에게 요청.</p>
+        <p class="text-[11px] text-slate-500 mt-2">⚠ 코드는 관리자가 관리합니다. 추가/변경이 필요하면 관리자에게 별도 요청.</p>
       </section>
       <section class="bg-amber-950/30 border border-amber-700/50 rounded-xl p-4">
         <h4 class="font-bold text-base mb-2 text-amber-200">⚠ 개인정보 보호</h4>
@@ -5752,7 +5752,7 @@ const HELP_CONTENT = {
       <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
         <h4 class="font-bold text-base mb-2">⑥ 브리핑 모드 (실명 보호)</h4>
         <p class="text-slate-300">우상단 <span class="bg-amber-500 text-amber-950 px-2 py-0.5 rounded text-xs font-bold">브리핑 모드 ON</span> 토글로 이름·주증상을 마스킹. 언론·외부인 앞에서 화면 공개 시 사용.</p>
-        <p class="text-[11px] text-slate-500 mt-1">예: 한경승 → 한** / 호흡곤란 → 호***</p>
+        <p class="text-[11px] text-slate-500 mt-1">예: 김반장 → 김** / 호흡곤란 → 호***</p>
       </section>
 
       <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
@@ -5764,7 +5764,7 @@ const HELP_CONTENT = {
   `,
 
   admin: `
-    <h3 class="text-xl font-bold mb-3 text-purple-300">⚙️ 관리자 — 한경승 콘솔</h3>
+    <h3 class="text-xl font-bold mb-3 text-purple-300">⚙️ 관리자 콘솔</h3>
     <div class="space-y-4">
 
       <section class="bg-slate-950 rounded-xl p-4 border border-purple-800/50">
@@ -5965,7 +5965,7 @@ const HELP_CONTENT = {
           재난 종료 후 데이터는 어디 있나요?
         </summary>
         <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
-          관리자(한경승)가 강제 종료하거나 일반 사용자가 "관리 → 새 재난 시작"을 누르면 자동 백업됩니다. 관리자 콘솔의 <strong>백업 이력</strong> 패널에서 엑셀로 다운로드 가능.
+          관리자가 강제 종료하거나 일반 사용자가 "관리 → 새 재난 시작"을 누르면 자동 백업됩니다. 관리자 콘솔의 <strong>백업 이력</strong> 패널에서 엑셀로 다운로드 가능.
         </div>
       </details>
 
@@ -5975,7 +5975,7 @@ const HELP_CONTENT = {
           새 코드를 추가하고 싶어요
         </summary>
         <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
-          관리자(한경승)에게 요청하세요. 관리자 콘솔 → "관서 코드 관리" → "+ 코드 추가"에서 즉시 추가 가능합니다. 추가 즉시 모든 사용자에게 반영됨.
+          관리자에게 요청하세요. 관리자 콘솔 → "관서 코드 관리" → "+ 코드 추가"에서 즉시 추가 가능합니다. 추가 즉시 모든 사용자에게 반영됨.
         </div>
       </details>
 
