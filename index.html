@@ -397,14 +397,23 @@
     display: none !important;
   }
   /* 표출 모드에서 외부 모드 토글은 좌하단에 표시되지만 크기 약간 축소 */
-  body[data-view="display"] #outdoor-toggle {
+  body[data-view="display"] #outdoor-toggle,
+  body[data-view="display"] #help-btn {
     width: 2.5rem;
     height: 2.5rem;
     opacity: 0.7;
   }
-  body[data-view="display"] #outdoor-toggle:hover {
+  body[data-view="display"] #outdoor-toggle:hover,
+  body[data-view="display"] #help-btn:hover {
     opacity: 1;
   }
+  /* 도움말 버튼 위치 — 외부 모드 토글 옆 (둘 다 좌하단) */
+  body[data-view="display"] #help-btn {
+    left: 4rem;       /* 표출 모드 작은 사이즈일 때 살짝 더 가깝게 */
+  }
+
+  /* 도움말 모달 — 활성 탭 강조 (border-blue-500 + text-white를 inline으로도 적용되도록 보조) */
+  .help-tab-btn:hover { background: rgba(15, 23, 42, 0.5); }
 
   /* ── 표출 모드 병원 그리드 — 한 줄 강제 배치 + 가로 폭 자동 분할 ──
        grid-template-columns는 인라인 style로 동적 지정 (병원 수 = N → repeat(N, 1fr))
@@ -491,6 +500,52 @@
 <button id="outdoor-toggle" class="fixed bottom-4 left-4 z-[100] w-12 h-12 rounded-full bg-amber-500 hover:bg-amber-400 shadow-2xl shadow-amber-900/30 flex items-center justify-center text-white border-2 border-amber-300 transition-all" title="외부 모드 켜기 (시인성 강화)" aria-label="외부 모드 전환">
   <i data-lucide="sun" class="w-5 h-5"></i>
 </button>
+
+<!-- 도움말 버튼 (좌하단, 외부 모드 토글 옆) -->
+<button id="help-btn" class="fixed bottom-4 left-20 z-[100] w-12 h-12 rounded-full bg-blue-500 hover:bg-blue-400 shadow-2xl shadow-blue-900/30 flex items-center justify-center text-white border-2 border-blue-300 transition-all" title="도움말 / 사용법" aria-label="도움말">
+  <i data-lucide="help-circle" class="w-5 h-5"></i>
+</button>
+
+<!-- 도움말 모달 (body에 직접 배치, 모든 화면에서 접근 가능) -->
+<div id="help-modal" class="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm hidden">
+  <div class="absolute inset-0 flex items-center justify-center p-2 sm:p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-5xl max-h-[95vh] flex flex-col shadow-2xl">
+      <!-- 헤더 -->
+      <header class="px-5 py-4 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-700 flex items-center justify-center">
+            <i data-lucide="help-circle" class="w-6 h-6 text-white"></i>
+          </div>
+          <div>
+            <h2 class="text-lg font-bold">도움말 — 사용 설명서</h2>
+            <p class="text-xs text-slate-500">MCI 통합 상황판 · v1.0</p>
+          </div>
+        </div>
+        <button id="help-close" class="text-slate-400 hover:text-white p-2" aria-label="닫기">
+          <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+      </header>
+      <!-- 탭 -->
+      <nav class="flex border-b border-slate-800 overflow-x-auto flex-shrink-0">
+        <button data-help-tab="start" class="help-tab-btn px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent transition-colors">🚀 시작하기</button>
+        <button data-help-tab="agency" class="help-tab-btn px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent transition-colors">🚒 일선 소방관</button>
+        <button data-help-tab="admin" class="help-tab-btn px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent transition-colors">⚙️ 관리자</button>
+        <button data-help-tab="observer" class="help-tab-btn px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent transition-colors">🔭 본부</button>
+        <button data-help-tab="display" class="help-tab-btn px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent transition-colors">📺 TV 표출</button>
+        <button data-help-tab="faq" class="help-tab-btn px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent transition-colors">❓ 자주 묻는 질문</button>
+      </nav>
+      <!-- 본문 (탭별 콘텐츠 — JS에서 동적 표시) -->
+      <main id="help-content" class="flex-1 overflow-y-auto p-5 text-sm leading-relaxed">
+        <!-- JS가 채움 -->
+      </main>
+      <!-- 푸터 -->
+      <footer class="px-5 py-3 border-t border-slate-800 text-xs text-slate-500 flex items-center justify-between flex-shrink-0">
+        <span>제작 · 소방위 한경승</span>
+        <span class="text-slate-600">문의는 관리자에게</span>
+      </footer>
+    </div>
+  </div>
+</div>
 
 <!-- PWA 앱 설치 배너 — 설치 가능한 브라우저에서만 표시
      beforeinstallprompt 이벤트 받으면 자동으로 노출. 거부 시 localStorage에 저장 후 재노출 X. -->
@@ -5577,6 +5632,394 @@ function applyOutdoorMode() {
   if (window.lucide) window.lucide.createIcons();
 }
 
+// ==================== 도움말 모달 ====================
+// 사용 설명서 — 탭 6개 (시작/일선/관리자/본부/표출/FAQ)
+const HELP_CONTENT = {
+  start: `
+    <h3 class="text-xl font-bold mb-3 text-blue-300">🚀 시작하기</h3>
+    <div class="space-y-4">
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">MCI 통합 상황판이란?</h4>
+        <p class="text-slate-300">재난 발생 직후부터 <strong class="text-amber-300">현장지휘통제단 가동 전</strong>까지의 초기 상황을 신속히 공유하기 위한 도구입니다. 사상자 정보(트리아지·생체징후·이송)를 입력하는 즉시 모든 사용자에게 실시간 동기화됩니다.</p>
+      </section>
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">접속 방법</h4>
+        <ul class="space-y-1.5 text-slate-300">
+          <li>📱 <strong>웹:</strong> <code class="text-cyan-300 bg-slate-800 px-2 py-0.5 rounded text-xs">https://mci.visanu81.workers.dev</code></li>
+          <li>🏠 <strong>휴대폰 홈에 설치:</strong> 첫 접속 시 하단에 "앱으로 설치하기" 핑크색 배너 → 탭하면 홈에 아이콘 생김</li>
+          <li>⚡ <strong>오프라인 가능:</strong> 한 번 설치하면 와이파이·LTE 끊겨도 화면 뜸 (동기화는 통신 복구 시)</li>
+        </ul>
+      </section>
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">로그인 코드 종류</h4>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead><tr class="text-slate-500 border-b border-slate-800"><th class="text-left py-2 px-2">코드 종류</th><th class="text-left py-2 px-2">예시</th><th class="text-left py-2 px-2">권한</th></tr></thead>
+            <tbody class="text-slate-300">
+              <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300 text-[10px] mono font-bold">NORMAL</span></td><td class="py-2 px-2 mono">동두천119, 양주119, 의정부119 등</td><td class="py-2 px-2">소속 관서 재난 입력·조회</td></tr>
+              <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-sky-900/40 text-sky-300 text-[10px] mono font-bold">OBSERVER</span></td><td class="py-2 px-2 mono">본부119</td><td class="py-2 px-2">모든 재난 읽기 전용</td></tr>
+              <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-300 text-[10px] mono font-bold">ADMIN</span></td><td class="py-2 px-2 mono">한경승</td><td class="py-2 px-2">시스템 전권 (관서코드·강제종료·백업)</td></tr>
+              <tr><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-violet-900/40 text-violet-300 text-[10px] mono font-bold">DISPLAY</span></td><td class="py-2 px-2 mono">상황판119</td><td class="py-2 px-2">TV/모니터용 표출 화면</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-[11px] text-slate-500 mt-2">⚠ 코드는 관리자가 관리합니다. 추가/변경이 필요하면 한경승에게 요청.</p>
+      </section>
+      <section class="bg-amber-950/30 border border-amber-700/50 rounded-xl p-4">
+        <h4 class="font-bold text-base mb-2 text-amber-200">⚠ 개인정보 보호</h4>
+        <p class="text-amber-100/90">실제 환자의 <strong>실명·주민번호·연락처</strong>는 입력하지 마세요. 이름을 모를 땐 비워두면 <code class="bg-slate-800 px-1.5 py-0.5 rounded text-pink-300 text-xs">#001 -본인이름</code> 형식으로 자동 부여됩니다.</p>
+      </section>
+    </div>
+  `,
+
+  agency: `
+    <h3 class="text-xl font-bold mb-3 text-emerald-300">🚒 일선 소방관 — 일반 관서 사용법</h3>
+    <div class="space-y-4">
+
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">① 로그인 → 재난 합류</h4>
+        <ol class="list-decimal list-inside space-y-1.5 text-slate-300 marker:text-emerald-400 marker:font-bold">
+          <li>관서 코드 입력 (예: <code class="bg-slate-800 px-1.5 py-0.5 rounded text-xs">동두천119</code>)</li>
+          <li>로비에 진행 중 재난이 있으면 → 클릭해서 합류</li>
+          <li>없으면 → 우상단 <span class="bg-red-600 text-white px-2 py-0.5 rounded text-xs font-bold">+ 새 재난 시작</span> → 제목·종류 입력</li>
+        </ol>
+      </section>
+
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">② 직책과 호출명 입력</h4>
+        <ul class="space-y-1.5 text-slate-300">
+          <li>🛡 <strong>지휘관</strong> — 현장 총괄 / 카드 모든 권한</li>
+          <li>🩺 <strong>구급팀장</strong> — 트리아지·이송 결정 / 모든 카드 수정 가능</li>
+          <li>💗 <strong>구급팀원</strong> — 생체징후·처치 입력 / 모든 카드 수정 가능</li>
+          <li>⛑ <strong>현장대원</strong> — 빠른 카드 입력 / <em class="text-amber-300">자기 카드만 수정 가능</em></li>
+          <li class="text-[11px] text-slate-500 mt-2">호출명 예시: <code class="bg-slate-800 px-1.5 py-0.5 rounded text-xs">불현1급차</code>, <code class="bg-slate-800 px-1.5 py-0.5 rounded text-xs">동대장</code></li>
+        </ul>
+      </section>
+
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">③ 모드 선택 — 일반 재난 vs MCI</h4>
+        <div class="grid grid-cols-2 gap-3 text-xs">
+          <div class="bg-red-900/20 border border-red-700/40 rounded-lg p-3">
+            <div class="font-bold text-red-300 mb-1">🔥 일반 재난</div>
+            <div class="text-slate-300">소수 사상자 + 사고개요·피해·동원·조치 등 통합 관리</div>
+          </div>
+          <div class="bg-pink-900/20 border border-pink-700/40 rounded-lg p-3">
+            <div class="font-bold text-pink-300 mb-1">💗 다수사상자(MCI)</div>
+            <div class="text-slate-300">대량 사상자 발생 시 — 트리아지 카드 위주, 사상자 카드 빠른 입력 최적화</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">④ MCI 사상자 카드 입력 (가장 중요)</h4>
+        <p class="text-slate-400 text-xs mb-2">"사상자 카드" 탭 → 빠른 카드 또는 풀 카드 모드</p>
+        <ol class="list-decimal list-inside space-y-1.5 text-slate-300 marker:text-pink-400 marker:font-bold">
+          <li><strong>트리아지 분류</strong> (가장 큰 버튼) — STAR/JumpSTART 30초 분류 후 즉시 입력. 나중 수정 가능.<br>
+            <div class="flex gap-1.5 mt-1 ml-5 text-[11px]">
+              <span class="px-2 py-0.5 rounded font-black" style="background:#dc2626;color:#fff">I 긴급</span>
+              <span class="px-2 py-0.5 rounded font-black" style="background:#facc15;color:#451a03">II 응급</span>
+              <span class="px-2 py-0.5 rounded font-black" style="background:#22c55e;color:#fff">III 비응급</span>
+              <span class="px-2 py-0.5 rounded font-black" style="background:#475569;color:#fff">IV 사망</span>
+            </div>
+          </li>
+          <li><strong>기본 정보</strong> — 이름·연령·성별. <em class="text-amber-300">이름 모르면 비워두기 (자동 부여)</em></li>
+          <li><strong>발견장소</strong> — 가능한 한 동·호수까지 (예: 102동 1503호 안방)</li>
+          <li><strong>주증상</strong> — 한 줄로 요약 (예: 호흡곤란, 가슴통증)</li>
+          <li><strong>풀 카드 모드 추가 항목</strong>: 의식(AVPU)·생체징후·손상기전·손상부위·처치내용·이송 정보</li>
+          <li><strong>미이송</strong> 토글 — 자체귀가하는 사람들은 이걸 켜기</li>
+          <li>아래 <span class="bg-pink-600 text-white px-2 py-0.5 rounded text-xs font-bold">사상자 카드 저장</span> 클릭</li>
+        </ol>
+      </section>
+
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">⑤ 통합 상황판 조회 — 드릴다운</h4>
+        <p class="text-slate-300 mb-2">"MCI 통합 상황판" 탭에서:</p>
+        <ul class="space-y-1.5 text-slate-300 ml-4 list-disc marker:text-pink-400">
+          <li><strong>트리아지 합계</strong> 카드 클릭 → 해당 분류의 환자 목록 펼침</li>
+          <li><strong>이송 상태</strong> 카드 클릭 (미배정·이송중·병원도착·미이송) → 해당 상태 환자 목록</li>
+          <li><strong>병원별 이송 현황</strong> 카드 클릭 → 그 병원으로 이송된 환자 목록</li>
+          <li>환자 행 클릭 → <strong>사상자 카드 상세 모달</strong> 표시</li>
+        </ul>
+      </section>
+
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">⑥ 브리핑 모드 (실명 보호)</h4>
+        <p class="text-slate-300">우상단 <span class="bg-amber-500 text-amber-950 px-2 py-0.5 rounded text-xs font-bold">브리핑 모드 ON</span> 토글로 이름·주증상을 마스킹. 언론·외부인 앞에서 화면 공개 시 사용.</p>
+        <p class="text-[11px] text-slate-500 mt-1">예: 한경승 → 한** / 호흡곤란 → 호***</p>
+      </section>
+
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">⑦ 데이터 내보내기</h4>
+        <p class="text-slate-300">우상단 <span class="bg-slate-700 text-white px-2 py-0.5 rounded text-xs">관리</span> 버튼 → "데이터 내보내기" 탭 → 엑셀(.xlsx) 다운로드. 실명 버전 / 마스킹 버전 둘 다 가능.</p>
+      </section>
+
+    </div>
+  `,
+
+  admin: `
+    <h3 class="text-xl font-bold mb-3 text-purple-300">⚙️ 관리자 — 한경승 콘솔</h3>
+    <div class="space-y-4">
+
+      <section class="bg-slate-950 rounded-xl p-4 border border-purple-800/50">
+        <h4 class="font-bold text-base mb-2 text-purple-300">관리자 콘솔 구성</h4>
+        <ol class="list-decimal list-inside space-y-1.5 text-slate-300 marker:text-purple-400 marker:font-bold">
+          <li><strong>시스템 통계</strong> — 진행 중/종료 재난, 누적 백업, 백업된 사상자 수</li>
+          <li><strong>새 재난 시작</strong> — 임의 관서 명의로 재난 생성 (관서 대행)</li>
+          <li><strong>진행 중 재난</strong> — 모든 관서의 재난 목록, 클릭 진입 또는 [종료] 강제 종료</li>
+          <li><strong>백업 이력</strong> — 종료된 재난의 자동 백업, 엑셀 다운로드·삭제</li>
+          <li><strong>관서 코드 관리</strong> — 코드 추가·수정·삭제 (CRUD)</li>
+        </ol>
+      </section>
+
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">관서 코드 관리</h4>
+        <p class="text-slate-300 mb-2"><strong class="text-purple-300">+ 코드 추가</strong> 버튼:</p>
+        <ul class="space-y-1.5 text-slate-300 ml-4 list-disc marker:text-purple-400">
+          <li><strong>진입 코드</strong> — 로그인할 때 입력하는 문자열 (예: 강남119)</li>
+          <li><strong>표시명</strong> — 화면에 보일 짧은 이름 (예: 강남)</li>
+          <li><strong>id</strong> — 영문·숫자 (비워두면 <code class="bg-slate-800 px-1.5 py-0.5 rounded text-xs">auto_xxxxxx</code> 자동 생성). <em class="text-amber-300">생성 후 변경 불가</em></li>
+          <li><strong>역할</strong> — normal · observer · admin · display 중 선택</li>
+        </ul>
+        <p class="text-[11px] text-slate-500 mt-2">⚠ 마지막 admin 코드는 삭제 불가 (시스템 잠금 방지)</p>
+      </section>
+
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">재난 강제 종료</h4>
+        <p class="text-slate-300">진행 중 재난 옆 <span class="bg-red-950 text-red-200 px-2 py-0.5 rounded text-xs font-bold">종료</span> 버튼:</p>
+        <ol class="list-decimal list-inside space-y-1 text-slate-300 marker:text-red-400 marker:font-bold mt-1">
+          <li>확인 다이얼로그 → 진행</li>
+          <li>현재 데이터(사고·피해·동원·사상자·조치) 자동 백업</li>
+          <li>인덱스에 closedAt 마킹 → 일반 사용자에게 더는 안 보임</li>
+          <li>서브데이터 삭제 (저장공간 회수)</li>
+        </ol>
+        <p class="text-[11px] text-red-300 mt-2">⚠ 되돌릴 수 없음. 백업은 archives에서 다운로드 가능.</p>
+      </section>
+
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">백업 (Archives) 관리</h4>
+        <ul class="space-y-1.5 text-slate-300 ml-4 list-disc marker:text-emerald-400">
+          <li>각 백업 항목: 라벨·시각·백업자·관서·데이터 요약 표시</li>
+          <li><span class="bg-emerald-800 text-white px-2 py-0.5 rounded text-xs font-bold">엑셀로 다운로드</span> — 5개 시트 종합 보고서</li>
+          <li>🗑 — 영구 삭제 (확인 필요)</li>
+        </ul>
+      </section>
+
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">새 재난 대행 시작</h4>
+        <p class="text-slate-300">상단 패널에서 관서 선택·제목·종류 입력 → <span class="bg-purple-600 text-white px-2 py-0.5 rounded text-xs font-bold">+ 시작</span>. 관리자 명의로 해당 관서 소속 재난 생성. 합류는 안 됨(관리자는 관제만).</p>
+      </section>
+
+    </div>
+  `,
+
+  observer: `
+    <h3 class="text-xl font-bold mb-3 text-sky-300">🔭 본부 — 관찰자 (본부119)</h3>
+    <div class="space-y-4">
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">권한 및 화면</h4>
+        <ul class="space-y-1.5 text-slate-300 ml-4 list-disc marker:text-sky-400">
+          <li>로그인 후 <strong>"본부 통합 모니터링"</strong> 화면 — 모든 관서의 진행 중 재난 목록을 관서별로 그룹화하여 표시</li>
+          <li>각 재난 옆 <code class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-sky-300">READ-ONLY</code> 표시 — 읽기 전용</li>
+          <li>재난 클릭 → 진입 후 데이터 조회 가능. <em class="text-amber-300">입력·수정·삭제 불가.</em></li>
+        </ul>
+      </section>
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">사용 시나리오</h4>
+        <ul class="space-y-1.5 text-slate-300 ml-4 list-disc marker:text-sky-400">
+          <li>여러 관서가 동시 출동 시 본부에서 통합 현황 모니터링</li>
+          <li>언론 브리핑 자료 사전 검토 (브리핑 모드로 보기)</li>
+          <li>데이터 내보내기 (엑셀)로 사후 보고서 작성</li>
+        </ul>
+      </section>
+    </div>
+  `,
+
+  display: `
+    <h3 class="text-xl font-bold mb-3 text-violet-300">📺 TV 표출 모드 — 상황판119</h3>
+    <div class="space-y-4">
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">용도</h4>
+        <p class="text-slate-300">현장 지휘소·관제실·교육장 등의 <strong>대형 모니터·TV</strong>에 표출. 입력 기능 없이 시각적으로 한눈에 들어오는 통합 상황판.</p>
+      </section>
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">사용법</h4>
+        <ol class="list-decimal list-inside space-y-1.5 text-slate-300 marker:text-violet-400 marker:font-bold">
+          <li><code class="bg-slate-800 px-1.5 py-0.5 rounded text-xs">상황판119</code> 입력 → 표출 화면 진입</li>
+          <li>진행 중 재난 목록 표시 → 화면에 띄울 재난 선택</li>
+          <li>풀스크린 (F11) 권장 — TV 모드</li>
+          <li>실시간 자동 갱신 — 새 카드 입력 즉시 반영</li>
+        </ol>
+      </section>
+      <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+        <h4 class="font-bold text-base mb-2">화면 구성</h4>
+        <ul class="space-y-1.5 text-slate-300 ml-4 list-disc marker:text-violet-400">
+          <li>상단: 시스템 이름 · 진행 중 재난명 · <strong>대형 디지털 시계</strong></li>
+          <li>트리아지 합계 4칸 (긴급·응급·비응급·사망) — 풀컬러</li>
+          <li>이송 상태 4칸 (미배정·이송중·병원도착·미이송)</li>
+          <li>병원별 이송 현황 — 한 줄로 균등 분할</li>
+          <li>각 카드 클릭 → 해당 환자 목록 모달 / 환자 클릭 → 카드 상세</li>
+          <li>좌하단 ☀ 외부 모드 토글 — 밝은 환경에서 가독성 강화</li>
+          <li>"재난 변경" 버튼 — 다른 재난으로 전환</li>
+        </ul>
+      </section>
+    </div>
+  `,
+
+  faq: `
+    <h3 class="text-xl font-bold mb-3 text-amber-300">❓ 자주 묻는 질문</h3>
+    <div class="space-y-3">
+
+      <details class="bg-slate-950 rounded-xl border border-slate-800 group">
+        <summary class="px-4 py-3 cursor-pointer font-bold flex items-center gap-2 hover:bg-slate-900">
+          <i data-lucide="chevron-right" class="w-4 h-4 group-open:rotate-90 transition-transform"></i>
+          앱 설치 알림이 안 떠요
+        </summary>
+        <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
+          첫 방문에 자동 알림이 안 나올 수 있습니다. 수동으로 설치:<br>
+          • <strong>안드로이드 Chrome</strong>: 우상단 ⋮ → "앱 설치" 또는 "홈 화면에 추가"<br>
+          • <strong>아이폰 Safari</strong>: 하단 공유 ⬆️ → "홈 화면에 추가"<br>
+          • <strong>삼성 인터넷</strong>: 우하단 ☰ → "현재 페이지 추가" → "홈 화면"
+        </div>
+      </details>
+
+      <details class="bg-slate-950 rounded-xl border border-slate-800 group">
+        <summary class="px-4 py-3 cursor-pointer font-bold flex items-center gap-2 hover:bg-slate-900">
+          <i data-lucide="chevron-right" class="w-4 h-4 group-open:rotate-90 transition-transform"></i>
+          카톡 링크로 들어가면 일부 기능이 안 돼요
+        </summary>
+        <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
+          카톡 내장 브라우저는 PWA 일부 기능을 막아요. 카톡 우상단 메뉴 → <strong>"다른 브라우저로 열기"</strong> 선택 → Chrome/Safari로 열기. 또는 URL을 길게 눌러 "주소 복사" → Chrome에 붙여넣기.
+        </div>
+      </details>
+
+      <details class="bg-slate-950 rounded-xl border border-slate-800 group">
+        <summary class="px-4 py-3 cursor-pointer font-bold flex items-center gap-2 hover:bg-slate-900">
+          <i data-lucide="chevron-right" class="w-4 h-4 group-open:rotate-90 transition-transform"></i>
+          오프라인에서 사용할 수 있나요?
+        </summary>
+        <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
+          앱을 한 번 설치(또는 한 번 방문)한 후엔 통신이 끊겨도 화면이 뜹니다. 사상자 카드 입력 등 데이터는 통신 복구 시 자동 동기화됩니다. <strong>훈련 현장·신호 약한 곳에 권장</strong>.
+        </div>
+      </details>
+
+      <details class="bg-slate-950 rounded-xl border border-slate-800 group">
+        <summary class="px-4 py-3 cursor-pointer font-bold flex items-center gap-2 hover:bg-slate-900">
+          <i data-lucide="chevron-right" class="w-4 h-4 group-open:rotate-90 transition-transform"></i>
+          햇빛에서 화면이 안 보여요
+        </summary>
+        <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
+          좌하단 <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-500 text-white">☀</span> 버튼 → <strong>외부 모드</strong> 켜기. 밝은 배경 + 진한 글씨로 햇빛에서 시인성 강화. 다시 누르면 어두운 모드로 복귀.
+        </div>
+      </details>
+
+      <details class="bg-slate-950 rounded-xl border border-slate-800 group">
+        <summary class="px-4 py-3 cursor-pointer font-bold flex items-center gap-2 hover:bg-slate-900">
+          <i data-lucide="chevron-right" class="w-4 h-4 group-open:rotate-90 transition-transform"></i>
+          이름을 모르는 환자는?
+        </summary>
+        <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
+          이름란을 <strong>비워두세요</strong>. 자동으로 <code class="bg-slate-800 px-1.5 py-0.5 rounded text-pink-300 text-xs">#001 -본인호출명</code> 형식으로 부여됩니다. "미상"이라고 직접 적지 마세요.
+        </div>
+      </details>
+
+      <details class="bg-slate-950 rounded-xl border border-slate-800 group">
+        <summary class="px-4 py-3 cursor-pointer font-bold flex items-center gap-2 hover:bg-slate-900">
+          <i data-lucide="chevron-right" class="w-4 h-4 group-open:rotate-90 transition-transform"></i>
+          병원별 이송 현황에서 같은 병원이 나뉘어 보여요
+        </summary>
+        <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
+          입력자마다 병원 이름을 다르게 적으면(예: "의정부병원" vs "의정부성모병원") 별도로 집계됩니다. <strong>이송병원 입력란에서 일부만 타이핑하면 자동완성 제안</strong>이 뜨니, 가능한 한 거기서 선택해주세요.
+        </div>
+      </details>
+
+      <details class="bg-slate-950 rounded-xl border border-slate-800 group">
+        <summary class="px-4 py-3 cursor-pointer font-bold flex items-center gap-2 hover:bg-slate-900">
+          <i data-lucide="chevron-right" class="w-4 h-4 group-open:rotate-90 transition-transform"></i>
+          미이송(자체귀가)은 뭔가요?
+        </summary>
+        <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
+          현장에서 처치 후 <strong>병원에 이송하지 않고 자체귀가하는 환자</strong>를 따로 집계하기 위한 분류. 사상자 카드 → 이송 정보 → "미이송" 토글 ON. 트리아지 합계의 미이송 카드에 별도 카운트됨.
+        </div>
+      </details>
+
+      <details class="bg-slate-950 rounded-xl border border-slate-800 group">
+        <summary class="px-4 py-3 cursor-pointer font-bold flex items-center gap-2 hover:bg-slate-900">
+          <i data-lucide="chevron-right" class="w-4 h-4 group-open:rotate-90 transition-transform"></i>
+          카드를 잘못 입력했어요
+        </summary>
+        <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
+          "사상자 카드" 탭 하단의 <strong>"내가 등록한 카드"</strong> 목록에서 해당 카드 옆 ✏ 연필 아이콘 → 수정. 현장대원은 자기 카드만, 그 외 직책은 모든 카드 수정 가능.
+        </div>
+      </details>
+
+      <details class="bg-slate-950 rounded-xl border border-slate-800 group">
+        <summary class="px-4 py-3 cursor-pointer font-bold flex items-center gap-2 hover:bg-slate-900">
+          <i data-lucide="chevron-right" class="w-4 h-4 group-open:rotate-90 transition-transform"></i>
+          재난 종료 후 데이터는 어디 있나요?
+        </summary>
+        <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
+          관리자(한경승)가 강제 종료하거나 일반 사용자가 "관리 → 새 재난 시작"을 누르면 자동 백업됩니다. 관리자 콘솔의 <strong>백업 이력</strong> 패널에서 엑셀로 다운로드 가능.
+        </div>
+      </details>
+
+      <details class="bg-slate-950 rounded-xl border border-slate-800 group">
+        <summary class="px-4 py-3 cursor-pointer font-bold flex items-center gap-2 hover:bg-slate-900">
+          <i data-lucide="chevron-right" class="w-4 h-4 group-open:rotate-90 transition-transform"></i>
+          새 코드를 추가하고 싶어요
+        </summary>
+        <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
+          관리자(한경승)에게 요청하세요. 관리자 콘솔 → "관서 코드 관리" → "+ 코드 추가"에서 즉시 추가 가능합니다. 추가 즉시 모든 사용자에게 반영됨.
+        </div>
+      </details>
+
+    </div>
+  `,
+};
+
+let _helpInitialized = false;
+function initHelpModal() {
+  if (_helpInitialized) return;
+  _helpInitialized = true;
+  const modal = document.getElementById('help-modal');
+  const btn = document.getElementById('help-btn');
+  const closeBtn = document.getElementById('help-close');
+  const content = document.getElementById('help-content');
+  if (!modal || !btn || !closeBtn || !content) return;
+
+  function renderHelpTab(key) {
+    content.innerHTML = HELP_CONTENT[key] || HELP_CONTENT.start;
+    if (window.lucide) window.lucide.createIcons();
+    // 탭 활성 표시
+    document.querySelectorAll('.help-tab-btn').forEach(b => {
+      const active = b.dataset.helpTab === key;
+      b.classList.toggle('border-blue-500', active);
+      b.classList.toggle('text-white', active);
+      b.classList.toggle('text-slate-400', !active);
+    });
+    content.scrollTop = 0;
+  }
+
+  function openHelp() {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    renderHelpTab('start');
+  }
+  function closeHelp() {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+
+  btn.onclick = openHelp;
+  closeBtn.onclick = closeHelp;
+  modal.onclick = (e) => { if (e.target === modal) closeHelp(); };
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeHelp();
+  });
+  document.querySelectorAll('.help-tab-btn').forEach(b => {
+    b.onclick = () => renderHelpTab(b.dataset.helpTab);
+  });
+}
+
 function initOutdoorToggle() {
   // localStorage에서 직전 설정 복원
   try { state.outdoorMode = localStorage.getItem('disaster_outdoor') === '1'; } catch {}
@@ -5604,6 +6047,7 @@ function boot() {
     } catch {}
   }
   initOutdoorToggle();
+  initHelpModal();
   bindRealtime();
   render();
 }
