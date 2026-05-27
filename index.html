@@ -540,7 +540,7 @@
       </main>
       <!-- 푸터 -->
       <footer class="px-5 py-3 border-t border-slate-800 text-xs text-slate-500 flex items-center justify-between flex-shrink-0 gap-2 flex-wrap">
-        <span>제작 · 소방위 한경승</span>
+        <span>제작 · 소방위 한경승 · 기능개선·문의 <a href="mailto:visanu@gg.go.kr" class="text-blue-400 hover:text-blue-300 underline">visanu@gg.go.kr</a></span>
         <div class="flex items-center gap-2 flex-wrap">
           <a href="/MCI_통합상황판_현장치트시트.pdf" download class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors" title="A4 한 장 — 인쇄해서 현장 비치">
             <i data-lucide="file-text" class="w-3.5 h-3.5"></i>현장 치트시트
@@ -3075,9 +3075,11 @@ function renderMain() {
           ? (state.view === 'dashboard' ? renderDashboard() : renderInput())
           : (state.mciTab === 'situation' ? renderMciSituation() : renderMciCasualtyForm())}
         <footer class="px-4 py-6 mt-4 text-center">
-          <div class="inline-flex items-center gap-2 text-[11px] text-slate-600 tracking-wider">
+          <div class="inline-flex items-center gap-2 text-[11px] text-slate-600 tracking-wider flex-wrap justify-center">
             <span class="w-8 h-px bg-slate-800"></span>
             <span>제작자 · 소방위 한경승</span>
+            <span class="text-slate-700">|</span>
+            <span>기능개선·문의 <a href="mailto:visanu@gg.go.kr" class="text-blue-400 hover:text-blue-300 underline">visanu@gg.go.kr</a></span>
             <span class="w-8 h-px bg-slate-800"></span>
           </div>
         </footer>
