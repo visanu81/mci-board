@@ -651,8 +651,7 @@ const findAgencyByCode = (code) => {
   }
   return null;
 };
-// V1 호환 (3단계 종료 모달의 ACCESS_CODE 검증 — 추후 V2 권한으로 대체)
-const ACCESS_CODE = "119";
+// (구버전 ACCESS_CODE는 P0-3에서 제거됨 — 이제 권한 기반 isAdmin() 체크 사용)
 
 // ==================== 병원 자동완성 프리셋 ====================
 // 경기북부 권역 주요 응급의료기관(시드). 실제 입력 시 datalist 자동완성으로 활용되며,
@@ -706,6 +705,16 @@ const isObserver = () => state.session?.role === 'observer' || state.session?.ro
 const isAdmin    = () => state.session?.role === 'admin';
 const isDisplay  = () => state.session?.role === 'display';
 const canWrite   = () => !isObserver();   // 본부119/표출119는 모든 쓰기 차단
+// === observer 쓰기 차단 헬퍼 (P0-1) ===
+// save/delete 함수에서 호출 → 본부 계정의 모든 쓰기 작업 차단
+function assertCanWrite(action = '저장') {
+  if (isObserver()) {
+    alert(`본부 계정은 ${action}/수정/삭제 권한이 없습니다 (읽기 전용)`);
+    return false;
+  }
+  return true;
+}
+
 // 모든 직책이 풀 카드 입력 가능. 다만 카드 수정은 자기가 만든 카드만 가능 (현장대원 한정).
 // 구급팀장·구급팀원·지휘관은 모든 카드 수정 가능. 본부는 차단. 관리자는 전권.
 const isFieldOnly = (teamId) => teamId === 'safety';
@@ -859,6 +868,28 @@ function bindRealtime() {
   onValue(ref(db, 'incidents'), snap => {
     const v = snap.val() || {};
     state.incidents = Object.entries(v).map(([k, val]) => ({ ...val, _key: k }));
+    // P0-2: 사용자가 보고 있던 재난이 강제 종료(closedAt)되면 자동 이탈 + 알림
+    if (state.currentIncidentId) {
+      const cur = state.incidents.find(i => i._key === state.currentIncidentId);
+      if (cur && cur.closedAt) {
+        const title = cur.title || '제목 없음';
+        // 표출 모드: 재난 picker로 복귀 (전체 로그아웃하지 않음)
+        if (state.session?.role === 'display') {
+          state.currentIncidentId = null;
+          try { sessionStorage.removeItem('disaster_currentIncidentId'); } catch {}
+          rebindIncidentRealtime();
+          render();
+          setTimeout(() => alert(`"${title}" 재난이 관리자에 의해 종료되었습니다. 재난 선택 화면으로 돌아갑니다.`), 50);
+          return;
+        }
+        // 일반/본부/관리자: 로비로 복귀
+        setTimeout(() => {
+          alert(`"${title}" 재난이 관리자에 의해 종료되었습니다. 로비로 돌아갑니다.`);
+          leaveIncident();
+        }, 50);
+        return;
+      }
+    }
     render();
   });
   // V2 — archives (글로벌, 종료된 재난 백업)
@@ -1027,6 +1058,7 @@ function rebindIncidentRealtime() {
 }
 
 async function saveIncident(data) {
+  if (!assertCanWrite('사고개요 저장')) return false;
   const formKey = 'incident';
   setSaveStatus(formKey, { saving: true });
   try {
@@ -1041,6 +1073,7 @@ async function saveIncident(data) {
 }
 
 async function saveDamage(teamId, data, author) {
+  if (!assertCanWrite('피해 저장')) return false;
   const formKey = 'damage';
   setSaveStatus(formKey, { saving: true });
   try {
@@ -1055,6 +1088,7 @@ async function saveDamage(teamId, data, author) {
 }
 
 async function saveMobil(teamId, agencies, vehicles, author) {
+  if (!assertCanWrite('동원 저장')) return false;
   const formKey = 'mobil';
   setSaveStatus(formKey, { saving: true });
   try {
@@ -1069,6 +1103,7 @@ async function saveMobil(teamId, agencies, vehicles, author) {
 }
 
 async function addAction(content, teamId, author) {
+  if (!assertCanWrite('조치사항 저장')) return false;
   const formKey = 'action';
   setSaveStatus(formKey, { saving: true });
   try {
@@ -1089,11 +1124,13 @@ async function addAction(content, teamId, author) {
 }
 
 async function deleteAction(key) {
+  if (!assertCanWrite('조치사항 삭제')) return false;
   try { await remove(ref(db, incPath(`actions/${key}`))); return true; }
   catch (e) { alert('삭제 실패: ' + e.message); return false; }
 }
 
 async function saveCasualty(data, teamId, author, editKey) {
+  if (!assertCanWrite('사상자 카드 저장')) return false;
   const formKey = 'casualty';
   setSaveStatus(formKey, { saving: true });
   try {
@@ -1133,12 +1170,14 @@ async function saveCasualty(data, teamId, author, editKey) {
 }
 
 async function deleteCasualty(key) {
+  if (!assertCanWrite('사상자 카드 삭제')) return false;
   try { await remove(ref(db, incPath(`casualties/${key}`))); return true; }
   catch (e) { alert('삭제 실패: ' + e.message); return false; }
 }
 
 // MCI 사상자
 async function saveMciCasualty(data, teamId, author, editKey) {
+  if (!assertCanWrite('MCI 사상자 카드 저장')) return false;
   const formKey = 'mciCasualty';
   setSaveStatus(formKey, { saving: true });
   try {
@@ -1172,6 +1211,7 @@ async function saveMciCasualty(data, teamId, author, editKey) {
 }
 
 async function deleteMciCasualty(key) {
+  if (!assertCanWrite('MCI 사상자 카드 삭제')) return false;
   try { await remove(ref(db, incPath(`mciCasualties/${key}`))); return true; }
   catch (e) { alert('삭제 실패: ' + e.message); return false; }
 }
@@ -1258,7 +1298,8 @@ function downloadExcel(masked = false) {
     const tName = TEAMS.find(t => t.id === c.teamId)?.name || c.teamId || '';
     const tr = TRIAGE.find(t => t.id === c.triage)?.name || c.triage || '';
     const ts = c.timestamp ? new Date(c.timestamp).toLocaleString('ko-KR') : '';
-    casualtyRows.push([i+1, name, c.age || '', c.gender || '', tr, symptom || '', c.hospital || '', c.depart || '', c.author || '', tName, ts]);
+    const author = masked ? maskName(c.author) : (c.author || '');
+    casualtyRows.push([i+1, name, c.age || '', c.gender || '', tr, symptom || '', c.hospital || '', c.depart || '', author, tName, ts]);
   });
   const ws4 = XLSX.utils.aoa_to_sheet(casualtyRows);
   ws4['!cols'] = [{wch: 5}, {wch: 10}, {wch: 10}, {wch: 6}, {wch: 8}, {wch: 25}, {wch: 18}, {wch: 10}, {wch: 12}, {wch: 12}, {wch: 20}];
@@ -1271,7 +1312,8 @@ function downloadExcel(masked = false) {
   [...snap.actions].sort((a,b) => (a.timestamp||0) - (b.timestamp||0)).forEach(a => {
     const ts = a.timestamp ? new Date(a.timestamp).toLocaleString('ko-KR') : '';
     const tName = TEAMS.find(t => t.id === a.teamId)?.name || a.teamId || '';
-    actionRows.push([ts, tName, a.author || '', a.content || '']);
+    const author = masked ? maskName(a.author) : (a.author || '');
+    actionRows.push([ts, tName, author, a.content || '']);
   });
   const ws5 = XLSX.utils.aoa_to_sheet(actionRows);
   ws5['!cols'] = [{wch: 20}, {wch: 12}, {wch: 12}, {wch: 60}];
@@ -1290,13 +1332,14 @@ function downloadExcel(masked = false) {
       const parts = Array.isArray(c.injuryParts) ? c.injuryParts.join(',') : '';
       const treats = Array.isArray(c.treatments) ? c.treatments.join(',') : '';
       const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '';
+      const author = masked ? maskName(c.author) : (c.author || '');
       mciRows.push([
         i+1, cardNo, tr, name, c.age||'', c.gender||'', c.isPediatric ? 'Y' : '',
         c.location||'',
         c.consciousness||'', c.rr||'', c.pulse||'', c.bpSys||'', c.bpDia||'', c.spo2||'',
         symptom, c.mechanism||'', parts, treats, c.drugs||'',
         c.hospital||'', c.departTime||'', c.arriveTime||'', c.notes||'',
-        c.author||'', ts,
+        author, ts,
       ]);
     });
     const ws6 = XLSX.utils.aoa_to_sheet(mciRows);
@@ -1318,7 +1361,8 @@ function downloadCsv(masked = false) {
     const tName = TEAMS.find(t => t.id === c.teamId)?.name || c.teamId || '';
     const tr = TRIAGE.find(t => t.id === c.triage)?.name || c.triage || '';
     const ts = c.timestamp ? new Date(c.timestamp).toLocaleString('ko-KR') : '';
-    rows.push([i+1, name, c.age||'', c.gender||'', tr, symptom||'', c.hospital||'', c.depart||'', c.author||'', tName, ts]);
+    const author = masked ? maskName(c.author) : (c.author || '');
+    rows.push([i+1, name, c.age||'', c.gender||'', tr, symptom||'', c.hospital||'', c.depart||'', author, tName, ts]);
   });
   const csv = '\uFEFF' + rows.map(r => r.map(v => {
     const s = String(v ?? '');
@@ -1346,6 +1390,7 @@ function downloadJson() {
 
 // ==================== 초기화 ====================
 async function archiveAndReset(label) {
+  if (!assertCanWrite('재난 종료/초기화')) return { ok: false, reason: '권한 없음' };
   const snap = buildSnapshot();
   // 데이터가 비어있으면 백업 안 함
   const hasData = snap.incident || Object.keys(snap.damages).length || Object.keys(snap.mobilizations).length
@@ -1378,6 +1423,7 @@ async function archiveAndReset(label) {
 }
 
 async function deleteArchive(key) {
+  if (!assertCanWrite('백업 삭제')) return false;
   try { await remove(ref(db, `archives/${key}`)); return true; }
   catch (e) { alert('삭제 실패: ' + e.message); return false; }
 }
@@ -1646,7 +1692,7 @@ function bindAuthEvents() {
   const err = document.getElementById('auth-error');
   const submit = () => {
     const raw = (input.value || '').trim();
-    console.log('[V2 login] raw=', JSON.stringify(raw), 'codePoints=', [...raw].map(c => c.codePointAt(0).toString(16)).join(' '));
+    // 보안: 진입 코드는 절대 로그에 남기지 않음 (디버그용 console.log 제거)
     const agency = findAgencyByCode(raw);
     if (agency) {
       state.session = { agencyId: agency.id, agency: agency, role: agency.role };
@@ -2186,7 +2232,7 @@ function renderDisplayModal() {
                     <span class="text-base px-2 py-1 rounded font-black flex-shrink-0" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.shortName || '?'}</span>
                     ${c.isPediatric ? '<i data-lucide="baby" class="w-5 h-5 text-cyan-400 flex-shrink-0"></i>' : ''}
                     <span class="font-bold ${c._autoNamed ? 'italic text-slate-400' : 'text-slate-100'} flex-shrink-0">${escapeHtml(c.name || '-')}</span>
-                    <span class="text-base text-slate-400 mono flex-shrink-0">${escapeHtml(c.age || '?')}/${c.gender || '?'}</span>
+                    <span class="text-base text-slate-400 mono flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
                     ${c.location ? `<span class="text-base text-pink-300 truncate max-w-[260px] flex-shrink-0"><i data-lucide="map-pin" class="w-4 h-4 inline"></i>${escapeHtml(c.location)}</span>` : ''}
                     <span class="flex-1 min-w-0 text-base text-slate-300 truncate">${escapeHtml(c.symptom || '')}</span>
                     <div class="flex items-center gap-3 flex-shrink-0 text-base">
@@ -2196,8 +2242,8 @@ function renderDisplayModal() {
                             ? `<span class="text-emerald-300 truncate max-w-[160px]">${escapeHtml(c.hospital)}</span>`
                             : '<span class="text-amber-400">미배정</span>')}
                       ${c.arriveTime
-                        ? `<span class="text-emerald-400 mono">${c.arriveTime}</span>`
-                        : (c.departTime && !c.notTransported ? `<span class="text-amber-400 mono">${c.departTime}</span>` : '')}
+                        ? `<span class="text-emerald-400 mono">${escapeHtml(c.arriveTime)}</span>`
+                        : (c.departTime && !c.notTransported ? `<span class="text-amber-400 mono">${escapeHtml(c.departTime)}</span>` : '')}
                     </div>
                     <i data-lucide="chevron-right" class="w-5 h-5 text-slate-600 flex-shrink-0"></i>
                   </button>
@@ -2215,10 +2261,10 @@ function renderDisplayPatientCard(c) {
   const tr = MCI_TRIAGE.find(t => t.id === c.triage);
   const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '-';
   const vital = [
-    c.rr ? `RR ${c.rr}` : '',
-    c.pulse ? `P ${c.pulse}` : '',
-    (c.bpSys && c.bpDia) ? `BP ${c.bpSys}/${c.bpDia}` : '',
-    c.spo2 ? `SpO₂ ${c.spo2}` : '',
+    c.rr ? `RR ${escapeHtml(c.rr)}` : '',
+    c.pulse ? `P ${escapeHtml(c.pulse)}` : '',
+    (c.bpSys && c.bpDia) ? `BP ${escapeHtml(c.bpSys)}/${escapeHtml(c.bpDia)}` : '',
+    c.spo2 ? `SpO₂ ${escapeHtml(c.spo2)}` : '',
   ].filter(Boolean).join(' · ');
 
   return `
@@ -2239,7 +2285,7 @@ function renderDisplayPatientCard(c) {
           <div class="grid grid-cols-3 gap-4">
             <div class="bg-slate-950 rounded-xl p-4 border border-slate-800">
               <div class="text-xs text-slate-500 tracking-wider uppercase mb-1">연령 / 성별</div>
-              <div class="text-2xl mono text-slate-100">${escapeHtml(c.age || '-')} / ${c.gender || '-'}</div>
+              <div class="text-2xl mono text-slate-100">${escapeHtml(c.age || '-')} / ${escapeHtml(c.gender || '-')}</div>
             </div>
             <div class="col-span-2 bg-slate-950 rounded-xl p-4 border border-slate-800">
               <div class="text-xs text-slate-500 tracking-wider uppercase mb-1 flex items-center gap-1"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-pink-400"></i>발견장소</div>
@@ -2252,7 +2298,7 @@ function renderDisplayPatientCard(c) {
             <div class="flex items-center gap-4 flex-wrap">
               <div>
                 <span class="text-xs text-slate-500">AVPU</span>
-                ${c.consciousness ? `<span class="text-xl ml-2 px-3 py-1 rounded bg-slate-800 text-slate-100 font-bold">${c.consciousness}</span>` : '<span class="text-slate-600 ml-2">미입력</span>'}
+                ${c.consciousness ? `<span class="text-xl ml-2 px-3 py-1 rounded bg-slate-800 text-slate-100 font-bold">${escapeHtml(c.consciousness)}</span>` : '<span class="text-slate-600 ml-2">미입력</span>'}
               </div>
               <div class="text-xl mono text-slate-200">${vital || '<span class="text-slate-600">생체징후 미입력</span>'}</div>
             </div>
@@ -2948,6 +2994,7 @@ async function openNewIncidentDialog() {
 // opts.agencyId : 명시적 관서 ID 지정 (없으면 현재 세션 관서)  ← 관리자가 타관서 대행 생성 시 사용
 // opts.noJoin   : true면 합류하지 않음 (관리자가 콘솔에서 다수 생성 시 사용)
 async function createIncident(title, type, opts = {}) {
+  if (!assertCanWrite('새 재난 시작')) return false;
   try {
     const newRef = push(ref(db, 'incidents'));
     const incidentId = newRef.key;
@@ -3004,8 +3051,20 @@ function leaveIncident() {
 function renderMain() {
   const team = TEAMS.find(t => t.id === state.user.teamId)
     || { id: state.user.teamId, name: '미상', color: '#64748b' };
+  const observerMode = isObserver();
+  // observer가 어쩌다 입력 탭에 들어가 있으면 강제로 조회 탭으로
+  if (observerMode) {
+    if (state.view === 'input') state.view = 'dashboard';
+    if (state.mciTab === 'casualty') state.mciTab = 'situation';
+  }
   return `
     <div class="min-h-screen text-slate-100">
+      ${observerMode ? `
+        <div class="bg-sky-900/40 border-b border-sky-700 text-sky-100 text-center py-2 text-xs font-bold flex items-center justify-center gap-2">
+          <i data-lucide="eye" class="w-4 h-4"></i>
+          본부 통합 모니터링 — 읽기 전용 (입력·수정·삭제 불가)
+        </div>
+      ` : ''}
       <header class="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800">
         <div class="px-4 py-3 flex items-center justify-between">
           <div class="flex items-center gap-2">
@@ -3018,11 +3077,13 @@ function renderMain() {
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <button id="admin-btn" class="text-[11px] text-slate-300 px-3 py-1.5 rounded bg-slate-800/50 hover:bg-slate-700 flex items-center gap-1">
-              <i data-lucide="settings" class="w-3 h-3"></i>관리
-            </button>
+            ${!observerMode ? `
+              <button id="admin-btn" class="text-[11px] text-slate-300 px-3 py-1.5 rounded bg-slate-800/50 hover:bg-slate-700 flex items-center gap-1">
+                <i data-lucide="settings" class="w-3 h-3"></i>관리
+              </button>
+            ` : ''}
             <button id="logout-btn" class="text-[11px] text-slate-500 px-3 py-1.5 rounded bg-slate-800/50">
-              반 변경
+              ${observerMode ? '로비로' : '반 변경'}
             </button>
           </div>
         </div>
@@ -3077,11 +3138,13 @@ function renderMain() {
             }">
               <i data-lucide="eye" class="w-4 h-4 inline mr-1.5"></i>통합 상황판
             </button>
-            <button data-view="input" class="view-btn flex-1 py-2.5 text-sm font-medium transition-all ${
-              state.view === 'input' ? 'text-white border-b-2 border-red-500' : 'text-slate-500'
-            }">
-              <i data-lucide="edit-3" class="w-4 h-4 inline mr-1.5"></i>입력
-            </button>
+            ${!observerMode ? `
+              <button data-view="input" class="view-btn flex-1 py-2.5 text-sm font-medium transition-all ${
+                state.view === 'input' ? 'text-white border-b-2 border-red-500' : 'text-slate-500'
+              }">
+                <i data-lucide="edit-3" class="w-4 h-4 inline mr-1.5"></i>입력
+              </button>
+            ` : ''}
           </div>
         ` : `
           <div class="flex border-t border-slate-800">
@@ -3090,11 +3153,13 @@ function renderMain() {
             }">
               <i data-lucide="layout-dashboard" class="w-4 h-4 inline mr-1.5"></i>MCI 통합 상황판
             </button>
-            <button data-mci-tab="casualty" class="mci-tab-btn flex-1 py-2.5 text-sm font-medium transition-all ${
-              state.mciTab === 'casualty' ? 'text-white border-b-2 border-pink-500' : 'text-slate-500'
-            }">
-              <i data-lucide="user-round-plus" class="w-4 h-4 inline mr-1.5"></i>사상자 카드
-            </button>
+            ${!observerMode ? `
+              <button data-mci-tab="casualty" class="mci-tab-btn flex-1 py-2.5 text-sm font-medium transition-all ${
+                state.mciTab === 'casualty' ? 'text-white border-b-2 border-pink-500' : 'text-slate-500'
+              }">
+                <i data-lucide="user-round-plus" class="w-4 h-4 inline mr-1.5"></i>사상자 카드
+              </button>
+            ` : ''}
           </div>
         `}
       </header>
@@ -3297,12 +3362,7 @@ function renderResetPanel() {
         <label class="text-[11px] text-slate-400 block mb-1">확인을 위해 <span class="text-red-400 font-bold">초기화</span> 를 정확히 입력하세요</label>
         <input id="reset-confirm" type="text" placeholder="초기화"
           class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
-      </div>
-
-      <div>
-        <label class="text-[11px] text-slate-400 block mb-1">접근 코드 재입력</label>
-        <input id="reset-pw" type="password" placeholder="접근 코드"
-          class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
+        <p class="text-[10px] text-slate-600 mt-1">⚠ 실행하면 현재 재난 데이터가 백업되고 초기화됩니다. 되돌릴 수 없음.</p>
       </div>
 
       <button id="execute-reset" class="w-full py-3 rounded-xl bg-red-700 hover:bg-red-600 font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2">
@@ -3319,11 +3379,15 @@ function bindMainEvents() {
     formDrafts = { incident: null, damage: null, mobil: { agencies: null, vehicles: null }, action: '' };
     leaveIncident();
   };
-  document.getElementById('admin-btn').onclick = () => {
-    state.adminModal = true;
-    state.adminTab = 'export';
-    render();
-  };
+  // 관리 버튼은 observer에게는 숨겨져 있음 → null 체크
+  const adminBtn = document.getElementById('admin-btn');
+  if (adminBtn) {
+    adminBtn.onclick = () => {
+      state.adminModal = true;
+      state.adminTab = 'export';
+      render();
+    };
+  }
   document.querySelectorAll('.view-btn').forEach(btn => {
     btn.onclick = () => { state.view = btn.dataset.view; render(); };
   });
@@ -3408,15 +3472,15 @@ function bindAdminModalEvents() {
     execBtn.onclick = async () => {
       const label = (document.getElementById('reset-label')?.value || '').trim();
       const confirmText = (document.getElementById('reset-confirm')?.value || '').trim();
-      const pw = (document.getElementById('reset-pw')?.value || '').trim();
       const resultEl = document.getElementById('reset-result');
 
-      if (confirmText !== '초기화') {
-        resultEl.innerHTML = '<span class="text-red-400">"초기화" 를 정확히 입력해주세요</span>';
+      // 권한 가드: observer(본부) 차단
+      if (isObserver()) {
+        resultEl.innerHTML = '<span class="text-red-400">권한이 없습니다 (본부 계정은 읽기 전용)</span>';
         return;
       }
-      if (pw !== ACCESS_CODE) {
-        resultEl.innerHTML = '<span class="text-red-400">접근 코드가 잘못되었습니다</span>';
+      if (confirmText !== '초기화') {
+        resultEl.innerHTML = '<span class="text-red-400">"초기화" 를 정확히 입력해주세요</span>';
         return;
       }
       if (!confirm(`정말로 현재 재난 데이터를 백업하고 초기화하시겠습니까?\n\n라벨: ${label || '(빈 값)'}\n\n이 작업은 되돌릴 수 없습니다.`)) return;
@@ -3612,7 +3676,7 @@ function renderDashboard() {
                     <tr class="border-t border-slate-800 hover:bg-slate-950/40">
                       <td class="px-2 py-2 text-slate-500 mono">${i + 1}</td>
                       <td class="px-2 py-2 font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'}">${displayName}</td>
-                      <td class="px-2 py-2 text-center text-slate-400 mono">${displayAge}/${c.gender || '-'}</td>
+                      <td class="px-2 py-2 text-center text-slate-400 mono">${displayAge}/${escapeHtml(c.gender || '-')}</td>
                       <td class="px-2 py-2 text-center">
                         <span class="text-[10px] px-1.5 py-0.5 rounded font-bold" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.name || '?'}</span>
                       </td>
@@ -4006,7 +4070,7 @@ function renderCasualtyForm() {
                 <div class="flex items-center gap-2 p-2 rounded-lg ${isCurrent ? 'bg-amber-950/30 border border-amber-700/50' : 'bg-slate-950'}">
                   <span class="text-[10px] px-1.5 py-0.5 rounded font-bold flex-shrink-0" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.name || '?'}</span>
                   <span class="text-sm font-medium">${escapeHtml(c.name)}</span>
-                  <span class="text-xs text-slate-500">${escapeHtml(c.age || '?')}/${c.gender || '?'}</span>
+                  <span class="text-xs text-slate-500">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
                   <span class="text-xs text-slate-400 truncate flex-1">${escapeHtml(c.symptom || '')}</span>
                   <button data-edit-cs="${c._key}" class="edit-casualty text-slate-500 hover:text-amber-400 flex-shrink-0">
                     <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
@@ -4613,7 +4677,7 @@ function renderMciCasualtyForm() {
                   <span class="text-[9px] text-slate-600 mono w-9 flex-shrink-0">${cardNo}</span>
                   <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.shortName || '?'}</span>
                   <span class="text-sm font-medium ${c._autoNamed ? 'text-slate-400 italic' : ''}">${escapeHtml(c.name || '-')}</span>
-                  <span class="text-xs text-slate-500">${escapeHtml(c.age || '?')}/${c.gender || '?'}</span>
+                  <span class="text-xs text-slate-500">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
                   ${c.isPediatric ? '<i data-lucide="baby" class="w-3 h-3 text-cyan-400"></i>' : ''}
                   <div class="flex-1 min-w-0 text-xs text-slate-400 truncate">
                     ${c.location ? `<span class="text-pink-300">📍${escapeHtml(c.location)}</span> · ` : ''}${escapeHtml(c.symptom || '')}
@@ -5033,7 +5097,7 @@ function renderMciSituation() {
                         <span class="text-[10px] text-slate-500 mono w-9 flex-shrink-0">${cardNo}</span>
                         ${c.isPediatric ? '<i data-lucide="baby" class="w-3 h-3 text-cyan-400 flex-shrink-0"></i>' : ''}
                         <span class="text-sm font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''} flex-shrink-0">${displayName}</span>
-                        <span class="text-[10px] text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${c.gender || '?'}</span>
+                        <span class="text-[10px] text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
                         ${c.location ? `<span class="text-[11px] text-pink-300 truncate max-w-[160px] flex-shrink-0" title="${escapeHtml(c.location)}"><i data-lucide="map-pin" class="w-3 h-3 inline"></i>${escapeHtml(c.location)}</span>` : ''}
                         <span class="flex-1 min-w-0 text-[11px] text-slate-500 truncate">${displaySymptom}</span>
                         <div class="flex items-center gap-2 text-[10px] mono flex-shrink-0">
@@ -5045,7 +5109,7 @@ function renderMciSituation() {
                           ${c.notTransported
                             ? ''
                             : (c.arriveTime
-                                ? `<span class="text-emerald-400">${c.arriveTime}</span>`
+                                ? `<span class="text-emerald-400">${escapeHtml(c.arriveTime)}</span>`
                                 : (c.departTime ? `<span class="text-amber-400">이송중</span>` : ''))}
                         </div>
                         <i data-lucide="chevron-right" class="w-3 h-3 text-slate-600 flex-shrink-0"></i>
@@ -5128,7 +5192,7 @@ function renderMciSituation() {
                         <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.shortName || '?'}</span>
                         ${c.isPediatric ? '<i data-lucide="baby" class="w-3 h-3 text-cyan-400 flex-shrink-0"></i>' : ''}
                         <span class="text-sm font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''} flex-shrink-0">${displayName}</span>
-                        <span class="text-[10px] text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${c.gender || '?'}</span>
+                        <span class="text-[10px] text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
                         ${c.location ? `<span class="text-[11px] text-pink-300 truncate max-w-[140px] flex-shrink-0" title="${escapeHtml(c.location)}"><i data-lucide="map-pin" class="w-3 h-3 inline"></i>${escapeHtml(c.location)}</span>` : ''}
                         <span class="flex-1 min-w-0 text-[11px] text-slate-500 truncate">${displaySymptom}</span>
                         <div class="flex items-center gap-2 text-[10px] mono flex-shrink-0">
@@ -5140,8 +5204,8 @@ function renderMciSituation() {
                           ${c.notTransported
                             ? ''
                             : (c.arriveTime
-                                ? `<span class="text-emerald-400">${c.arriveTime}</span>`
-                                : (c.departTime ? `<span class="text-amber-400">출발 ${c.departTime}</span>` : ''))}
+                                ? `<span class="text-emerald-400">${escapeHtml(c.arriveTime)}</span>`
+                                : (c.departTime ? `<span class="text-amber-400">출발 ${escapeHtml(c.departTime)}</span>` : ''))}
                         </div>
                         <i data-lucide="chevron-right" class="w-3 h-3 text-slate-600 flex-shrink-0"></i>
                       </button>
@@ -5212,11 +5276,11 @@ function renderMciSituation() {
                           <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.shortName || '?'}</span>
                           ${c.isPediatric ? '<i data-lucide="baby" class="w-3 h-3 text-cyan-400 flex-shrink-0"></i>' : ''}
                           <span class="text-sm font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''} flex-shrink-0">${displayName}</span>
-                          <span class="text-[10px] text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${c.gender || '?'}</span>
+                          <span class="text-[10px] text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
                           <span class="flex-1 min-w-0 text-[11px] text-slate-500 truncate">${displaySymptom}</span>
                           <div class="flex items-center gap-2 text-[10px] mono flex-shrink-0">
-                            ${c.departTime ? `<span class="text-slate-500">출발 ${c.departTime}</span>` : ''}
-                            ${c.arriveTime ? `<span class="text-emerald-400">도착 ${c.arriveTime}</span>` : (c.departTime ? '<span class="text-amber-400">이송 중</span>' : '<span class="text-slate-600">미출발</span>')}
+                            ${c.departTime ? `<span class="text-slate-500">출발 ${escapeHtml(c.departTime)}</span>` : ''}
+                            ${c.arriveTime ? `<span class="text-emerald-400">도착 ${escapeHtml(c.arriveTime)}</span>` : (c.departTime ? '<span class="text-amber-400">이송 중</span>' : '<span class="text-slate-600">미출발</span>')}
                           </div>
                           <i data-lucide="chevron-right" class="w-3 h-3 text-slate-600 flex-shrink-0"></i>
                         </button>
@@ -5271,10 +5335,10 @@ function renderMciSituation() {
                   const displayAuthor = state.briefingMode ? maskName(c.author) : escapeHtml(c.author || '-');
                   const displaySymptom = state.briefingMode ? maskSymptom(c.symptom) : escapeHtml(c.symptom || '-');
                   const vital = [
-                    c.rr ? `RR ${c.rr}` : '',
-                    c.pulse ? `P ${c.pulse}` : '',
-                    (c.bpSys && c.bpDia) ? `${c.bpSys}/${c.bpDia}` : '',
-                    c.spo2 ? `SpO₂ ${c.spo2}` : '',
+                    c.rr ? `RR ${escapeHtml(c.rr)}` : '',
+                    c.pulse ? `P ${escapeHtml(c.pulse)}` : '',
+                    (c.bpSys && c.bpDia) ? `${escapeHtml(c.bpSys)}/${escapeHtml(c.bpDia)}` : '',
+                    c.spo2 ? `SpO₂ ${escapeHtml(c.spo2)}` : '',
                   ].filter(Boolean).join(' / ');
                   const tx = Array.isArray(c.treatments) ? c.treatments.slice(0, 3).join('·') : '';
                   const txMore = Array.isArray(c.treatments) && c.treatments.length > 3 ? ` +${c.treatments.length - 3}` : '';
@@ -5287,10 +5351,10 @@ function renderMciSituation() {
                         ${c.isPediatric ? '<i data-lucide="baby" class="w-3.5 h-3.5 text-cyan-400 inline ml-1"></i>' : ''}
                       </td>
                       <td class="px-2.5 py-2.5 font-bold ${state.briefingMode ? 'mono text-slate-200' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''}">${displayName}</td>
-                      <td class="px-2.5 py-2.5 text-center text-slate-300 mono font-medium">${escapeHtml(c.age || '-')}/${c.gender || '-'}</td>
+                      <td class="px-2.5 py-2.5 text-center text-slate-300 mono font-medium">${escapeHtml(c.age || '-')}/${escapeHtml(c.gender || '-')}</td>
                       <td class="px-2.5 py-2.5 text-slate-200 max-w-[160px] truncate" title="${escapeHtml(c.location || '')}">${escapeHtml(c.location || '-')}</td>
                       <td class="px-2.5 py-2.5 text-center">
-                        ${c.consciousness ? `<span class="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-100 font-bold">${c.consciousness}</span>` : '<span class="text-slate-600">-</span>'}
+                        ${c.consciousness ? `<span class="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-100 font-bold">${escapeHtml(c.consciousness)}</span>` : '<span class="text-slate-600">-</span>'}
                       </td>
                       <td class="px-2.5 py-2.5 text-slate-200 mono text-xs max-w-[200px]">${vital || '-'}</td>
                       <td class="px-2.5 py-2.5 text-slate-200 max-w-[140px] truncate">${displaySymptom}</td>
@@ -5301,7 +5365,7 @@ function renderMciSituation() {
                           : `<span class="text-slate-200">${escapeHtml(c.hospital || '-')}</span>`
                       }</td>
                       <td class="px-2.5 py-2.5 text-center text-slate-300 mono text-xs">
-                        ${c.departTime || '-'}<br>${c.arriveTime ? `<span class="text-emerald-400 font-bold">${c.arriveTime}</span>` : '-'}
+                        ${escapeHtml(c.departTime || '-')}<br>${c.arriveTime ? `<span class="text-emerald-400 font-bold">${escapeHtml(c.arriveTime)}</span>` : '-'}
                       </td>
                       <td class="px-2.5 py-2.5 text-slate-300 text-xs max-w-[90px] truncate">${displayAuthor}</td>
                     </tr>
@@ -5426,10 +5490,10 @@ function renderMciCardDetailModal() {
   const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '-';
 
   const vitalRows = [
-    { label: '호흡수 (RR)', val: c.rr ? `${c.rr} 회/분` : '' },
-    { label: '맥박 (P)',    val: c.pulse ? `${c.pulse} 회/분` : '' },
-    { label: '혈압 (BP)',   val: (c.bpSys && c.bpDia) ? `${c.bpSys}/${c.bpDia} mmHg` : '' },
-    { label: 'SpO₂',        val: c.spo2 ? `${c.spo2} %` : '' },
+    { label: '호흡수 (RR)', val: c.rr ? `${escapeHtml(c.rr)} 회/분` : '' },
+    { label: '맥박 (P)',    val: c.pulse ? `${escapeHtml(c.pulse)} 회/분` : '' },
+    { label: '혈압 (BP)',   val: (c.bpSys && c.bpDia) ? `${escapeHtml(c.bpSys)}/${escapeHtml(c.bpDia)} mmHg` : '' },
+    { label: 'SpO₂',        val: c.spo2 ? `${escapeHtml(c.spo2)} %` : '' },
   ];
   const hasVital = vitalRows.some(v => v.val);
 
@@ -5468,7 +5532,7 @@ function renderMciCardDetailModal() {
               </div>
               <div>
                 <div class="text-[10px] text-slate-500 mb-0.5">성별</div>
-                <div class="text-slate-200">${c.gender || '-'}</div>
+                <div class="text-slate-200">${escapeHtml(c.gender || '-')}</div>
               </div>
             </div>
           </section>
@@ -5489,7 +5553,7 @@ function renderMciCardDetailModal() {
                 <div class="text-[10px] text-slate-500 mb-0.5">의식 (AVPU)</div>
                 ${c.consciousness ? `
                   <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-100 font-bold">
-                    ${c.consciousness}${avpu ? ` · ${avpu.name.replace(/^.\·/, '')} (${avpu.desc})` : ''}
+                    ${escapeHtml(c.consciousness)}${avpu ? ` · ${avpu.name.replace(/^.\·/, '')} (${avpu.desc})` : ''}
                   </span>
                 ` : '<span class="text-slate-600 text-xs">미입력</span>'}
               </div>
