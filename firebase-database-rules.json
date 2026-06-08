@@ -1,0 +1,119 @@
+{
+  "rules": {
+
+    "//": "================================================================",
+    "//1": "MCI 통합 상황판 — Firebase Realtime Database 보안 규칙",
+    "//2": "",
+    "//3": "원칙:",
+    "//4": "  - Anonymous Auth로 인증된 사용자만 read/write 가능 (auth != null)",
+    "//5": "  - 외부에서 curl/postman으로 직접 호출 차단",
+    "//6": "  - 데이터 크기 제한으로 DoS 방지",
+    "//7": "  - 클라이언트 측 역할(role) 체크는 UI 가드용 (Rules가 진짜 보호)",
+    "//8": "",
+    "//9": "적용 방법:",
+    "//10": "  Firebase Console → Realtime Database → 규칙(Rules) 탭 → 이 내용 붙여넣기 → 게시",
+    "//11": "================================================================",
+
+    ".read": false,
+    ".write": false,
+
+    "incidents": {
+      ".read": "auth != null",
+      ".indexOn": ["agencyId", "closedAt", "startedAt"],
+      "$incidentId": {
+        ".write": "auth != null",
+
+        "agencyId":        { ".validate": "newData.isString() && newData.val().length <= 50" },
+        "title":           { ".validate": "newData.isString() && newData.val().length <= 200" },
+        "type":            { ".validate": "newData.isString() && newData.val().length <= 50" },
+        "startedAt":       { ".validate": "newData.isNumber()" },
+        "lastActivityAt":  { ".validate": "newData.isNumber()" },
+        "createdBy":       { ".validate": "newData.isString() && newData.val().length <= 100" },
+        "closedAt":        { ".validate": "newData.val() === null || newData.isNumber()" },
+        "closedBy":        { ".validate": "newData.isString() && newData.val().length <= 100" },
+
+        "incident": {
+          "$field": { ".validate": "newData.isString() && newData.val().length <= 5000" }
+        },
+
+        "damages": {
+          "$teamId": {
+            ".validate": "$teamId.length <= 50",
+            "$field": { ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 200)" }
+          }
+        },
+
+        "mobilizations": {
+          "$teamId": {
+            ".validate": "$teamId.length <= 50"
+          }
+        },
+
+        "actions": {
+          "$actionId": {
+            "content":  { ".validate": "newData.isString() && newData.val().length <= 5000" },
+            "teamId":   { ".validate": "newData.isString() && newData.val().length <= 50" },
+            "author":   { ".validate": "newData.isString() && newData.val().length <= 100" },
+            "timestamp":{ ".validate": "newData.isNumber()" }
+          }
+        },
+
+        "casualties": {
+          "$cardId": {
+            "name":     { ".validate": "newData.isString() && newData.val().length <= 100" },
+            "age":      { ".validate": "newData.isString() && newData.val().length <= 30" },
+            "gender":   { ".validate": "newData.isString() && newData.val().length <= 10" },
+            "symptom":  { ".validate": "newData.isString() && newData.val().length <= 1000" },
+            "hospital": { ".validate": "newData.isString() && newData.val().length <= 100" },
+            "notes":    { ".validate": "newData.isString() && newData.val().length <= 3000" },
+            "$other":   { ".validate": true }
+          }
+        },
+
+        "mciCasualties": {
+          "$cardId": {
+            "name":       { ".validate": "newData.isString() && newData.val().length <= 100" },
+            "age":        { ".validate": "newData.isString() && newData.val().length <= 30" },
+            "gender":     { ".validate": "newData.isString() && newData.val().length <= 10" },
+            "location":   { ".validate": "newData.isString() && newData.val().length <= 500" },
+            "triage":     { ".validate": "newData.isString() && newData.val().length <= 30" },
+            "consciousness": { ".validate": "newData.isString() && newData.val().length <= 30" },
+            "rr":         { ".validate": "newData.val() === '' || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 200) || (newData.isString() && newData.val().length <= 10)" },
+            "pulse":      { ".validate": "newData.val() === '' || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 300) || (newData.isString() && newData.val().length <= 10)" },
+            "bpSys":      { ".validate": "newData.val() === '' || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 400) || (newData.isString() && newData.val().length <= 10)" },
+            "bpDia":      { ".validate": "newData.val() === '' || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 300) || (newData.isString() && newData.val().length <= 10)" },
+            "spo2":       { ".validate": "newData.val() === '' || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 100) || (newData.isString() && newData.val().length <= 10)" },
+            "symptom":    { ".validate": "newData.isString() && newData.val().length <= 1000" },
+            "mechanism":  { ".validate": "newData.isString() && newData.val().length <= 100" },
+            "drugs":      { ".validate": "newData.isString() && newData.val().length <= 500" },
+            "hospital":   { ".validate": "newData.isString() && newData.val().length <= 100" },
+            "departTime": { ".validate": "newData.isString() && newData.val().length <= 10" },
+            "arriveTime": { ".validate": "newData.isString() && newData.val().length <= 10" },
+            "notes":      { ".validate": "newData.isString() && newData.val().length <= 3000" },
+            "$other":     { ".validate": true }
+          }
+        }
+      }
+    },
+
+    "archives": {
+      ".read":  "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["archivedAt"]
+    },
+
+    "config": {
+      "agencyCodes": {
+        ".read":  "auth != null",
+        ".write": "auth != null",
+        "$codeId": {
+          "code": { ".validate": "newData.isString() && newData.val().length <= 50" },
+          "id":   { ".validate": "newData.isString() && newData.val().length <= 50" },
+          "name": { ".validate": "newData.isString() && newData.val().length <= 50" },
+          "role": { ".validate": "newData.isString() && (newData.val() === 'normal' || newData.val() === 'observer' || newData.val() === 'admin' || newData.val() === 'display')" }
+        }
+      }
+    }
+
+  }
+}

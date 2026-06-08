@@ -575,6 +575,9 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import {
   getDatabase, ref, set, get, onValue, remove, push, update, child
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import {
+  getAuth, signInAnonymously, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 // ==================== Firebase 설정 ====================
 const firebaseConfig = {
@@ -590,6 +593,32 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const auth = getAuth(app);
+
+// ==================== Firebase 익명 인증 ====================
+// Database Rules에서 auth != null 요구 → 외부 직접 API 호출 차단.
+// 첫 페이지 로드 시 익명 사용자로 자동 로그인 (사용자 눈에는 안 보임).
+// 오프라인일 땐 5초 후 타임아웃 → 일반 진행 (캐시된 화면 표시).
+const authReady = new Promise((resolve) => {
+  let resolved = false;
+  const finish = (user) => {
+    if (resolved) return;
+    resolved = true;
+    resolve(user || null);
+  };
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      console.log('[Auth] 익명 인증 완료');
+      finish(user);
+    }
+  });
+  signInAnonymously(auth).catch((err) => {
+    console.warn('[Auth] 익명 인증 실패 (네트워크?):', err.code);
+    finish(null);
+  });
+  // 안전망: 5초 안에 응답 없으면 일단 진행 (오프라인 캐시 시나리오)
+  setTimeout(() => finish(null), 5000);
+});
 
 // ==================== V2 진입 코드 매핑 ====================
 // 동두천119/양주119/... → 각 관서 로비 (소속 관서 재난만 보임)
@@ -6044,7 +6073,7 @@ function initOutdoorToggle() {
 }
 
 // ==================== 초기 부팅 ====================
-function boot() {
+async function boot() {
   if (sessionStorage.getItem('disaster_authed') === '1') {
     state.authed = true;
   }
@@ -6057,6 +6086,9 @@ function boot() {
   }
   initOutdoorToggle();
   initHelpModal();
+  // 익명 인증 대기 — Firebase Rules가 auth!=null 요구하므로 인증 후 데이터 구독.
+  // 오프라인이거나 5초 안에 응답 없으면 일단 진행 (캐시 화면 표시).
+  await authReady;
   bindRealtime();
   render();
 }
