@@ -21,6 +21,8 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- Tesseract.js — 카메라 OCR (한국어 인식) -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
   body { font-family: 'Pretendard', sans-serif; background: #020617; color: #f1f5f9; }
   input[type=number]::-webkit-inner-spin-button,
@@ -47,6 +49,13 @@
   input, textarea, select {
     color: #f1f5f9 !important;        /* slate-100, 매우 밝음 */
     font-weight: 500;
+  }
+
+  /* OCR로 자동 채워진 필드 — 노란 외곽선 + 배경으로 "확인 필요" 강조 */
+  .ocr-filled {
+    background-color: rgba(250, 204, 21, 0.08) !important;
+    border-color: #facc15 !important;
+    box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.3);
   }
 
   /* ============================================================================
@@ -505,6 +514,69 @@
 <button id="help-btn" class="fixed bottom-4 left-20 z-[100] w-12 h-12 rounded-full bg-blue-500 hover:bg-blue-400 shadow-2xl shadow-blue-900/30 flex items-center justify-center text-white border-2 border-blue-300 transition-all" title="도움말 / 사용법" aria-label="도움말">
   <i data-lucide="help-circle" class="w-5 h-5"></i>
 </button>
+
+<!-- 카메라 OCR 모달 (body에 직접 배치) -->
+<div id="camera-modal" class="fixed inset-0 z-[200] bg-black hidden flex-col">
+  <!-- 헤더 -->
+  <div class="px-4 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
+    <div class="flex items-center gap-2">
+      <i data-lucide="camera" class="w-5 h-5 text-pink-400"></i>
+      <h2 id="camera-title" class="text-base font-bold text-white">사상자 카드 촬영</h2>
+    </div>
+    <button id="camera-close" class="text-slate-400 hover:text-white p-2" aria-label="닫기">
+      <i data-lucide="x" class="w-6 h-6"></i>
+    </button>
+  </div>
+
+  <!-- 본문 — 라이브 / 미리보기 / 분석 중 3개 화면 전환 -->
+  <div class="flex-1 relative bg-black overflow-hidden">
+
+    <!-- ① 라이브 카메라 -->
+    <div id="camera-live" class="absolute inset-0 flex items-center justify-center">
+      <video id="camera-video" autoplay playsinline muted class="max-w-full max-h-full"></video>
+      <!-- 가이드 프레임 -->
+      <div class="absolute inset-8 border-2 border-pink-500/60 rounded-2xl pointer-events-none flex items-end justify-center pb-4">
+        <span class="text-xs text-pink-200 bg-pink-900/70 px-2 py-0.5 rounded">서식을 이 프레임 안에 맞춰주세요</span>
+      </div>
+    </div>
+
+    <!-- ② 캡처 미리보기 -->
+    <div id="camera-preview" class="absolute inset-0 hidden flex items-center justify-center">
+      <img id="camera-preview-img" alt="캡처 이미지" class="max-w-full max-h-full" />
+    </div>
+
+    <!-- ③ 분석 중 오버레이 -->
+    <div id="camera-analyzing" class="absolute inset-0 hidden bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center">
+      <div class="w-16 h-16 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+      <p class="text-white text-base font-bold mb-1">분석 중...</p>
+      <p id="camera-progress" class="text-pink-300 text-xs">텍스트를 인식하고 있습니다</p>
+    </div>
+
+    <!-- 오류/정보 메시지 -->
+    <div id="camera-message" class="absolute top-4 left-4 right-4 hidden bg-amber-900/80 border border-amber-500/50 rounded-lg px-3 py-2 text-amber-100 text-sm"></div>
+  </div>
+
+  <!-- 푸터 — 액션 버튼 -->
+  <div class="px-4 py-4 bg-slate-950 border-t border-slate-800 flex-shrink-0">
+    <!-- 라이브 화면 버튼 -->
+    <div id="camera-live-actions" class="flex items-center justify-center gap-4">
+      <button id="camera-capture" class="w-16 h-16 rounded-full bg-pink-600 hover:bg-pink-500 border-4 border-white shadow-2xl flex items-center justify-center" title="촬영">
+        <i data-lucide="camera" class="w-7 h-7 text-white"></i>
+      </button>
+    </div>
+    <!-- 미리보기 화면 버튼 -->
+    <div id="camera-preview-actions" class="hidden items-center justify-between gap-3">
+      <button id="camera-retake" class="flex-1 py-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold flex items-center justify-center gap-2">
+        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>재촬영
+      </button>
+      <button id="camera-analyze" class="flex-1 py-3 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-sm font-bold flex items-center justify-center gap-2">
+        <i data-lucide="sparkles" class="w-4 h-4"></i>분석 시작
+      </button>
+    </div>
+  </div>
+
+  <canvas id="camera-canvas" class="hidden"></canvas>
+</div>
 
 <!-- 도움말 모달 (body에 직접 배치, 모든 화면에서 접근 가능) -->
 <div id="help-modal" class="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm hidden">
@@ -4293,6 +4365,8 @@ function smallNumField(id, value) {
 
 // ==================== MCI 모드 ====================
 
+// OCR로 자동 채워진 필드 — 노란 강조 후 사용자가 수정하면 false로 해제
+let mciOcrFlags = {};
 let mciDraft = {
   name: '', age: '', gender: '', isPediatric: false,
   location: '', // 발견장소
@@ -4429,9 +4503,16 @@ function renderMciCasualtyForm() {
             <i data-lucide="${isEditing ? 'pencil' : 'user-round-plus'}" class="w-4 h-4 ${isEditing ? 'text-amber-400' : 'text-pink-400'}"></i>
             ${isEditing ? '카드 수정 중' : (inputMode === 'simple' ? '빠른 카드 추가' : '사상자 카드 추가')}
           </h3>
-          ${isEditing ? `
-            <button id="mci-cancel-edit" class="text-[11px] text-slate-400 hover:text-slate-200 px-2 py-1 rounded bg-slate-800">취소</button>
-          ` : ''}
+          <div class="flex items-center gap-2">
+            ${!isEditing ? `
+              <button id="mci-ocr-btn" class="text-[11px] text-white px-2.5 py-1 rounded bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 font-bold flex items-center gap-1" title="카메라로 카드 촬영 → 자동 입력">
+                <i data-lucide="camera" class="w-3 h-3"></i>카메라로 입력
+              </button>
+            ` : ''}
+            ${isEditing ? `
+              <button id="mci-cancel-edit" class="text-[11px] text-slate-400 hover:text-slate-200 px-2 py-1 rounded bg-slate-800">취소</button>
+            ` : ''}
+          </div>
         </div>
 
         <div class="p-4 space-y-4">
@@ -4704,6 +4785,255 @@ function renderMciCasualtyForm() {
   `;
 }
 
+// ==================== 카메라 OCR 자동 입력 ====================
+// 사상자 카드 폼 → 📸 버튼 → 카메라 모달 → 캡처 → Tesseract.js → 필드 추출 → mciDraft 병합
+let _cameraStream = null;
+let _cameraCapturedBlob = null;
+
+function openCameraModal() {
+  const modal = document.getElementById('camera-modal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  showCameraLive();
+  if (window.lucide) window.lucide.createIcons();
+
+  // 후면 카메라 우선
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+    .then(stream => {
+      _cameraStream = stream;
+      const video = document.getElementById('camera-video');
+      if (video) { video.srcObject = stream; }
+    })
+    .catch(err => {
+      showCameraMessage('카메라 접근이 거부되었습니다. 브라우저 권한을 확인해주세요. (' + (err.name || err.message) + ')');
+    });
+}
+
+function closeCameraModal() {
+  const modal = document.getElementById('camera-modal');
+  if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+  // 카메라 스트림 해제
+  if (_cameraStream) {
+    _cameraStream.getTracks().forEach(t => t.stop());
+    _cameraStream = null;
+  }
+  _cameraCapturedBlob = null;
+  const img = document.getElementById('camera-preview-img');
+  if (img) img.src = '';
+}
+
+function showCameraLive() {
+  document.getElementById('camera-live')?.classList.remove('hidden');
+  document.getElementById('camera-preview')?.classList.add('hidden');
+  document.getElementById('camera-analyzing')?.classList.add('hidden');
+  document.getElementById('camera-live-actions')?.classList.remove('hidden');
+  document.getElementById('camera-preview-actions')?.classList.add('hidden');
+  document.getElementById('camera-preview-actions')?.classList.remove('flex');
+  hideCameraMessage();
+}
+
+function showCameraPreview() {
+  document.getElementById('camera-live')?.classList.add('hidden');
+  document.getElementById('camera-preview')?.classList.remove('hidden');
+  document.getElementById('camera-analyzing')?.classList.add('hidden');
+  document.getElementById('camera-live-actions')?.classList.add('hidden');
+  document.getElementById('camera-preview-actions')?.classList.remove('hidden');
+  document.getElementById('camera-preview-actions')?.classList.add('flex');
+  hideCameraMessage();
+}
+
+function showCameraAnalyzing(text) {
+  document.getElementById('camera-analyzing')?.classList.remove('hidden');
+  const p = document.getElementById('camera-progress');
+  if (p && text) p.textContent = text;
+}
+
+function showCameraMessage(msg) {
+  const el = document.getElementById('camera-message');
+  if (el) { el.textContent = msg; el.classList.remove('hidden'); }
+}
+function hideCameraMessage() {
+  document.getElementById('camera-message')?.classList.add('hidden');
+}
+
+function captureCameraFrame() {
+  const video = document.getElementById('camera-video');
+  const canvas = document.getElementById('camera-canvas');
+  if (!video || !canvas) return;
+  const w = video.videoWidth || 1280;
+  const h = video.videoHeight || 720;
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, w, h);
+  canvas.toBlob(blob => {
+    _cameraCapturedBlob = blob;
+    const img = document.getElementById('camera-preview-img');
+    if (img) img.src = URL.createObjectURL(blob);
+    showCameraPreview();
+  }, 'image/jpeg', 0.92);
+}
+
+// Tesseract.js로 OCR 실행 → 텍스트 반환
+async function runOcr(blob) {
+  if (typeof Tesseract === 'undefined') {
+    throw new Error('OCR 엔진(Tesseract.js)이 로드되지 않았습니다. 인터넷 연결 확인 후 다시 시도해주세요.');
+  }
+  // 한국어 + 영어 (숫자·기호 포함)
+  const result = await Tesseract.recognize(blob, 'kor+eng', {
+    logger: m => {
+      if (m.status === 'recognizing text') {
+        const pct = Math.round((m.progress || 0) * 100);
+        const p = document.getElementById('camera-progress');
+        if (p) p.textContent = `텍스트 인식 중... ${pct}%`;
+      } else if (m.status === 'loading language traineddata') {
+        const p = document.getElementById('camera-progress');
+        if (p) p.textContent = '한국어 모델 로딩...';
+      }
+    },
+  });
+  return result.data.text || '';
+}
+
+// OCR 결과 텍스트에서 필드 추출 → mciDraft 부분 업데이트
+// MVP: 트리아지, 이름, 연령, 성별, 주증상, 발견장소
+function extractFieldsFromOcr(text) {
+  const flags = {};
+  const draft = mciDraft;
+  const norm = text.replace(/\s+/g, ' ').replace(/[•●◆■]/g, '');
+
+  // 1) 트리아지: I/II/III/IV 또는 긴급/응급/비응급/사망
+  const triageMap = {
+    'I': 'emergency', '긴급': 'emergency',
+    'II': 'urgent', '응급': 'urgent',
+    'III': 'nonurgent', '비응급': 'nonurgent', '경증': 'nonurgent',
+    'IV': 'dead', '사망': 'dead',
+  };
+  let triageMatch = null;
+  // 우선 순서: 한글 키워드 → 로마자 (긴급이 II·III에 포함될 위험 방지)
+  for (const key of ['긴급','응급','비응급','경증','사망']) {
+    if (norm.includes(key)) { triageMatch = triageMap[key]; break; }
+  }
+  if (!triageMatch) {
+    // 로마자: 단어 경계 검사 (긴급 카드만 띄어서 'I' 있는 경우 포함)
+    const m = /(?:^|[^A-Z])(IV|III|II|I)(?:[^A-Z]|$)/.exec(norm);
+    if (m) triageMatch = triageMap[m[1]];
+  }
+  if (triageMatch && !draft.triage) {
+    draft.triage = triageMatch;
+    flags.triage = true;
+  }
+
+  // 2) 이름 (한글 2-4자) — "이름" 라벨 다음
+  const nameM = /이름[:\s]*([가-힣]{2,4})/.exec(norm);
+  if (nameM && !draft.name) {
+    draft.name = nameM[1];
+    flags.name = true;
+  }
+
+  // 3) 연령 (40세, 8세, 40대, 80세, "연령" 라벨 다음 숫자)
+  const ageM = /(?:연령|나이)[:\s]*([0-9]{1,3})\s*(세|대)?/.exec(norm)
+            || /([0-9]{1,3})\s*(세|대)/.exec(norm);
+  if (ageM && !draft.age) {
+    draft.age = ageM[1] + (ageM[2] || '세');
+    flags.age = true;
+  }
+
+  // 4) 성별 (남/여 라벨 또는 단독)
+  const genderM = /성별[:\s]*([남여])/.exec(norm) || /\b([남여])\s*(자|성)?\b/.exec(norm);
+  if (genderM && !draft.gender) {
+    draft.gender = genderM[1];
+    flags.gender = true;
+  }
+
+  // 5) 발견장소: "발견장소" 또는 "장소" 다음 텍스트
+  const locM = /(?:발견장소|장소)[:\s]*([^\n]{2,40})/.exec(text);
+  if (locM && !draft.location) {
+    draft.location = locM[1].trim().slice(0, 200);
+    flags.location = true;
+  }
+
+  // 6) 주증상: "주증상" 또는 "증상" 다음 텍스트
+  const symM = /(?:주증상|증상)[:\s]*([^\n]{2,60})/.exec(text);
+  if (symM && !draft.symptom) {
+    draft.symptom = symM[1].trim().slice(0, 200);
+    flags.symptom = true;
+  }
+
+  // 7) 풀모드 보너스: 생체징후 (호흡·맥박·BP·SpO2)
+  const rrM    = /(?:호흡|RR)[:\s]*(\d{1,2})/.exec(norm);
+  const pulseM = /(?:맥박|HR|P)[:\s]*(\d{2,3})/.exec(norm);
+  const bpM    = /(?:혈압|BP)[:\s]*(\d{2,3})\s*\/\s*(\d{2,3})/.exec(norm);
+  const spo2M  = /SpO[2₂]?[:\s]*(\d{2,3})/.exec(norm);
+  if (rrM && !draft.rr)         { draft.rr = rrM[1]; flags.rr = true; }
+  if (pulseM && !draft.pulse)   { draft.pulse = pulseM[1]; flags.pulse = true; }
+  if (bpM && !draft.bpSys)      { draft.bpSys = bpM[1]; draft.bpDia = bpM[2]; flags.bpSys = true; flags.bpDia = true; }
+  if (spo2M && !draft.spo2)     { draft.spo2 = spo2M[1]; flags.spo2 = true; }
+
+  return flags;
+}
+
+async function analyzeCapturedImage() {
+  if (!_cameraCapturedBlob) {
+    showCameraMessage('캡처된 이미지가 없습니다');
+    return;
+  }
+  showCameraAnalyzing('한국어 모델 로딩...');
+  try {
+    const text = await runOcr(_cameraCapturedBlob);
+    const flags = extractFieldsFromOcr(text);
+    const filledCount = Object.keys(flags).length;
+    if (filledCount === 0) {
+      showCameraAnalyzing('인식된 정보가 없습니다');
+      setTimeout(() => {
+        showCameraMessage('카드에서 필드를 인식하지 못했습니다. 더 선명하게 다시 촬영해주세요.');
+        showCameraLive();
+        // 카메라 라이브 재개
+        if (_cameraStream) {
+          const video = document.getElementById('camera-video');
+          if (video && !video.srcObject) video.srcObject = _cameraStream;
+        } else {
+          openCameraModal();
+        }
+      }, 1200);
+      return;
+    }
+    // 성공: mciDraft 갱신, OCR 플래그 병합, 모달 닫고 폼 다시 그림
+    Object.assign(mciOcrFlags, flags);
+    closeCameraModal();
+    render();
+    setTimeout(() => alert(`${filledCount}개 필드가 자동 입력되었습니다. 노란색으로 강조된 부분을 꼭 확인해주세요.`), 100);
+  } catch (err) {
+    console.error('[OCR] 분석 실패:', err);
+    showCameraMessage('분석 실패: ' + (err.message || err));
+    showCameraLive();
+  }
+}
+
+// 카메라 모달의 영구 이벤트 (닫기·캡처·재촬영·분석) — boot()에서 1회만 호출
+function initCameraModal() {
+  const modal = document.getElementById('camera-modal');
+  if (!modal) return;
+  document.getElementById('camera-close')?.addEventListener('click', closeCameraModal);
+  document.getElementById('camera-capture')?.addEventListener('click', captureCameraFrame);
+  document.getElementById('camera-retake')?.addEventListener('click', () => {
+    _cameraCapturedBlob = null;
+    showCameraLive();
+  });
+  document.getElementById('camera-analyze')?.addEventListener('click', analyzeCapturedImage);
+  // 배경 클릭 시 닫기 (모달 안 클릭은 무시)
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeCameraModal();
+  });
+  // ESC 키 — 모달 열린 상태에서만 닫기
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeCameraModal();
+  });
+}
+
+// ==================== /카메라 OCR ====================
+
 function bindMciCasualtyEvents() {
   // V2: 일반/MCI 모드 분기 (폼 통합)
   const _draft = currentCasualtyDraft();
@@ -4726,9 +5056,26 @@ function bindMciCasualtyEvents() {
     const el = document.getElementById('mci-' + k);
     if (el) {
       el.value = _draft[k] || '';
-      el.oninput = (e) => { _draft[k] = e.target.value; };
+      // OCR로 자동 채워진 필드 강조 (사용자가 수정하면 해제)
+      if (mciOcrFlags[k]) el.classList.add('ocr-filled');
+      el.oninput = (e) => {
+        _draft[k] = e.target.value;
+        if (mciOcrFlags[k]) { delete mciOcrFlags[k]; el.classList.remove('ocr-filled'); }
+      };
     }
   });
+
+  // 카메라 OCR 버튼 (사상자 카드 추가 헤더)
+  const ocrBtn = document.getElementById('mci-ocr-btn');
+  if (ocrBtn) {
+    ocrBtn.onclick = () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        alert('이 브라우저는 카메라 기능을 지원하지 않습니다.');
+        return;
+      }
+      openCameraModal();
+    };
+  }
 
   // 시간 필드 자동 포맷팅 (HH:MM, 24시간제)
   ['departTime', 'arriveTime'].forEach(k => {
@@ -6074,6 +6421,18 @@ const HELP_CONTENT = {
         </div>
       </details>
 
+      <details class="bg-slate-950 rounded-xl border border-slate-800 group">
+        <summary class="px-4 py-3 cursor-pointer font-bold flex items-center gap-2 hover:bg-slate-900">
+          <i data-lucide="chevron-right" class="w-4 h-4 group-open:rotate-90 transition-transform"></i>
+          📸 카메라로 카드 자동 입력은 어떻게 쓰나요?
+        </summary>
+        <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
+          MCI 사상자 카드 폼 우상단의 <strong>[📸 카메라로 입력]</strong> 버튼 → 후면 카메라 활성화 → 종이 카드를 프레임에 맞추고 셔터 → 분석 시작.<br>
+          한국어 OCR로 <strong>트리아지·이름·연령·성별·발견장소·주증상·생체징후</strong>를 자동 추출 → 노란색으로 강조 표시. <strong>저장 전 반드시 노란 항목을 확인·수정</strong>하세요.<br>
+          <em class="text-amber-300">* 인쇄체가 잘 인식되고 손글씨는 정확도가 낮을 수 있습니다.</em>
+        </div>
+      </details>
+
     </div>
   `,
 };
@@ -6150,6 +6509,7 @@ async function boot() {
   }
   initOutdoorToggle();
   initHelpModal();
+  initCameraModal();
   // 익명 인증 대기 — Firebase Rules가 auth!=null 요구하므로 인증 후 데이터 구독.
   // 오프라인이거나 5초 안에 응답 없으면 일단 진행 (캐시 화면 표시).
   await authReady;
