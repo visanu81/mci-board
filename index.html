@@ -3234,8 +3234,10 @@ function renderMain() {
           본부 통합 모니터링 — 읽기 전용 (입력·수정·삭제 불가)
         </div>
       ` : ''}
+      <!-- PC 와이드 화면: 배경 띠는 전체 폭, 내용물은 max-w-5xl(1024px)로 중앙 정렬
+           — 로비/관리자 화면과 동일한 폭 기준 (휴대폰에서는 변화 없음) -->
       <header class="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800">
-        <div class="px-4 py-3 flex items-center justify-between">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <div class="w-9 h-9 rounded-lg bg-gradient-to-br ${state.mode === 'mci' ? 'from-rose-600 to-pink-700' : 'from-red-600 to-red-700'} flex items-center justify-center shadow-lg shadow-red-900/50">
               <i data-lucide="${state.mode === 'mci' ? 'heart-pulse' : 'flame'}" class="w-5 h-5 text-white"></i>
@@ -3258,7 +3260,7 @@ function renderMain() {
         </div>
 
         <!-- 모드 전환 -->
-        <div class="px-4 pb-2 flex items-center gap-1.5">
+        <div class="max-w-5xl mx-auto px-4 pb-2 flex items-center gap-1.5">
           <button data-mode="general" class="mode-btn flex-1 py-1.5 text-xs font-bold rounded transition-all ${
             state.mode === 'general'
               ? 'bg-red-600/30 text-red-200 border border-red-500/50'
@@ -3275,7 +3277,7 @@ function renderMain() {
           </button>
         </div>
 
-        <div class="px-4 pb-2 flex items-center justify-between text-[11px]">
+        <div class="max-w-5xl mx-auto px-4 pb-2 flex items-center justify-between text-[11px]">
           <div class="flex items-center gap-2">
             <span class="px-2 py-0.5 rounded text-slate-100 font-medium" style="background:${team.color}30">
               ${team.name}
@@ -3301,39 +3303,43 @@ function renderMain() {
         </div>
 
         ${state.mode === 'general' ? `
-          <div class="flex border-t border-slate-800">
-            <button data-view="dashboard" class="view-btn flex-1 py-2.5 text-sm font-medium transition-all ${
-              state.view === 'dashboard' ? 'text-white border-b-2 border-red-500' : 'text-slate-500'
-            }">
-              <i data-lucide="eye" class="w-4 h-4 inline mr-1.5"></i>통합 상황판
-            </button>
-            ${!observerMode ? `
-              <button data-view="input" class="view-btn flex-1 py-2.5 text-sm font-medium transition-all ${
-                state.view === 'input' ? 'text-white border-b-2 border-red-500' : 'text-slate-500'
+          <div class="border-t border-slate-800">
+            <div class="max-w-5xl mx-auto flex">
+              <button data-view="dashboard" class="view-btn flex-1 py-2.5 text-sm font-medium transition-all ${
+                state.view === 'dashboard' ? 'text-white border-b-2 border-red-500' : 'text-slate-500'
               }">
-                <i data-lucide="edit-3" class="w-4 h-4 inline mr-1.5"></i>입력
+                <i data-lucide="eye" class="w-4 h-4 inline mr-1.5"></i>통합 상황판
               </button>
-            ` : ''}
+              ${!observerMode ? `
+                <button data-view="input" class="view-btn flex-1 py-2.5 text-sm font-medium transition-all ${
+                  state.view === 'input' ? 'text-white border-b-2 border-red-500' : 'text-slate-500'
+                }">
+                  <i data-lucide="edit-3" class="w-4 h-4 inline mr-1.5"></i>입력
+                </button>
+              ` : ''}
+            </div>
           </div>
         ` : `
-          <div class="flex border-t border-slate-800">
-            <button data-mci-tab="situation" class="mci-tab-btn flex-1 py-2.5 text-sm font-medium transition-all ${
-              state.mciTab === 'situation' ? 'text-white border-b-2 border-pink-500' : 'text-slate-500'
-            }">
-              <i data-lucide="layout-dashboard" class="w-4 h-4 inline mr-1.5"></i>MCI 통합 상황판
-            </button>
-            ${!observerMode ? `
-              <button data-mci-tab="casualty" class="mci-tab-btn flex-1 py-2.5 text-sm font-medium transition-all ${
-                state.mciTab === 'casualty' ? 'text-white border-b-2 border-pink-500' : 'text-slate-500'
+          <div class="border-t border-slate-800">
+            <div class="max-w-5xl mx-auto flex">
+              <button data-mci-tab="situation" class="mci-tab-btn flex-1 py-2.5 text-sm font-medium transition-all ${
+                state.mciTab === 'situation' ? 'text-white border-b-2 border-pink-500' : 'text-slate-500'
               }">
-                <i data-lucide="user-round-plus" class="w-4 h-4 inline mr-1.5"></i>사상자 카드
+                <i data-lucide="layout-dashboard" class="w-4 h-4 inline mr-1.5"></i>MCI 통합 상황판
               </button>
-            ` : ''}
+              ${!observerMode ? `
+                <button data-mci-tab="casualty" class="mci-tab-btn flex-1 py-2.5 text-sm font-medium transition-all ${
+                  state.mciTab === 'casualty' ? 'text-white border-b-2 border-pink-500' : 'text-slate-500'
+                }">
+                  <i data-lucide="user-round-plus" class="w-4 h-4 inline mr-1.5"></i>사상자 카드
+                </button>
+              ` : ''}
+            </div>
           </div>
         `}
       </header>
 
-      <main class="pb-20">
+      <main class="max-w-5xl mx-auto pb-20">
         ${state.mode === 'general'
           ? (state.view === 'dashboard' ? renderDashboard() : renderInput())
           : (state.mciTab === 'situation' ? renderMciSituation() : renderMciCasualtyForm())}
