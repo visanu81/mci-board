@@ -4897,7 +4897,7 @@ async function runOcr(blob) {
 }
 
 // OCR 결과 텍스트에서 필드 추출 → mciDraft 부분 업데이트
-// MVP: 트리아지, 이름, 연령, 성별, 주증상, 발견장소
+// 표준 카드 양식 (활력징후·환자정보) 지원
 function extractFieldsFromOcr(text) {
   const flags = {};
   const draft = mciDraft;
@@ -4911,65 +4911,123 @@ function extractFieldsFromOcr(text) {
     'IV': 'dead', '사망': 'dead',
   };
   let triageMatch = null;
-  // 우선 순서: 한글 키워드 → 로마자 (긴급이 II·III에 포함될 위험 방지)
   for (const key of ['긴급','응급','비응급','경증','사망']) {
     if (norm.includes(key)) { triageMatch = triageMap[key]; break; }
   }
   if (!triageMatch) {
-    // 로마자: 단어 경계 검사 (긴급 카드만 띄어서 'I' 있는 경우 포함)
     const m = /(?:^|[^A-Z])(IV|III|II|I)(?:[^A-Z]|$)/.exec(norm);
     if (m) triageMatch = triageMap[m[1]];
   }
-  if (triageMatch && !draft.triage) {
-    draft.triage = triageMatch;
-    flags.triage = true;
-  }
 
-  // 2) 이름 (한글 2-4자) — "이름" 라벨 다음
-  const nameM = /이름[:\s]*([가-힣]{2,4})/.exec(norm);
+  // 2) 이름 (한글 2-4자) — "이름" 라벨 다음. 표 형식 (이름|성별|나이) 도 처리
+  const nameM = /이름[:\s|]*([가-힣]{2,4})/.exec(norm);
   if (nameM && !draft.name) {
     draft.name = nameM[1];
     flags.name = true;
   }
 
-  // 3) 연령 (40세, 8세, 40대, 80세, "연령" 라벨 다음 숫자)
-  const ageM = /(?:연령|나이)[:\s]*([0-9]{1,3})\s*(세|대)?/.exec(norm)
+  // 3) 연령 (40세, 8세, 40대, "나이/연령" 라벨, 표 형식 "나이|27")
+  const ageM = /(?:연령|나이)[:\s|]*([0-9]{1,3})\s*(세|대)?/.exec(norm)
             || /([0-9]{1,3})\s*(세|대)/.exec(norm);
   if (ageM && !draft.age) {
     draft.age = ageM[1] + (ageM[2] || '세');
     flags.age = true;
   }
 
-  // 4) 성별 (남/여 라벨 또는 단독)
-  const genderM = /성별[:\s]*([남여])/.exec(norm) || /\b([남여])\s*(자|성)?\b/.exec(norm);
+  // 4) 성별
+  const genderM = /성별[:\s|]*([남여])/.exec(norm) || /\b([남여])\s*(자|성)?\b/.exec(norm);
   if (genderM && !draft.gender) {
     draft.gender = genderM[1];
     flags.gender = true;
   }
 
-  // 5) 발견장소: "발견장소" 또는 "장소" 다음 텍스트
-  const locM = /(?:발견장소|장소)[:\s]*([^\n]{2,40})/.exec(text);
+  // 5) 발견장소
+  const locM = /(?:발견장소|장소)[:\s|]*([^\n]{2,40})/.exec(text);
   if (locM && !draft.location) {
     draft.location = locM[1].trim().slice(0, 200);
     flags.location = true;
   }
 
-  // 6) 주증상: "주증상" 또는 "증상" 다음 텍스트
-  const symM = /(?:주증상|증상)[:\s]*([^\n]{2,60})/.exec(text);
-  if (symM && !draft.symptom) {
-    draft.symptom = symM[1].trim().slice(0, 200);
+  // 6) 주증상 — "증상", "주증상" + 진단명까지 통합
+  let symptomText = '';
+  const symM = /(?:주증상|증상)[:\s|]*([^\n]{2,80})/.exec(text);
+  if (symM) symptomText = symM[1].trim();
+  const dxM = /진단[명]?[:\s|]*([^\n]{2,40})/.exec(text);
+  if (dxM) {
+    // 진단명을 증상 앞에 통합 (예: "손가락 열상 — 손가락통증, 부종, 출혈")
+    const dx = dxM[1].trim();
+    symptomText = symptomText ? `${dx} — ${symptomText}` : dx;
+  }
+  if (symptomText && !draft.symptom) {
+    draft.symptom = symptomText.slice(0, 200);
     flags.symptom = true;
   }
 
-  // 7) 풀모드 보너스: 생체징후 (호흡·맥박·BP·SpO2)
-  const rrM    = /(?:호흡|RR)[:\s]*(\d{1,2})/.exec(norm);
-  const pulseM = /(?:맥박|HR|P)[:\s]*(\d{2,3})/.exec(norm);
-  const bpM    = /(?:혈압|BP)[:\s]*(\d{2,3})\s*\/\s*(\d{2,3})/.exec(norm);
-  const spo2M  = /SpO[2₂]?[:\s]*(\d{2,3})/.exec(norm);
+  // 7) 생체징후 — BP는 슬래시 양옆 공백 허용
+  const rrM    = /(?:호흡|RR)[:\s|]*(\d{1,2})/.exec(norm);
+  const pulseM = /(?:맥박|HR|P\b)[:\s|]*(\d{2,3})/.exec(norm);
+  const bpM    = /(?:혈압|BP)[:\s|]*(\d{2,3})\s*\/\s*(\d{2,3})/.exec(norm);
+  const spo2M  = /SpO[2₂]?[:\s|]*(\d{2,3})/.exec(norm);
   if (rrM && !draft.rr)         { draft.rr = rrM[1]; flags.rr = true; }
   if (pulseM && !draft.pulse)   { draft.pulse = pulseM[1]; flags.pulse = true; }
   if (bpM && !draft.bpSys)      { draft.bpSys = bpM[1]; draft.bpDia = bpM[2]; flags.bpSys = true; flags.bpDia = true; }
   if (spo2M && !draft.spo2)     { draft.spo2 = spo2M[1]; flags.spo2 = true; }
+
+  // 8) GCS → AVPU 자동 매핑
+  // 15 = A(Alert), 13-14 = V(Verbal), 9-12 = P(Pain), 3-8 = U(Unresponsive)
+  const gcsM = /GCS[\s\S]{0,30}?(\d{1,2})\s*(?:점|점수)?(?:\s|$)/.exec(norm)
+            || /(?:총|합|=)\s*([3-9]|1[0-5])(?:점)?\s*(?:GCS|점)/.exec(norm);
+  if (gcsM && !draft.consciousness) {
+    const gcs = parseInt(gcsM[1], 10);
+    if (gcs >= 3 && gcs <= 15) {
+      let avpu = 'A';
+      if (gcs >= 13) avpu = 'A';
+      else if (gcs >= 9) avpu = 'V';
+      else if (gcs >= 6) avpu = 'P';
+      else avpu = 'U';
+      draft.consciousness = avpu;
+      flags.consciousness = true;
+    }
+  }
+
+  // 9) 환자평가 (START 분류법) → 트리아지 자동 추정
+  // 걸음·호흡·맥박촉지·반응 4항목의 O/X 패턴 분석
+  // 트리아지가 이미 위에서 인식된 경우는 덮어쓰지 않음
+  if (!triageMatch) {
+    const evalCheck = (label) => {
+      const re = new RegExp(label + '[\\s\\S]{0,15}?([Oo0OoㅇOＯxX×ＸX])(?:\\s|$|,|\\n)', 'i');
+      const m = re.exec(norm);
+      if (!m) return null;
+      const v = m[1];
+      // O/o/0/ㅇ → true (양성), X/× → false (음성)
+      if (/[Oo0ㅇＯO]/.test(v)) return true;
+      if (/[xX×Ｘ]/.test(v))   return false;
+      return null;
+    };
+    const walks   = evalCheck('걸음');
+    const breath  = evalCheck('호흡');
+    const pulseOk = evalCheck('맥박촉지') ?? evalCheck('맥박');
+    const respond = evalCheck('반응');
+    // START 알고리즘 단순화:
+    // - 걸음 O → III 비응급
+    // - 호흡 X (확실히 X) → IV 사망 (기도 확보 후 그래도 X면)
+    // - 호흡 O + 맥박 O + 반응 O → II 응급
+    // - 그 외 (호흡/맥박/반응 중 하나라도 X) → I 긴급
+    if (walks === true) {
+      triageMatch = 'nonurgent';
+    } else if (breath === false) {
+      triageMatch = 'dead';
+    } else if (breath === true && pulseOk === true && respond === true) {
+      triageMatch = 'urgent';
+    } else if (breath === true || pulseOk === true || respond === true) {
+      triageMatch = 'emergency';
+    }
+  }
+
+  if (triageMatch && !draft.triage) {
+    draft.triage = triageMatch;
+    flags.triage = true;
+  }
 
   return flags;
 }
