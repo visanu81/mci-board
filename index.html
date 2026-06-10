@@ -2,7 +2,8 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<!-- maximum-scale 제한 없음 — 저시력 사용자가 핀치줌으로 확대할 수 있어야 함 (접근성) -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>MCI 통합 상황판</title>
 
 <!-- ==================== PWA 메타데이터 ==================== -->
@@ -19,6 +20,12 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
 <script src="https://cdn.tailwindcss.com"></script>
+<script>
+  // 터치 기기 호버 잔상(stuck hover) 방지 — hover: 클래스가
+  // 실제 호버 가능한 기기(마우스)에서만 적용되도록 @media (hover:hover)로 감싸서 생성.
+  // 휴대폰에서 버튼을 탭한 뒤 강조 색이 계속 남아있던 문제 해결.
+  tailwind.config = { future: { hoverOnlyWhenSupported: true } };
+</script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <!-- Tesseract.js — 카메라 OCR (한국어 인식) -->
@@ -369,9 +376,11 @@
     color: #475569 !important;
     border-color: #cbd5e1 !important;
   }
-  body.outdoor-mode .mode-btn.bg-slate-900:hover {
-    color: #0f172a !important;
-    border-color: #94a3b8 !important;
+  @media (hover: hover) {
+    body.outdoor-mode .mode-btn.bg-slate-900:hover {
+      color: #0f172a !important;
+      border-color: #94a3b8 !important;
+    }
   }
 
   /* ── ⑬ 모달 닫기 버튼 ── */
@@ -381,9 +390,11 @@
     color: #0f172a !important;
     font-weight: 700 !important;
   }
-  body.outdoor-mode [data-mci-card-modal-close]:hover {
-    background-color: #e2e8f0 !important;
-    border-color: #1e293b !important;
+  @media (hover: hover) {
+    body.outdoor-mode [data-mci-card-modal-close]:hover {
+      background-color: #e2e8f0 !important;
+      border-color: #1e293b !important;
+    }
   }
   body.outdoor-mode #admin-close {
     background-color: #f1f5f9 !important;
@@ -391,7 +402,9 @@
     border-radius: 8px;
     color: #0f172a !important;
   }
-  body.outdoor-mode #admin-close:hover { background-color: #e2e8f0 !important; }
+  @media (hover: hover) {
+    body.outdoor-mode #admin-close:hover { background-color: #e2e8f0 !important; }
+  }
 
   /* ── ⑭ 외부 모드 토글 ── */
   body.outdoor-mode #outdoor-toggle {
@@ -399,7 +412,9 @@
     border-color: #334155 !important;
     color: #fbbf24 !important;
   }
-  body.outdoor-mode #outdoor-toggle:hover { background-color: #334155 !important; }
+  @media (hover: hover) {
+    body.outdoor-mode #outdoor-toggle:hover { background-color: #334155 !important; }
+  }
 
   /* ── 설치 배너 — 로그인(auth)·로비 화면에서만 표시 ──
      재난방 입력 화면·표출 모드 등에서는 숨김: 모바일에서 하단 입력/저장 버튼을 가리는 충돌 방지.
@@ -423,20 +438,23 @@
     left: 4rem;       /* 표출 모드 작은 사이즈일 때 살짝 더 가깝게 */
   }
 
-  /* 도움말 모달 — 활성 탭 강조 (border-blue-500 + text-white를 inline으로도 적용되도록 보조) */
-  body:not(.outdoor-mode) .help-tab-btn:hover { background: rgba(15, 23, 42, 0.5); }
+  /* 도움말 모달 — 활성 탭 강조 (border-blue-500 + text-white를 inline으로도 적용되도록 보조)
+     hover 규칙은 @media (hover:hover)로 감쌈 — 터치 기기 탭 후 잔상 방지 */
+  @media (hover: hover) {
+    body:not(.outdoor-mode) .help-tab-btn:hover { background: rgba(15, 23, 42, 0.5); }
+    body.outdoor-mode .help-tab-btn:hover { background: #e2e8f0; }
+    /* 다크용 hover 배경 클래스가 라이트 모드에서 거꾸로 어두워지는 문제 (FAQ 펼침 등) */
+    body.outdoor-mode .hover\:bg-slate-900:hover,
+    body.outdoor-mode .hover\:bg-slate-800:hover { background-color: #e2e8f0 !important; }
+  }
 
   /* ── 도움말 모달 외부(밝은) 모드 색상 보강 ──
      활성 탭의 text-white가 흰 배경에서 안 보이고, 어두운 반투명 뱃지/패널이
      라이트 배경 위에서 가독성이 떨어지는 문제 해결. */
-  body.outdoor-mode .help-tab-btn:hover { background: #e2e8f0; }
   body.outdoor-mode .help-tab-btn.text-white {
     color: #1d4ed8 !important;     /* 활성 탭 — 파란 보더와 같은 계열의 진한 파랑 */
     font-weight: 800;
   }
-  /* 다크용 hover 배경 클래스가 라이트 모드에서 거꾸로 어두워지는 문제 (FAQ 펼침 등) */
-  body.outdoor-mode .hover\:bg-slate-900:hover,
-  body.outdoor-mode .hover\:bg-slate-800:hover { background-color: #e2e8f0 !important; }
   /* 권한 뱃지 — 어두운 반투명 → 라이트 톤 (글씨색은 ⑨의 진한 색 규칙이 적용됨) */
   body.outdoor-mode .bg-emerald-900\/40 { background-color: #d1fae5 !important; }
   body.outdoor-mode .bg-violet-900\/40  { background-color: #ede9fe !important; }
@@ -592,7 +610,7 @@
   <div class="px-4 py-4 bg-slate-950 border-t border-slate-800 flex-shrink-0">
     <!-- 라이브 화면 버튼 -->
     <div id="camera-live-actions" class="flex items-center justify-center gap-4">
-      <button id="camera-capture" class="w-16 h-16 rounded-full bg-pink-600 hover:bg-pink-500 border-4 border-white shadow-2xl flex items-center justify-center" title="촬영">
+      <button id="camera-capture" class="w-16 h-16 rounded-full bg-pink-600 hover:bg-pink-500 border-4 border-white shadow-2xl flex items-center justify-center" title="촬영" aria-label="촬영">
         <i data-lucide="camera" class="w-7 h-7 text-white"></i>
       </button>
     </div>
@@ -2364,7 +2382,7 @@ function renderDisplayModal() {
           <div class="px-3 py-1 rounded-lg font-black text-lg" style="background:${color}30;color:${color}">${escapeHtml(title)}</div>
           ${subtitle ? `<div class="text-lg text-slate-400">${escapeHtml(subtitle)}</div>` : ''}
           <div class="text-lg text-slate-400">총 <span class="text-slate-100 font-bold mono">${patients.length}</span>명</div>
-          <button id="display-modal-close" class="ml-auto text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800">
+          <button id="display-modal-close" class="ml-auto text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800" aria-label="닫기">
             <i data-lucide="x" class="w-7 h-7"></i>
           </button>
         </div>
@@ -2427,7 +2445,7 @@ function renderDisplayPatientCard(c) {
           <span class="text-xl px-3 py-1 rounded-lg font-black" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.shortName || '?'} · ${tr?.name || '미분류'}</span>
           ${c.isPediatric ? '<span class="text-cyan-300 text-base px-2 py-1 rounded bg-cyan-950/50 flex items-center gap-1"><i data-lucide="baby" class="w-4 h-4"></i>소아</span>' : ''}
           <span class="text-2xl font-bold ${c._autoNamed ? 'italic text-slate-400' : 'text-slate-100'}">${escapeHtml(c.name || '-')}</span>
-          <button id="display-modal-close" class="ml-auto text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800">
+          <button id="display-modal-close" class="ml-auto text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800" aria-label="닫기">
             <i data-lucide="x" class="w-7 h-7"></i>
           </button>
         </div>
@@ -2719,7 +2737,7 @@ function renderAdminArchivesPanel() {
                       백업자: ${escapeHtml(ar.archivedBy || '-')}${agencyName ? ` · 관서: ${escapeHtml(agencyName)}` : ''}
                     </div>
                   </div>
-                  <button data-del-archive="${ar._key}" class="del-archive text-slate-600 hover:text-red-400 p-1 flex-shrink-0">
+                  <button data-del-archive="${ar._key}" class="del-archive text-slate-600 hover:text-red-400 p-1 flex-shrink-0" title="백업 삭제" aria-label="백업 삭제">
                     <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                   </button>
                 </div>
@@ -2904,7 +2922,7 @@ function renderAdminAgencyCodesPanel() {
               <span class="text-sm text-slate-300 truncate">${escapeHtml(e.name || '')}</span>
               <span class="text-[10px] px-1.5 py-0.5 rounded mono border font-bold ${roleColor}">${e.role}</span>
               <span class="text-[10px] text-slate-600 mono ml-1 truncate">id:${escapeHtml(e.id || '')}</span>
-              <button data-code-edit="${e._key}" class="code-edit-btn ml-auto text-slate-500 hover:text-amber-400 p-1 flex-shrink-0" title="수정">
+              <button data-code-edit="${e._key}" class="code-edit-btn ml-auto text-slate-500 hover:text-amber-400 p-1 flex-shrink-0" title="수정" aria-label="코드 수정">
                 <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
               </button>
               ${isLastAdmin ? `
@@ -2912,7 +2930,7 @@ function renderAdminAgencyCodesPanel() {
                   <i data-lucide="lock" class="w-3.5 h-3.5"></i>
                 </span>
               ` : `
-                <button data-code-del="${e._key}" data-code-label="${escapeHtml(e.code || '')}" class="code-del-btn text-slate-600 hover:text-red-400 p-1 flex-shrink-0" title="삭제">
+                <button data-code-del="${e._key}" data-code-label="${escapeHtml(e.code || '')}" class="code-del-btn text-slate-600 hover:text-red-400 p-1 flex-shrink-0" title="삭제" aria-label="코드 삭제">
                   <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 </button>
               `}
@@ -3351,7 +3369,7 @@ function renderAdminModal() {
           <h2 class="font-bold flex items-center gap-2">
             <i data-lucide="settings" class="w-4 h-4 text-slate-400"></i>관리
           </h2>
-          <button id="admin-close" class="text-slate-500 hover:text-slate-200 p-1">
+          <button id="admin-close" class="text-slate-500 hover:text-slate-200 p-1" aria-label="닫기">
             <i data-lucide="x" class="w-5 h-5"></i>
           </button>
         </div>
@@ -3464,7 +3482,7 @@ function renderArchivesPanel() {
                 <div class="text-[11px] text-slate-500 mono">${date.toLocaleString('ko-KR')}</div>
                 <div class="text-[10px] text-slate-600 mt-0.5">백업자: ${escapeHtml(ar.archivedBy || '-')}</div>
               </div>
-              <button data-del-archive="${ar._key}" class="del-archive text-slate-600 hover:text-red-400 p-1">
+              <button data-del-archive="${ar._key}" class="del-archive text-slate-600 hover:text-red-400 p-1" title="백업 삭제" aria-label="백업 삭제">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
               </button>
             </div>
@@ -4223,10 +4241,10 @@ function renderCasualtyForm() {
                   <span class="text-sm font-medium">${escapeHtml(c.name)}</span>
                   <span class="text-xs text-slate-500">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
                   <span class="text-xs text-slate-400 truncate flex-1">${escapeHtml(c.symptom || '')}</span>
-                  <button data-edit-cs="${c._key}" class="edit-casualty text-slate-500 hover:text-amber-400 flex-shrink-0">
+                  <button data-edit-cs="${c._key}" class="edit-casualty text-slate-500 hover:text-amber-400 flex-shrink-0" title="수정" aria-label="사상자 수정">
                     <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
                   </button>
-                  <button data-del-cs="${c._key}" class="del-casualty text-slate-600 hover:text-red-400 flex-shrink-0">
+                  <button data-del-cs="${c._key}" class="del-casualty text-slate-600 hover:text-red-400 flex-shrink-0" title="삭제" aria-label="사상자 삭제">
                     <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                   </button>
                 </div>
@@ -4376,7 +4394,7 @@ function renderActionForm() {
                 <div class="flex items-start gap-2">
                   <span class="text-[10px] mono text-slate-500 mt-0.5">${fmtHM(date)}</span>
                   <p class="flex-1 text-sm text-slate-200">${escapeHtml(a.content)}</p>
-                  <button data-del="${a._key}" class="del-action text-slate-600 hover:text-red-400">
+                  <button data-del="${a._key}" class="del-action text-slate-600 hover:text-red-400" title="삭제" aria-label="조치사항 삭제">
                     <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                   </button>
                 </div>
@@ -4850,10 +4868,10 @@ function renderMciCasualtyForm() {
                   ${c.hospital ? `<span class="text-[10px] text-emerald-400 px-1 rounded bg-emerald-950/40 flex-shrink-0">${escapeHtml(c.hospital)}</span>` : ''}
                   ${!isMine ? `<span class="text-[9px] text-slate-600 truncate max-w-[60px] flex-shrink-0">${escapeHtml(c.author || '')}</span>` : ''}
                   ${editable ? `
-                    <button data-mci-edit="${c._key}" class="mci-edit-btn text-slate-500 hover:text-amber-400 flex-shrink-0">
+                    <button data-mci-edit="${c._key}" class="mci-edit-btn text-slate-500 hover:text-amber-400 flex-shrink-0" title="수정" aria-label="카드 수정">
                       <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
                     </button>
-                    <button data-mci-del="${c._key}" class="mci-del-btn text-slate-600 hover:text-red-400 flex-shrink-0">
+                    <button data-mci-del="${c._key}" class="mci-del-btn text-slate-600 hover:text-red-400 flex-shrink-0" title="삭제" aria-label="카드 삭제">
                       <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                     </button>
                   ` : `
@@ -5174,9 +5192,32 @@ function initCameraModal() {
   modal.addEventListener('click', (e) => {
     if (e.target === modal) closeCameraModal();
   });
-  // ESC 키 — 모달 열린 상태에서만 닫기
+  // ESC 처리는 initGlobalEscHandler()에서 통합 관리
+}
+
+// ==================== ESC 키 — 모달 통합 처리 ====================
+// 모든 모달의 ESC 닫기를 한 곳에서 처리. ESC 한 번에 "맨 위" 모달 하나만 닫는다.
+// 우선순위 = z-index 순: 카메라(z-200) > 도움말(z-200) > 상태 기반 모달(z-50)
+// (상태 기반 z-50 모달들은 화면 특성상 동시에 열리지 않음)
+function initGlobalEscHandler() {
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeCameraModal();
+    if (e.key !== 'Escape') return;
+    // 1) 카메라 OCR 모달
+    const cam = document.getElementById('camera-modal');
+    if (cam && !cam.classList.contains('hidden')) { closeCameraModal(); return; }
+    // 2) 도움말 모달
+    const help = document.getElementById('help-modal');
+    if (help && !help.classList.contains('hidden')) {
+      help.classList.add('hidden');
+      help.classList.remove('flex');
+      return;
+    }
+    // 3) 표출 모드 드릴다운 (환자 목록/카드 상세)
+    if (state.displayModal) { state.displayModal = null; render(); return; }
+    // 4) 사상자 카드 상세 모달
+    if (state.viewMciCardKey) { state.viewMciCardKey = null; render(); return; }
+    // 5) 관리(다운로드/백업) 모달
+    if (state.adminModal) { state.adminModal = false; render(); return; }
   });
 }
 
@@ -6017,7 +6058,7 @@ function renderMciCardDetailModal() {
           <span class="text-xs px-2 py-1 rounded font-black" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.shortName || '?'} · ${tr?.name || '미분류'}</span>
           ${c.isPediatric ? '<span class="text-cyan-300 text-[11px] flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-cyan-950/50 border border-cyan-700/50"><i data-lucide="baby" class="w-3 h-3"></i>소아</span>' : ''}
           <span class="text-sm font-bold ${state.briefingMode ? 'mono text-slate-200' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''}">${displayName}</span>
-          <button data-mci-card-modal-close class="ml-auto text-slate-500 hover:text-slate-200 p-1">
+          <button data-mci-card-modal-close class="ml-auto text-slate-500 hover:text-slate-200 p-1" aria-label="닫기">
             <i data-lucide="x" class="w-5 h-5"></i>
           </button>
         </div>
@@ -6629,9 +6670,7 @@ function initHelpModal() {
   btn.onclick = openHelp;
   closeBtn.onclick = closeHelp;
   modal.onclick = (e) => { if (e.target === modal) closeHelp(); };
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeHelp();
-  });
+  // ESC 처리는 initGlobalEscHandler()에서 통합 관리
   document.querySelectorAll('.help-tab-btn').forEach(b => {
     b.onclick = () => renderHelpTab(b.dataset.helpTab);
   });
@@ -6678,6 +6717,7 @@ async function boot() {
   initOutdoorToggle();
   initHelpModal();
   initCameraModal();
+  initGlobalEscHandler();
   // 익명 인증 대기 — Firebase Rules가 auth!=null 요구하므로 인증 후 데이터 구독.
   // 오프라인이거나 5초 안에 응답 없으면 일단 진행 (캐시 화면 표시).
   await authReady;
