@@ -401,8 +401,10 @@
   }
   body.outdoor-mode #outdoor-toggle:hover { background-color: #334155 !important; }
 
-  /* ── 표출(TV) 모드 — 설치 배너만 숨김 (외부 모드 토글은 사용 가능하도록 유지) ── */
-  body[data-view="display"] #install-banner {
+  /* ── 설치 배너 — 로그인(auth)·로비 화면에서만 표시 ──
+     재난방 입력 화면·표출 모드 등에서는 숨김: 모바일에서 하단 입력/저장 버튼을 가리는 충돌 방지.
+     (JS의 showBanner는 display:flex만 켜고, 실제 노출 여부는 이 규칙이 view별로 제어) ── */
+  body:not([data-view="auth"]):not([data-view="lobby"]) #install-banner {
     display: none !important;
   }
   /* 표출 모드에서 외부 모드 토글은 좌하단에 표시되지만 크기 약간 축소 */
@@ -422,7 +424,36 @@
   }
 
   /* 도움말 모달 — 활성 탭 강조 (border-blue-500 + text-white를 inline으로도 적용되도록 보조) */
-  .help-tab-btn:hover { background: rgba(15, 23, 42, 0.5); }
+  body:not(.outdoor-mode) .help-tab-btn:hover { background: rgba(15, 23, 42, 0.5); }
+
+  /* ── 도움말 모달 외부(밝은) 모드 색상 보강 ──
+     활성 탭의 text-white가 흰 배경에서 안 보이고, 어두운 반투명 뱃지/패널이
+     라이트 배경 위에서 가독성이 떨어지는 문제 해결. */
+  body.outdoor-mode .help-tab-btn:hover { background: #e2e8f0; }
+  body.outdoor-mode .help-tab-btn.text-white {
+    color: #1d4ed8 !important;     /* 활성 탭 — 파란 보더와 같은 계열의 진한 파랑 */
+    font-weight: 800;
+  }
+  /* 다크용 hover 배경 클래스가 라이트 모드에서 거꾸로 어두워지는 문제 (FAQ 펼침 등) */
+  body.outdoor-mode .hover\:bg-slate-900:hover,
+  body.outdoor-mode .hover\:bg-slate-800:hover { background-color: #e2e8f0 !important; }
+  /* 권한 뱃지 — 어두운 반투명 → 라이트 톤 (글씨색은 ⑨의 진한 색 규칙이 적용됨) */
+  body.outdoor-mode .bg-emerald-900\/40 { background-color: #d1fae5 !important; }
+  body.outdoor-mode .bg-violet-900\/40  { background-color: #ede9fe !important; }
+  /* 모드 비교 패널 (일반 재난/MCI) */
+  body.outdoor-mode .bg-red-900\/20  { background-color: #fee2e2 !important; }
+  body.outdoor-mode .bg-pink-900\/20 { background-color: #fce7f3 !important; }
+  /* 개인정보 경고 패널 */
+  body.outdoor-mode .bg-amber-950\/30 { background-color: #fef3c7 !important; border-color: #d97706 !important; }
+  body.outdoor-mode [class*="text-amber-100"] { color: #78350f !important; }
+
+  /* ── 한글 줄바꿈 — 단어 중간 끊김 방지 ──
+     좁은 화면에서 "비응급"이 "비응/급"처럼 중간에 잘리는 문제.
+     keep-all: 한글 단어 단위로만 줄바꿈 / break-word: 칸보다 긴 단어는 넘치지 않게 예외 허용 */
+  .triage-card-clickable, .mci-triage-btn, .display-card {
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
 
   /* ── 표출 모드 병원 그리드 — 한 줄 강제 배치 + 가로 폭 자동 분할 ──
        grid-template-columns는 인라인 style로 동적 지정 (병원 수 = N → repeat(N, 1fr))
@@ -505,13 +536,14 @@
 <body>
 
 <!-- 외부(야외) 모드 토글 — 시인성 강화 (밝은 고대비 테마)
-     좌하단 배치: 모달의 우하단 액션 버튼(저장/닫기)과 겹치지 않도록 함. -->
-<button id="outdoor-toggle" class="fixed bottom-4 left-4 z-[100] w-12 h-12 rounded-full bg-amber-500 hover:bg-amber-400 shadow-2xl shadow-amber-900/30 flex items-center justify-center text-white border-2 border-amber-300 transition-all" title="외부 모드 켜기 (시인성 강화)" aria-label="외부 모드 전환">
+     좌하단 배치: 모달의 우하단 액션 버튼(저장/닫기)과 겹치지 않도록 함.
+     z-40: 일반 콘텐츠(≤z-30) 위, 모달(z-50)·배너 아래 — 모달이 열리면 버튼이 가려져야 함. -->
+<button id="outdoor-toggle" class="fixed bottom-4 left-4 z-40 w-12 h-12 rounded-full bg-amber-500 hover:bg-amber-400 shadow-2xl shadow-amber-900/30 flex items-center justify-center text-white border-2 border-amber-300 transition-all" title="외부 모드 켜기 (시인성 강화)" aria-label="외부 모드 전환">
   <i data-lucide="sun" class="w-5 h-5"></i>
 </button>
 
 <!-- 도움말 버튼 (좌하단, 외부 모드 토글 옆) -->
-<button id="help-btn" class="fixed bottom-4 left-20 z-[100] w-12 h-12 rounded-full bg-blue-500 hover:bg-blue-400 shadow-2xl shadow-blue-900/30 flex items-center justify-center text-white border-2 border-blue-300 transition-all" title="도움말 / 사용법" aria-label="도움말">
+<button id="help-btn" class="fixed bottom-4 left-20 z-40 w-12 h-12 rounded-full bg-blue-500 hover:bg-blue-400 shadow-2xl shadow-blue-900/30 flex items-center justify-center text-white border-2 border-blue-300 transition-all" title="도움말 / 사용법" aria-label="도움말">
   <i data-lucide="help-circle" class="w-5 h-5"></i>
 </button>
 
@@ -638,6 +670,14 @@
   <button id="install-dismiss" class="text-white/80 hover:text-white p-1 flex-shrink-0" aria-label="닫기">
     <i data-lucide="x" class="w-4 h-4"></i>
   </button>
+</div>
+
+<!-- 오프라인 상태 배너 — navigator.onLine 기반 (제어 스크립트는 문서 하단)
+     z-[150]: 모달(z-50) 위에도 보여야 함 — 오프라인 중 입력은 동기화되지 않으므로 항상 노출 -->
+<div id="offline-banner" class="fixed top-0 inset-x-0 z-[150] hidden" role="status" aria-live="polite">
+  <div id="offline-banner-inner" class="bg-red-600 text-white text-center text-xs font-bold px-4 py-2 shadow-lg">
+    <span id="offline-banner-text">📴 오프라인 — 네트워크 연결이 끊겼습니다.</span>
+  </div>
 </div>
 
 <div id="app"></div>
@@ -851,6 +891,44 @@ const MCI_TRIAGE = [
   { id: 'nonurgent', name: '비응급', shortName: 'III', color: '#22c55e', bg: '#14532d', desc: '경증' },
   { id: 'dead', name: '사망', shortName: 'IV', color: '#94a3b8', bg: '#1e293b', desc: '사망/예측사망' },
 ];
+
+// 생체징후 허용 범위 — 입력 폼의 min/max 속성과 동일하게 유지할 것.
+// (HTML min/max는 직접 타이핑·OCR 자동입력을 막지 못하므로 저장 시 여기서 최종 검증)
+const VITAL_RANGES = {
+  rr:    { label: '호흡수',     min: 0,  max: 80,  unit: '회/분' },
+  pulse: { label: '맥박',       min: 0,  max: 250, unit: '회/분' },
+  bpSys: { label: '수축기 혈압', min: 0,  max: 300, unit: 'mmHg' },
+  bpDia: { label: '이완기 혈압', min: 0,  max: 200, unit: 'mmHg' },
+  spo2:  { label: 'SpO₂',      min: 0,  max: 100, unit: '%' },
+  temp:  { label: '체온',       min: 20, max: 50,  unit: '°C' },
+};
+
+// 생체징후 검증 — 비어 있으면 통과, 입력된 값만 숫자·범위 확인.
+// 문제가 있으면 사람이 읽을 수 있는 메시지 배열 반환 (없으면 빈 배열).
+function validateVitals(d) {
+  const errs = [];
+  Object.entries(VITAL_RANGES).forEach(([k, r]) => {
+    const raw = String(d[k] ?? '').trim();
+    if (!raw) return;
+    const v = Number(raw);
+    if (!Number.isFinite(v)) {
+      errs.push(`· ${r.label}: 숫자가 아닙니다 ("${raw}")`);
+      return;
+    }
+    if (v < r.min || v > r.max) {
+      errs.push(`· ${r.label}: ${raw}${r.unit} — 허용 범위 ${r.min}~${r.max}${r.unit}`);
+    }
+  });
+  // 혈압 논리 검증 — 둘 다 입력됐을 때 이완기 > 수축기면 오타
+  const sysRaw = String(d.bpSys ?? '').trim(), diaRaw = String(d.bpDia ?? '').trim();
+  if (sysRaw && diaRaw) {
+    const sys = Number(sysRaw), dia = Number(diaRaw);
+    if (Number.isFinite(sys) && Number.isFinite(dia) && dia > sys) {
+      errs.push(`· 혈압: 이완기(${diaRaw})가 수축기(${sysRaw})보다 큽니다 — 자리가 바뀌지 않았는지 확인`);
+    }
+  }
+  return errs;
+}
 
 // ==================== 전역 상태 ====================
 let state = {
@@ -5349,6 +5427,12 @@ function bindMciCasualtyEvents() {
   // 저장
   document.getElementById('mci-save-btn').onclick = async () => {
     if (!_draft.triage) { alert('트리아지를 먼저 선택하세요'); return; }
+    // 생체징후 범위 검증 — 음수·오타·OCR 오인식 값 저장 차단
+    const vitalErrs = validateVitals(_draft);
+    if (vitalErrs.length) {
+      alert('생체징후 값을 확인해주세요:\n\n' + vitalErrs.join('\n'));
+      return;
+    }
     const ok = await saveSelectedCasualty({
       name: (_draft.name || '').trim(),
       age: (_draft.age || '').trim(),
@@ -6708,6 +6792,42 @@ boot();
     } else {
       bindBannerEvents();
     }
+  })();
+</script>
+
+<!-- ==================== 오프라인 상태 표시 ====================
+     navigator.onLine + online/offline 이벤트로 연결 상태를 상단 배너에 표시.
+     - 오프라인: 빨간 배너 상시 노출 (입력이 동기화되지 않음을 경고)
+     - 복구: 초록 배너 3초 노출 후 자동 숨김
+================================================================ -->
+<script>
+  (function () {
+    const banner = document.getElementById('offline-banner');
+    const inner  = document.getElementById('offline-banner-inner');
+    const text   = document.getElementById('offline-banner-text');
+    if (!banner || !inner || !text) return;
+    let hideTimer = null;
+
+    function showOffline() {
+      clearTimeout(hideTimer);
+      inner.classList.remove('bg-emerald-600');
+      inner.classList.add('bg-red-600');
+      text.textContent = '📴 오프라인 — 네트워크 연결이 끊겼습니다. 입력 내용이 다른 사용자에게 전달되지 않을 수 있습니다.';
+      banner.classList.remove('hidden');
+    }
+
+    function showRestored() {
+      inner.classList.remove('bg-red-600');
+      inner.classList.add('bg-emerald-600');
+      text.textContent = '✅ 연결 복구 — 실시간 동기화가 재개되었습니다.';
+      banner.classList.remove('hidden');
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => banner.classList.add('hidden'), 3000);
+    }
+
+    window.addEventListener('offline', showOffline);
+    window.addEventListener('online', showRestored);
+    if (!navigator.onLine) showOffline();   // 오프라인 상태로 열린 경우(PWA 캐시 실행)
   })();
 </script>
 
