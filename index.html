@@ -5146,41 +5146,164 @@ function extractFieldsFromOcr(text) {
   return flags;
 }
 
+// ==================== Claude AI 카드 분석 (서버 중계) ====================
+// 사진을 /api/ocr(Cloudflare Worker)로 보내면 서버가 Claude Vision으로 분석.
+// 손글씨·체크표시·동그라미까지 판독되어 Tesseract보다 인식률이 크게 높음.
+// 오프라인이거나 서버/키 미설정 등으로 실패하면 기존 Tesseract OCR로 자동 폴백.
+
+// 이미지 축소(긴 변 1568px) + JPEG 재압축 — 전송량과 분석 비용 절약
+function downscaleImageBlob(blob, maxDim = 1568, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('이미지 변환 실패')), 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('이미지 로드 실패')); };
+    img.src = url;
+  });
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+    r.onerror = () => reject(new Error('이미지 인코딩 실패'));
+    r.readAsDataURL(blob);
+  });
+}
+
+async function runClaudeOcr(blob) {
+  const user = auth.currentUser;
+  if (!user) throw new Error('인증되지 않음 — 새로고침 후 다시 시도');
+  const idToken = await user.getIdToken();
+  const resized = await downscaleImageBlob(blob);
+  const b64 = await blobToBase64(resized);
+  const res = await fetch('/api/ocr', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+    body: JSON.stringify({ image: b64, mediaType: 'image/jpeg' }),
+  });
+  if (!res.ok) {
+    let msg = 'AI 분석 서버 오류 (' + res.status + ')';
+    try { const e = await res.json(); if (e && e.error) msg = e.error; } catch {}
+    throw new Error(msg);
+  }
+  const data = await res.json();
+  if (!data || typeof data.fields !== 'object' || data.fields === null) {
+    throw new Error('AI 응답 형식 오류');
+  }
+  return data.fields;
+}
+
+// Claude 추출 결과 → mciDraft 반영. 빈 필드만 채움(사용자가 이미 적은 값은 보존),
+// 채운 필드는 flags로 표시되어 노란색 강조(저장 전 확인 유도).
+function applyClaudeOcrFields(f) {
+  const flags = {};
+  const draft = mciDraft;
+  const fillStr = (k, v) => {
+    if (v == null) return;
+    const s = String(v).trim();
+    if (s && !draft[k]) { draft[k] = s; flags[k] = true; }
+  };
+  const fillNum = (k, v) => {
+    if (v == null) return;
+    const s = String(v).trim();
+    if (s && Number.isFinite(Number(s)) && !draft[k]) { draft[k] = s; flags[k] = true; }
+  };
+
+  if (['emergency', 'urgent', 'nonurgent', 'dead'].includes(f.triage) && !draft.triage) {
+    draft.triage = f.triage; flags.triage = true;
+  }
+  fillStr('name', f.name);
+  fillNum('age', f.age);
+  if ((f.gender === '남' || f.gender === '여') && !draft.gender) {
+    draft.gender = f.gender; flags.gender = true;
+  }
+  if (f.isPediatric === true && !draft.isPediatric) {
+    draft.isPediatric = true; flags.isPediatric = true;
+  }
+  fillStr('location', f.location);
+  fillStr('symptom', f.symptom);
+  if (['A', 'V', 'P', 'U'].includes(f.consciousness) && !draft.consciousness) {
+    draft.consciousness = f.consciousness; flags.consciousness = true;
+  }
+  fillNum('rr', f.rr);
+  fillNum('pulse', f.pulse);
+  fillNum('bpSys', f.bpSys);
+  fillNum('bpDia', f.bpDia);
+  fillNum('spo2', f.spo2);
+  fillNum('temp', f.temp);
+  if (typeof f.mechanism === 'string' && MECHANISM.includes(f.mechanism) && !draft.mechanism) {
+    draft.mechanism = f.mechanism; flags.mechanism = true;
+  }
+  fillStr('hospital', f.hospital);
+  fillStr('notes', f.notes);
+  return flags;
+}
+
 async function analyzeCapturedImage() {
   if (!_cameraCapturedBlob) {
     showCameraMessage('캡처된 이미지가 없습니다');
     return;
   }
-  showCameraAnalyzing('한국어 모델 로딩...');
-  try {
-    const text = await runOcr(_cameraCapturedBlob);
-    const flags = extractFieldsFromOcr(text);
-    const filledCount = Object.keys(flags).length;
-    if (filledCount === 0) {
-      showCameraAnalyzing('인식된 정보가 없습니다');
-      setTimeout(() => {
-        showCameraMessage('카드에서 필드를 인식하지 못했습니다. 더 선명하게 다시 촬영해주세요.');
-        showCameraLive();
-        // 카메라 라이브 재개
-        if (_cameraStream) {
-          const video = document.getElementById('camera-video');
-          if (video && !video.srcObject) video.srcObject = _cameraStream;
-        } else {
-          openCameraModal();
-        }
-      }, 1200);
+
+  let flags = null;
+
+  // 1차: Claude AI 분석 (온라인일 때) — 손글씨·체크표시까지 판독
+  if (navigator.onLine) {
+    showCameraAnalyzing('AI 분석 중... (보통 5~15초)');
+    try {
+      const fields = await runClaudeOcr(_cameraCapturedBlob);
+      flags = applyClaudeOcrFields(fields);
+    } catch (err) {
+      console.error('[OCR] AI 분석 실패 — 로컬 문자인식으로 전환:', err);
+      flags = null;
+    }
+  }
+
+  // 2차: 로컬 Tesseract 폴백 (오프라인이거나 AI 분석 실패 시)
+  if (flags === null) {
+    showCameraAnalyzing('로컬 문자인식 중... (한국어 모델 로딩)');
+    try {
+      const text = await runOcr(_cameraCapturedBlob);
+      flags = extractFieldsFromOcr(text);
+    } catch (err) {
+      console.error('[OCR] 분석 실패:', err);
+      showCameraMessage('분석 실패: ' + (err.message || err));
+      showCameraLive();
       return;
     }
-    // 성공: mciDraft 갱신, OCR 플래그 병합, 모달 닫고 폼 다시 그림
-    Object.assign(mciOcrFlags, flags);
-    closeCameraModal();
-    render();
-    setTimeout(() => alert(`${filledCount}개 필드가 자동 입력되었습니다. 노란색으로 강조된 부분을 꼭 확인해주세요.`), 100);
-  } catch (err) {
-    console.error('[OCR] 분석 실패:', err);
-    showCameraMessage('분석 실패: ' + (err.message || err));
-    showCameraLive();
   }
+
+  const filledCount = Object.keys(flags).length;
+  if (filledCount === 0) {
+    showCameraAnalyzing('인식된 정보가 없습니다');
+    setTimeout(() => {
+      showCameraMessage('카드에서 필드를 인식하지 못했습니다. 더 선명하게 다시 촬영해주세요.');
+      showCameraLive();
+      // 카메라 라이브 재개
+      if (_cameraStream) {
+        const video = document.getElementById('camera-video');
+        if (video && !video.srcObject) video.srcObject = _cameraStream;
+      } else {
+        openCameraModal();
+      }
+    }, 1200);
+    return;
+  }
+
+  // 성공: mciDraft 갱신, OCR 플래그 병합, 모달 닫고 폼 다시 그림
+  Object.assign(mciOcrFlags, flags);
+  closeCameraModal();
+  render();
+  setTimeout(() => alert(`${filledCount}개 필드가 자동 입력되었습니다. 노란색으로 강조된 부분을 꼭 확인해주세요.`), 100);
 }
 
 // 카메라 모달의 영구 이벤트 (닫기·캡처·재촬영·분석) — boot()에서 1회만 호출
@@ -6631,8 +6754,8 @@ const HELP_CONTENT = {
         </summary>
         <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
           MCI 사상자 카드 폼 우상단의 <strong>[📸 카메라로 입력]</strong> 버튼 → 후면 카메라 활성화 → 종이 카드를 프레임에 맞추고 셔터 → 분석 시작.<br>
-          한국어 OCR로 <strong>트리아지·이름·연령·성별·발견장소·주증상·생체징후</strong>를 자동 추출 → 노란색으로 강조 표시. <strong>저장 전 반드시 노란 항목을 확인·수정</strong>하세요.<br>
-          <em class="text-amber-300">* 인쇄체가 잘 인식되고 손글씨는 정확도가 낮을 수 있습니다.</em>
+          AI(Claude)가 <strong>손글씨·체크표시·동그라미까지 판독</strong>하여 트리아지·이름·연령·성별·발견장소·주증상·생체징후·이송병원을 자동 추출 → 노란색으로 강조 표시. <strong>저장 전 반드시 노란 항목을 확인·수정</strong>하세요.<br>
+          <em class="text-amber-300">* 통신이 끊긴 경우 자동으로 기기 내 문자인식(인쇄체 위주)으로 전환됩니다.</em>
         </div>
       </details>
 

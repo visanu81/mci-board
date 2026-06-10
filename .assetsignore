@@ -1,0 +1,8 @@
+# 정적 자산으로 배포하지 않을 파일 (웹에서 직접 다운로드 불가)
+worker.js
+wrangler.jsonc
+README.md
+firebase-database-rules.json
+.claude/
+.tmp/
+.assetsignore
