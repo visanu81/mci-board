@@ -948,7 +948,7 @@ function bindRealtime() {
         // 표출 모드: 재난 picker로 복귀 (전체 로그아웃하지 않음)
         if (state.session?.role === 'display') {
           state.currentIncidentId = null;
-          try { sessionStorage.removeItem('disaster_currentIncidentId'); } catch {}
+          try { localStorage.removeItem('disaster_currentIncidentId'); } catch {}
           rebindIncidentRealtime();
           render();
           setTimeout(() => alert(`"${title}" 재난이 관리자에 의해 종료되었습니다. 재난 선택 화면으로 돌아갑니다.`), 50);
@@ -1394,7 +1394,7 @@ function downloadExcel(masked = false) {
   // 6. MCI 사상자 카드 (있을 때만)
   const mciList = state.mciCasualties || [];
   if (mciList.length > 0) {
-    const mciHeader = ['연번','카드#','분류','이름','연령','성별','소아','발견장소','의식','호흡','맥박','수축기','이완기','SpO2','주증상','손상기전','손상부위','처치','약물','이송병원','출발시각','도착시각','메모','등록자','등록시각'];
+    const mciHeader = ['연번','카드#','분류','이름','연령','성별','소아','발견장소','의식','호흡','맥박','수축기','이완기','SpO2','체온','주증상','손상기전','손상부위','처치','약물','이송병원','출발시각','도착시각','메모','등록자','등록시각'];
     const mciRows = [mciHeader];
     mciList.forEach((c, i) => {
       const name = masked ? maskName(c.name) : (c.name || '');
@@ -1408,14 +1408,14 @@ function downloadExcel(masked = false) {
       mciRows.push([
         i+1, cardNo, tr, name, c.age||'', c.gender||'', c.isPediatric ? 'Y' : '',
         c.location||'',
-        c.consciousness||'', c.rr||'', c.pulse||'', c.bpSys||'', c.bpDia||'', c.spo2||'',
+        c.consciousness||'', c.rr||'', c.pulse||'', c.bpSys||'', c.bpDia||'', c.spo2||'', c.temp||'',
         symptom, c.mechanism||'', parts, treats, c.drugs||'',
         c.hospital||'', c.departTime||'', c.arriveTime||'', c.notes||'',
         author, ts,
       ]);
     });
     const ws6 = XLSX.utils.aoa_to_sheet(mciRows);
-    ws6['!cols'] = [{wch: 5}, {wch: 7}, {wch: 8}, {wch: 12}, {wch: 10}, {wch: 6}, {wch: 5}, {wch: 22}, {wch: 6}, {wch: 6}, {wch: 6}, {wch: 6}, {wch: 6}, {wch: 6}, {wch: 25}, {wch: 10}, {wch: 15}, {wch: 25}, {wch: 15}, {wch: 18}, {wch: 10}, {wch: 10}, {wch: 25}, {wch: 12}, {wch: 20}];
+    ws6['!cols'] = [{wch: 5}, {wch: 7}, {wch: 8}, {wch: 12}, {wch: 10}, {wch: 6}, {wch: 5}, {wch: 22}, {wch: 6}, {wch: 6}, {wch: 6}, {wch: 6}, {wch: 6}, {wch: 6}, {wch: 7}, {wch: 25}, {wch: 10}, {wch: 15}, {wch: 25}, {wch: 15}, {wch: 18}, {wch: 10}, {wch: 10}, {wch: 25}, {wch: 12}, {wch: 20}];
     XLSX.utils.book_append_sheet(wb, ws6, masked ? 'MCI사상자(마스킹)' : 'MCI사상자');
   }
 
@@ -1774,9 +1774,9 @@ function bindAuthEvents() {
       else if (agency.role === 'observer') state.view2 = 'observer';
       else if (agency.role === 'display')  state.view2 = 'display';
       else                                 state.view2 = 'lobby';
-      sessionStorage.setItem('disaster_session', JSON.stringify(state.session));
-      sessionStorage.setItem('disaster_view2',   state.view2);
-      sessionStorage.setItem('disaster_authed', '1');
+      localStorage.setItem('disaster_session', JSON.stringify(state.session));
+      localStorage.setItem('disaster_view2',   state.view2);
+      localStorage.setItem('disaster_authed', '1');
       render();
     } else {
       err.textContent = '관서 코드가 올바르지 않습니다 (예시: 동두천119)';
@@ -1858,7 +1858,7 @@ function bindUserSetupEvents() {
       if (!name) { nameInput.focus(); return; }
       state.user = { name, teamId: state.tempTeamId || 'command' };
       state.mciInputMode = defaultInputMode(state.user.teamId);
-      sessionStorage.setItem('disaster_user', JSON.stringify(state.user));
+      localStorage.setItem('disaster_user', JSON.stringify(state.user));
       render();
     };
   }
@@ -1893,11 +1893,11 @@ function renderV2Header(title, subtitle, opts = {}) {
 function bindV2HeaderEvents() {
   const lo = document.getElementById('v2-logout-btn');
   if (lo) lo.onclick = () => {
-    sessionStorage.removeItem('disaster_session');
-    sessionStorage.removeItem('disaster_view2');
-    sessionStorage.removeItem('disaster_currentIncidentId');
-    sessionStorage.removeItem('disaster_authed');
-    sessionStorage.removeItem('disaster_user');
+    localStorage.removeItem('disaster_session');
+    localStorage.removeItem('disaster_view2');
+    localStorage.removeItem('disaster_currentIncidentId');
+    localStorage.removeItem('disaster_authed');
+    localStorage.removeItem('disaster_user');
     state.session = null;
     state.view2 = 'auth';
     state.authed = false;
@@ -2337,6 +2337,7 @@ function renderDisplayPatientCard(c) {
     c.pulse ? `P ${escapeHtml(c.pulse)}` : '',
     (c.bpSys && c.bpDia) ? `BP ${escapeHtml(c.bpSys)}/${escapeHtml(c.bpDia)}` : '',
     c.spo2 ? `SpO₂ ${escapeHtml(c.spo2)}` : '',
+    c.temp ? `T ${escapeHtml(c.temp)}°` : '',
   ].filter(Boolean).join(' · ');
 
   return `
@@ -2441,9 +2442,9 @@ function bindDisplayEvents() {
   ['display-logout', 'display-logout-picker'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.onclick = () => {
-      sessionStorage.removeItem('disaster_session');
-      sessionStorage.removeItem('disaster_view2');
-      sessionStorage.removeItem('disaster_currentIncidentId');
+      localStorage.removeItem('disaster_session');
+      localStorage.removeItem('disaster_view2');
+      localStorage.removeItem('disaster_currentIncidentId');
       state.session = null;
       state.view2 = 'auth';
       state.currentIncidentId = null;
@@ -2456,7 +2457,7 @@ function bindDisplayEvents() {
   document.querySelectorAll('.display-pick-incident').forEach(btn => {
     btn.onclick = () => {
       state.currentIncidentId = btn.dataset.id;
-      sessionStorage.setItem('disaster_currentIncidentId', btn.dataset.id);
+      localStorage.setItem('disaster_currentIncidentId', btn.dataset.id);
       rebindIncidentRealtime();
       render();
     };
@@ -2467,7 +2468,7 @@ function bindDisplayEvents() {
   if (changeBtn) changeBtn.onclick = () => {
     state.currentIncidentId = null;
     state.displayModal = null;
-    sessionStorage.removeItem('disaster_currentIncidentId');
+    localStorage.removeItem('disaster_currentIncidentId');
     rebindIncidentRealtime();
     render();
   };
@@ -3093,9 +3094,9 @@ function joinIncident(incidentId) {
   state.currentIncidentId = incidentId;
   state.view2 = 'incident';
   state.user = null;  // 직책 다시 선택 (재난방마다)
-  sessionStorage.setItem('disaster_currentIncidentId', incidentId);
-  sessionStorage.setItem('disaster_view2', 'incident');
-  sessionStorage.removeItem('disaster_user');
+  localStorage.setItem('disaster_currentIncidentId', incidentId);
+  localStorage.setItem('disaster_view2', 'incident');
+  localStorage.removeItem('disaster_user');
   // 새 재난 경로로 Firebase 재구독은 bindRealtime 재호출에서 처리
   rebindIncidentRealtime();
   render();
@@ -3109,9 +3110,9 @@ function leaveIncident() {
   state.view2 = state.session.role === 'admin' ? 'admin'
               : state.session.role === 'observer' ? 'observer'
               : 'lobby';
-  sessionStorage.removeItem('disaster_currentIncidentId');
-  sessionStorage.removeItem('disaster_user');
-  sessionStorage.setItem('disaster_view2', state.view2);
+  localStorage.removeItem('disaster_currentIncidentId');
+  localStorage.removeItem('disaster_user');
+  localStorage.setItem('disaster_view2', state.view2);
   rebindIncidentRealtime();
   render();
 }
@@ -4373,7 +4374,7 @@ let mciDraft = {
   triage: '',
   // 생체징후
   consciousness: '', // AVPU
-  rr: '', pulse: '', bpSys: '', bpDia: '', spo2: '',
+  rr: '', pulse: '', bpSys: '', bpDia: '', spo2: '', temp: '',  // temp: 체온(°C)
   // 평가
   symptom: '', mechanism: '', injuryParts: [],
   // 처치
@@ -4393,7 +4394,7 @@ function resetMciDraft() {
     location: '',
     triage: '',
     consciousness: '',
-    rr: '', pulse: '', bpSys: '', bpDia: '', spo2: '',
+    rr: '', pulse: '', bpSys: '', bpDia: '', spo2: '', temp: '',
     symptom: '', mechanism: '', injuryParts: [],
     treatments: [],
     drugs: '',
@@ -4411,7 +4412,7 @@ let csDraft = {
   location: '',
   triage: '',
   consciousness: '',
-  rr: '', pulse: '', bpSys: '', bpDia: '', spo2: '',
+  rr: '', pulse: '', bpSys: '', bpDia: '', spo2: '', temp: '',
   symptom: '', mechanism: '', injuryParts: [],
   treatments: [],
   drugs: '',
@@ -4425,7 +4426,7 @@ function resetCsDraft() {
     location: '',
     triage: '',
     consciousness: '',
-    rr: '', pulse: '', bpSys: '', bpDia: '', spo2: '',
+    rr: '', pulse: '', bpSys: '', bpDia: '', spo2: '', temp: '',
     symptom: '', mechanism: '', injuryParts: [],
     treatments: [],
     drugs: '',
@@ -4632,7 +4633,7 @@ function renderMciCasualtyForm() {
                     class="w-full bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-sm mono focus:outline-none focus:border-pink-500" />
                 </div>
               </div>
-              <div class="grid grid-cols-3 gap-2">
+              <div class="grid grid-cols-4 gap-2">
                 <div>
                   <label class="text-[10px] text-slate-500 block mb-0.5">수축기</label>
                   <input id="mci-bpSys" type="number" min="0" max="300" placeholder="예) 120"
@@ -4646,6 +4647,11 @@ function renderMciCasualtyForm() {
                 <div>
                   <label class="text-[10px] text-slate-500 block mb-0.5">SpO₂ (%)</label>
                   <input id="mci-spo2" type="number" min="0" max="100" placeholder="예) 98"
+                    class="w-full bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-sm mono focus:outline-none focus:border-pink-500" />
+                </div>
+                <div>
+                  <label class="text-[10px] text-slate-500 block mb-0.5">체온 (°C)</label>
+                  <input id="mci-temp" type="number" step="0.1" min="20" max="50" placeholder="예) 36.5"
                     class="w-full bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-sm mono focus:outline-none focus:border-pink-500" />
                 </div>
               </div>
@@ -4968,10 +4974,16 @@ function extractFieldsFromOcr(text) {
   const pulseM = /(?:맥박|HR|P\b)[:\s|]*(\d{2,3})/.exec(norm);
   const bpM    = /(?:혈압|BP)[:\s|]*(\d{2,3})\s*\/\s*(\d{2,3})/.exec(norm);
   const spo2M  = /SpO[2₂]?[:\s|]*(\d{2,3})/.exec(norm);
+  // 체온 — 소수점 1자리 (예: 35.6, 36.5, 37.2). 일반 범위 30.0~45.0 만 허용
+  const tempM  = /(?:체온|BT|T(?:emp)?)[:\s|]*(\d{2}(?:\.\d)?)/i.exec(norm);
   if (rrM && !draft.rr)         { draft.rr = rrM[1]; flags.rr = true; }
   if (pulseM && !draft.pulse)   { draft.pulse = pulseM[1]; flags.pulse = true; }
   if (bpM && !draft.bpSys)      { draft.bpSys = bpM[1]; draft.bpDia = bpM[2]; flags.bpSys = true; flags.bpDia = true; }
   if (spo2M && !draft.spo2)     { draft.spo2 = spo2M[1]; flags.spo2 = true; }
+  if (tempM && !draft.temp) {
+    const t = parseFloat(tempM[1]);
+    if (t >= 30 && t <= 45) { draft.temp = tempM[1]; flags.temp = true; }
+  }
 
   // 8) GCS → AVPU 자동 매핑
   // 15 = A(Alert), 13-14 = V(Verbal), 9-12 = P(Pain), 3-8 = U(Unresponsive)
@@ -5110,7 +5122,7 @@ function bindMciCasualtyEvents() {
   }
 
   // 텍스트/숫자 input
-  ['name','age','rr','pulse','bpSys','bpDia','spo2','symptom','drugs','hospital','departTime','arriveTime','notes','location'].forEach(k => {
+  ['name','age','rr','pulse','bpSys','bpDia','spo2','temp','symptom','drugs','hospital','departTime','arriveTime','notes','location'].forEach(k => {
     const el = document.getElementById('mci-' + k);
     if (el) {
       el.value = _draft[k] || '';
@@ -5346,7 +5358,7 @@ function bindMciCasualtyEvents() {
       triage: _draft.triage,
       consciousness: _draft.consciousness,
       rr: _draft.rr, pulse: _draft.pulse,
-      bpSys: _draft.bpSys, bpDia: _draft.bpDia, spo2: _draft.spo2,
+      bpSys: _draft.bpSys, bpDia: _draft.bpDia, spo2: _draft.spo2, temp: _draft.temp,
       symptom: (_draft.symptom || '').trim(),
       mechanism: _draft.mechanism,
       injuryParts: _draft.injuryParts,
@@ -5383,7 +5395,7 @@ function bindMciCasualtyEvents() {
         triage: c.triage || '',
         consciousness: c.consciousness || '',
         rr: c.rr || '', pulse: c.pulse || '',
-        bpSys: c.bpSys || '', bpDia: c.bpDia || '', spo2: c.spo2 || '',
+        bpSys: c.bpSys || '', bpDia: c.bpDia || '', spo2: c.spo2 || '', temp: c.temp || '',
         symptom: c.symptom || '',
         mechanism: c.mechanism || '',
         injuryParts: Array.isArray(c.injuryParts) ? [...c.injuryParts] : [],
@@ -5744,6 +5756,7 @@ function renderMciSituation() {
                     c.pulse ? `P ${escapeHtml(c.pulse)}` : '',
                     (c.bpSys && c.bpDia) ? `${escapeHtml(c.bpSys)}/${escapeHtml(c.bpDia)}` : '',
                     c.spo2 ? `SpO₂ ${escapeHtml(c.spo2)}` : '',
+                    c.temp ? `T ${escapeHtml(c.temp)}°` : '',
                   ].filter(Boolean).join(' / ');
                   const tx = Array.isArray(c.treatments) ? c.treatments.slice(0, 3).join('·') : '';
                   const txMore = Array.isArray(c.treatments) && c.treatments.length > 3 ? ` +${c.treatments.length - 3}` : '';
@@ -5899,6 +5912,7 @@ function renderMciCardDetailModal() {
     { label: '맥박 (P)',    val: c.pulse ? `${escapeHtml(c.pulse)} 회/분` : '' },
     { label: '혈압 (BP)',   val: (c.bpSys && c.bpDia) ? `${escapeHtml(c.bpSys)}/${escapeHtml(c.bpDia)} mmHg` : '' },
     { label: 'SpO₂',        val: c.spo2 ? `${escapeHtml(c.spo2)} %` : '' },
+    { label: '체온',        val: c.temp ? `${escapeHtml(c.temp)} °C` : '' },
   ];
   const hasVital = vitalRows.some(v => v.val);
 
@@ -6101,7 +6115,7 @@ function bindMciCardDetailModalEvents() {
         triage: c.triage || '',
         consciousness: c.consciousness || '',
         rr: c.rr || '', pulse: c.pulse || '',
-        bpSys: c.bpSys || '', bpDia: c.bpDia || '', spo2: c.spo2 || '',
+        bpSys: c.bpSys || '', bpDia: c.bpDia || '', spo2: c.spo2 || '', temp: c.temp || '',
         symptom: c.symptom || '',
         mechanism: c.mechanism || '',
         injuryParts: Array.isArray(c.injuryParts) ? [...c.injuryParts] : [],
@@ -6555,10 +6569,22 @@ function initOutdoorToggle() {
 
 // ==================== 초기 부팅 ====================
 async function boot() {
-  if (sessionStorage.getItem('disaster_authed') === '1') {
+  // 세션 복원 (P0: 새로고침 시 로비로 빠지지 않게)
+  // session/view2/currentIncidentId 모두 복원하지 않으면 view2='auth'로 떨어져 로그인 다시 받음.
+  // 명시적 "반 변경" / "로그아웃" 버튼으로만 세션 종료.
+  try {
+    const sessRaw = localStorage.getItem('disaster_session');
+    if (sessRaw) state.session = JSON.parse(sessRaw);
+  } catch {}
+  const v2 = localStorage.getItem('disaster_view2');
+  if (v2) state.view2 = v2;
+  const incId = localStorage.getItem('disaster_currentIncidentId');
+  if (incId) state.currentIncidentId = incId;
+
+  if (localStorage.getItem('disaster_authed') === '1') {
     state.authed = true;
   }
-  const u = sessionStorage.getItem('disaster_user');
+  const u = localStorage.getItem('disaster_user');
   if (u) {
     try {
       state.user = JSON.parse(u);
