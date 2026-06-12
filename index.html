@@ -488,6 +488,24 @@
   body.outdoor-mode .bg-amber-950\/30 { background-color: #fef3c7 !important; border-color: #d97706 !important; }
   body.outdoor-mode [class*="text-amber-100"] { color: #78350f !important; }
 
+  /* ── 발견 위치 최다 발생 칩 강조 — 공사장 스타일(노랑 바탕 + 검정 테두리) ──
+     환자가 가장 많이 발생한 층은 배경색 자체로 즉시 식별 (미분류 제외, 동률 모두).
+     안전 경고색이라 다크/라이트 모드 공통. 외부 모드 .bg-slate-* !important
+     오버라이드보다 우선하도록 body 스코프(동일 특이도 + 뒤 선언) 유지 */
+  body:not(.outdoor-mode) .floor-chip-max,
+  body.outdoor-mode .floor-chip-max {
+    background: #facc15 !important;       /* 공사장 노랑 */
+    border-color: #111827 !important;     /* 진한 검정 테두리 */
+    border-width: 2px !important;
+    color: #111827 !important;            /* 노란 바탕 위 진한 글씨 */
+  }
+  body:not(.outdoor-mode) .floor-chip-max .text-slate-100,
+  body.outdoor-mode .floor-chip-max .text-slate-100,
+  body:not(.outdoor-mode) .floor-chip-max .text-slate-400,
+  body.outdoor-mode .floor-chip-max .text-slate-400 {
+    color: #111827 !important;            /* 인원수·'명'도 진하게 */
+  }
+
   /* ── 한글 줄바꿈 — 단어 중간 끊김 방지 ──
      좁은 화면에서 "비응급"이 "비응/급"처럼 중간에 잘리는 문제.
      keep-all: 한글 단어 단위로만 줄바꿈 / break-word: 칸보다 긴 단어는 넘치지 않게 예외 허용 */
@@ -2273,6 +2291,9 @@ function renderDisplayMain() {
   const _floorOrder = (n) => n === '지하' ? -1 : n === '옥상' ? 9000 : n === '미분류' ? 9999 : parseInt(n, 10);
   const floors = Object.entries(floorMap).map(([name, d]) => ({ name, ...d }))
     .sort((a, b) => _floorOrder(a.name) - _floorOrder(b.name));
+  // 최다 발생 위치(미분류 제외, 동률이면 모두) — 칩 배경 강조로 즉시 식별
+  const _maxFloorTotal = Math.max(0, ...floors.filter(f => f.name !== '미분류').map(f => f.total));
+  const isHotFloor = (f) => f.name !== '미분류' && _maxFloorTotal > 0 && f.total === _maxFloorTotal;
 
   return `
     <!-- 좌우 여백: TV(와이드)일수록 넓게 — 콘텐츠가 화면 가장자리에 붙지 않도록 -->
@@ -2339,7 +2360,7 @@ function renderDisplayMain() {
             <span class="self-center flex items-center gap-1.5 flex-wrap justify-end font-normal">
               <span class="text-sm text-slate-400 mr-0.5">발견 위치별</span>
               ${floors.map(f => `
-                <button data-display-floor="${escapeHtml(f.name)}" class="display-card cursor-pointer px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-pink-500 transition-colors flex items-baseline gap-1.5">
+                <button data-display-floor="${escapeHtml(f.name)}" class="display-card cursor-pointer px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-pink-500 transition-colors flex items-baseline gap-1.5 ${isHotFloor(f) ? 'floor-chip-max' : ''}"${isHotFloor(f) ? ' title="환자 최다 발생 위치"' : ''}>
                   <span class="text-sm font-bold">${escapeHtml(f.name)}</span>
                   <span class="text-xl font-black mono leading-none text-slate-100">${f.total}</span>
                   ${f.emergency > 0 ? `<span class="text-[10px] px-1 py-0.5 rounded font-black" style="background:#dc2626;color:#ffffff;">I ${f.emergency}</span>` : ''}
@@ -6128,6 +6149,9 @@ function renderMciSituation() {
   const _floorOrder = (n) => n === '지하' ? -1 : n === '옥상' ? 9000 : n === '미분류' ? 9999 : parseInt(n, 10);
   const floors = Object.entries(floorMap).map(([name, d]) => ({ name, ...d }))
     .sort((a, b) => _floorOrder(a.name) - _floorOrder(b.name));
+  // 최다 발생 위치(미분류 제외, 동률이면 모두) — 칩 배경 강조로 즉시 식별
+  const _maxFloorTotal = Math.max(0, ...floors.filter(f => f.name !== '미분류').map(f => f.total));
+  const isHotFloor = (f) => f.name !== '미분류' && _maxFloorTotal > 0 && f.total === _maxFloorTotal;
 
   return `
     <div class="px-4 py-4 space-y-4">
@@ -6141,7 +6165,7 @@ function renderMciSituation() {
           ${floors.length > 0 ? `
             <div class="flex items-center gap-1 flex-wrap ml-1">
               ${floors.map(f => `
-                <button data-floor-chip="${escapeHtml(f.name)}" class="floor-chip-clickable px-2 py-0.5 rounded-md border text-xs flex items-baseline gap-1 transition-colors cursor-pointer ${state.expandedFloor === f.name ? 'border-pink-500 bg-pink-950/30' : 'border-slate-700 bg-slate-950 hover:border-pink-600'}" title="${state.expandedFloor === f.name ? '접기' : f.name + ' 발견 환자 목록 펼치기'}">
+                <button data-floor-chip="${escapeHtml(f.name)}" class="floor-chip-clickable px-2 py-0.5 rounded-md border text-xs flex items-baseline gap-1 transition-colors cursor-pointer ${state.expandedFloor === f.name ? 'border-pink-500 bg-pink-950/30' : 'border-slate-700 bg-slate-950 hover:border-pink-600'} ${isHotFloor(f) ? 'floor-chip-max' : ''}"${state.expandedFloor === f.name ? ' style="outline:2px solid #ec4899; outline-offset:1px;"' : ''} title="${isHotFloor(f) ? '환자 최다 발생 위치 — ' : ''}${state.expandedFloor === f.name ? '접기' : f.name + ' 발견 환자 목록 펼치기'}">
                   <span class="font-bold">${escapeHtml(f.name)}</span>
                   <span class="mono font-black text-sm text-slate-100">${f.total}</span>
                   ${f.emergency > 0 ? `<span class="text-[10px] px-1 rounded font-black" style="background:#dc2626;color:#ffffff;">I${f.emergency}</span>` : ''}
