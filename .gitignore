@@ -1,6 +1,9 @@
 # Claude SDK 메타데이터
 .claude/
 
+# wrangler 작업 폴더 (계정 캐시 등 — 절대 공개/커밋 금지)
+.wrangler/
+
 # 작업용 임시 파일
 .tmp/
 

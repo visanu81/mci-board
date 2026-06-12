@@ -38,6 +38,24 @@
   .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
   .scrollbar-thin::-webkit-scrollbar { width: 4px; }
   .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+  /* ============================================================
+     가독성 향상 (전역 일괄 보정)
+     1) 다크 모드: 어두운 배경에서 대비가 부족한 회색 글씨를 한 단계씩 밝게
+        (외부 모드는 자체 라이트 팔레트가 !important로 적용되므로 영향 없음)
+     2) 카드 테두리를 살짝 또렷하게 — 패널 구분감 향상
+     3) 초소형 글씨 크기 하한 상향 (양쪽 모드 공통) — 현장·야외 시인성
+     ※ body 접두로 특이도를 높여 Tailwind CDN 생성 규칙보다 우선 적용
+     ============================================================ */
+  body:not(.outdoor-mode) .text-slate-700 { color: #64748b; }
+  body:not(.outdoor-mode) .text-slate-600 { color: #7c8aa1; }
+  body:not(.outdoor-mode) .text-slate-500 { color: #94a3b8; }
+  body:not(.outdoor-mode) .text-slate-400 { color: #b9c4d2; }
+  body:not(.outdoor-mode) .border-slate-800 { border-color: #2b3850; }
+  body .text-\[9px\]  { font-size: 10.5px; }
+  body .text-\[10px\] { font-size: 11.5px; }
+  body .text-\[11px\] { font-size: 12px; }
+  body .text-xs { font-size: 13px; line-height: 1.125rem; }
   /* fade-in for status */
   .fade { animation: fade .25s ease; }
   @keyframes fade { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
@@ -91,12 +109,15 @@
   body.outdoor-mode .text-slate-200 { color: #1e293b !important; }
   body.outdoor-mode .text-slate-300 { color: #334155 !important; }
   body.outdoor-mode .text-slate-400 { color: #475569 !important; }   /* secondary */
-  body.outdoor-mode .text-slate-500 { color: #64748b !important; }   /* tertiary */
-  body.outdoor-mode .text-slate-600 { color: #94a3b8 !important; }   /* muted */
-  body.outdoor-mode .text-slate-700 { color: #94a3b8 !important; }
+  body.outdoor-mode .text-slate-500 { color: #57637b !important; }   /* tertiary — 가독성 보정(어둡게) */
+  body.outdoor-mode .text-slate-600 { color: #6b7890 !important; }   /* muted — 가독성 보정(어둡게) */
+  body.outdoor-mode .text-slate-700 { color: #6b7890 !important; }
   body.outdoor-mode strong, body.outdoor-mode .font-bold, body.outdoor-mode .font-black {
     font-weight: 800 !important;
   }
+  /* 직책 선택 버튼 라벨 — 인라인 밝은 회색(#cbd5e1)이 흰 배경에 묻히는 문제.
+     라이트 모드에선 전부 진한 글씨로 (선택 표시는 테두리·배경·아이콘 색이 담당) */
+  body.outdoor-mode .team-btn > div { color: #1e293b !important; }
 
   /* ── ③ 보더 ── */
   body.outdoor-mode .border-slate-700 { border-color: #475569 !important; }   /* 강조 보더 */
@@ -181,6 +202,7 @@
   }
   body.outdoor-mode .bg-red-600\/20.text-red-300,
   body.outdoor-mode .bg-red-600\/20 .text-red-300,
+  body.outdoor-mode .bg-red-600\/30.text-red-300,
   body.outdoor-mode .bg-red-600\/30 .text-red-300 {
     color: #ffffff !important;
   }
@@ -202,6 +224,7 @@
     background-color: #db2777 !important;
     border-color: #831843 !important;
   }
+  body.outdoor-mode .bg-pink-900\/60.text-pink-200,
   body.outdoor-mode .bg-pink-900\/60 .text-pink-200,
   body.outdoor-mode .bg-pink-900\/60 * {
     color: #ffffff !important;
@@ -725,6 +748,21 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
+// ==================== 데이터 네임스페이스 ====================
+// 같은 Firebase 안에서 데이터 공간을 구분한다.
+//   운영(이 파일):  DB_ROOT = ''     → incidents/, archives/, config/  (기존 운영 데이터 그대로)
+//   실험(mci2):    DB_ROOT = 'mci2' → mci2/incidents, mci2/archives, mci2/config
+// 모든 Firebase 경로는 rootPath()를 거친다.
+const DB_ROOT = '';
+const rootPath = (p) => (DB_ROOT ? `${DB_ROOT}/${p}` : p);
+
+// ==================== 표출 팝아웃 창 ====================
+// 입력 화면의 [표출] 버튼으로 띄우는 보조 창 (?popout=display&incident=ID).
+// 노트북+TV 듀얼 모니터: 본 창은 입력, 팝아웃 창은 TV에 끌어다 표출.
+// 같은 브라우저 저장소를 공유하므로 팝아웃은 localStorage 세션을 읽지도 쓰지도 않는다
+// (본 창의 로그인이 끊기지 않게). 표출 역할이라 쓰기도 차단됨(읽기 전용).
+const POPOUT_DISPLAY = new URLSearchParams(location.search).get('popout') === 'display';
+
 // ==================== Firebase 익명 인증 ====================
 // Database Rules에서 auth != null 요구 → 외부 직접 API 호출 차단.
 // 첫 페이지 로드 시 익명 사용자로 자동 로그인 (사용자 눈에는 안 보임).
@@ -859,8 +897,10 @@ const canEditCard = (user, card) => {
 };
 // 카드 입력 권한 (본부 차단, 그 외 가능)
 const canEditFullFields = (user) => !isObserver();
-// 자동 모드 결정: 현장대원은 간이 기본, 나머지는 풀 기본
-const defaultInputMode = (teamId) => isFieldOnly(teamId) ? 'simple' : 'full';
+// 자동 모드 결정: 신규 등록은 직책 무관 전원 간이 기본.
+// (훈련 결과: 초기엔 긴박하게 입력하고 환자 상세정보는 대부분 나중에 확보됨)
+// 카드 수정 진입 시에는 풀 카드로 자동 전환 — 상세정보 보완 단계.
+const defaultInputMode = (teamId) => 'simple';
 const AGENCIES = [
   { id: 'fire', name: '소방' }, { id: 'volunteer', name: '의소대' },
   { id: 'army', name: '군' }, { id: 'police', name: '경찰' },
@@ -909,6 +949,17 @@ const MCI_TRIAGE = [
   { id: 'nonurgent', name: '비응급', shortName: 'III', color: '#22c55e', bg: '#14532d', desc: '경증' },
   { id: 'dead', name: '사망', shortName: 'IV', color: '#94a3b8', bg: '#1e293b', desc: '사망/예측사망' },
 ];
+
+// 트리아지 소형 뱃지 공용 스타일 — 풀채도 배경 + 보색 글씨.
+// 기존 "어두운 배경+같은 계열 글씨"(tr.bg+tr.color) 조합은 내부 대비가 약해
+// 특히 외부(밝은) 모드에서 안 보였음. 단색 조합이라 다크/라이트 양쪽에서 또렷.
+const TRIAGE_BADGE_STYLE = {
+  emergency: 'background:#dc2626;color:#ffffff;',   // 빨강 + 흰 글씨
+  urgent:    'background:#f59e0b;color:#451a03;',   // 호박 + 진갈색 글씨
+  nonurgent: 'background:#15803d;color:#ffffff;',   // 진초록 + 흰 글씨
+  dead:      'background:#475569;color:#ffffff;',   // 회청 + 흰 글씨
+};
+const triageBadgeStyle = (id) => TRIAGE_BADGE_STYLE[id] || 'background:#334155;color:#e2e8f0;';
 
 // 생체징후 허용 범위 — 입력 폼의 min/max 속성과 동일하게 유지할 것.
 // (HTML min/max는 직접 타이핑·OCR 자동입력을 막지 못하므로 저장 시 여기서 최종 검증)
@@ -976,9 +1027,11 @@ let state = {
   adminModal: false,
   adminTab: 'export',
   viewMciCardKey: null,             // MCI 통합 상황판 → 사상자 명단 행 클릭 시, 상세 모달에 띄울 카드의 _key
+  inspectCardKey: null,             // 사상자 카드 탭 — 좌측 목록에서 클릭한 카드 (우측에 상세보기 표시, 재클릭 시 해제)
   expandedHospital: null,           // 병원별 이송 현황 — 펼쳐서 환자 목록을 보고 있는 병원 이름 (null = 모두 접힘)
   expandedTriage: null,             // 트리아지 합계 — 펼쳐서 환자 목록을 보고 있는 트리아지 id (null = 접힘)
   expandedTransport: null,          // 트리아지 합계 — 이송 상태 펼침: 'pending' | 'in-transit' | 'arrived' | null
+  expandedFloor: null,              // 트리아지 합계 — 발견 위치(층) 칩 펼침: 층 이름 | null
   outdoorMode: false,               // 외부(야외) 모드 — true면 흰 배경 + 진한 글씨로 햇빛에서도 시인성 확보
   // 표출(TV) 모드 — view2='display' 일 때 사용
   displayModal: null,               // { type: 'triage'|'transport'|'hospital'|'patient', value: ... }
@@ -1028,12 +1081,12 @@ let _incidentUnsubFns = [];
 // V2 — 현재 재난방의 Firebase 경로 헬퍼
 function incPath(suffix) {
   if (!state.currentIncidentId) return null;
-  return `incidents/${state.currentIncidentId}/${suffix}`;
+  return rootPath(`incidents/${state.currentIncidentId}/${suffix}`);
 }
 
 function bindRealtime() {
   // V2 — 인덱스: 진행 중 재난 목록 (로비/관찰자/관리자 모두 사용)
-  onValue(ref(db, 'incidents'), snap => {
+  onValue(ref(db, rootPath('incidents')), snap => {
     const v = snap.val() || {};
     state.incidents = Object.entries(v).map(([k, val]) => ({ ...val, _key: k }));
     // P0-2: 사용자가 보고 있던 재난이 강제 종료(closedAt)되면 자동 이탈 + 알림
@@ -1042,9 +1095,10 @@ function bindRealtime() {
       if (cur && cur.closedAt) {
         const title = cur.title || '제목 없음';
         // 표출 모드: 재난 picker로 복귀 (전체 로그아웃하지 않음)
+        // 팝아웃 창은 본 창(입력)의 저장소를 건드리면 안 됨 — 메모리 상태만 변경
         if (state.session?.role === 'display') {
           state.currentIncidentId = null;
-          try { localStorage.removeItem('disaster_currentIncidentId'); } catch {}
+          if (!POPOUT_DISPLAY) { try { localStorage.removeItem('disaster_currentIncidentId'); } catch {} }
           rebindIncidentRealtime();
           render();
           setTimeout(() => alert(`"${title}" 재난이 관리자에 의해 종료되었습니다. 재난 선택 화면으로 돌아갑니다.`), 50);
@@ -1061,7 +1115,7 @@ function bindRealtime() {
     render();
   });
   // V2 — archives (글로벌, 종료된 재난 백업)
-  onValue(ref(db, 'archives'), snap => {
+  onValue(ref(db, rootPath('archives')), snap => {
     const v = snap.val() || {};
     const list = Object.entries(v).map(([k, val]) => ({ ...val, _key: k }));
     list.sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0));
@@ -1069,7 +1123,7 @@ function bindRealtime() {
     render();
   });
   // V5 — 관서 코드: Firebase 동기화 + 비어있으면 SEED로 초기 1회 채움
-  onValue(ref(db, 'config/agencyCodes'), snap => {
+  onValue(ref(db, rootPath('config/agencyCodes')), snap => {
     const v = snap.val();
     if (!v || Object.keys(v).length === 0) {
       // 첫 부팅 / 빈 상태 → SEED 푸시 (응답이 다시 와서 채워짐)
@@ -1093,14 +1147,14 @@ function bindRealtime() {
 // V5 — Firebase /config/agencyCodes 가 비었을 때만 SEED 푸시 (멱등)
 async function seedDefaultAgencyCodes() {
   try {
-    const r = await get(ref(db, 'config/agencyCodes'));
+    const r = await get(ref(db, rootPath('config/agencyCodes')));
     if (r.exists() && Object.keys(r.val() || {}).length > 0) return; // 이미 채워짐
     const updates = {};
     DEFAULT_AGENCY_CODES_SEED.forEach(e => {
-      const k = push(ref(db, 'config/agencyCodes')).key;
+      const k = push(ref(db, rootPath('config/agencyCodes'))).key;
       updates[k] = e;
     });
-    await set(ref(db, 'config/agencyCodes'), updates);
+    await set(ref(db, rootPath('config/agencyCodes')), updates);
   } catch (e) {
     console.error('seedDefaultAgencyCodes', e);
   }
@@ -1131,7 +1185,7 @@ async function saveAgencyCode(key, data) {
         const adminCount = state.agencyCodesList.filter(e => e.role === 'admin').length;
         if (adminCount <= 1) throw new Error('마지막 admin 코드의 역할은 변경할 수 없습니다');
       }
-      await update(ref(db, `config/agencyCodes/${key}`), {
+      await update(ref(db, rootPath(`config/agencyCodes/${key}`)), {
         code, id: existing.id, name, role,
       });
     } else {
@@ -1143,7 +1197,7 @@ async function saveAgencyCode(key, data) {
       if (!/^[a-zA-Z0-9_]+$/.test(id)) throw new Error('id는 영문·숫자·언더스코어만 사용 가능합니다');
       const dupId = state.agencyCodesList.find(e => e.id === id);
       if (dupId) throw new Error(`이미 사용 중인 id입니다: ${id}`);
-      const newRef = push(ref(db, 'config/agencyCodes'));
+      const newRef = push(ref(db, rootPath('config/agencyCodes')));
       await set(newRef, { code, id, name, role });
     }
     return { ok: true };
@@ -1161,7 +1215,7 @@ async function deleteAgencyCode(key) {
       const adminCount = state.agencyCodesList.filter(e => e.role === 'admin').length;
       if (adminCount <= 1) throw new Error('마지막 admin 코드는 삭제할 수 없습니다');
     }
-    await remove(ref(db, `config/agencyCodes/${key}`));
+    await remove(ref(db, rootPath(`config/agencyCodes/${key}`)));
     return { ok: true };
   } catch (e) {
     return { ok: false, reason: e.message };
@@ -1183,7 +1237,7 @@ function rebindIncidentRealtime() {
     state.mciCasualties = [];
     return;
   }
-  const base = `incidents/${state.currentIncidentId}`;
+  const base = rootPath(`incidents/${state.currentIncidentId}`);
   // 사고개요
   _incidentUnsubFns.push(onValue(ref(db, `${base}/incident`), snap => {
     state.incident = snap.val();
@@ -1311,18 +1365,19 @@ async function saveCasualty(data, teamId, author, editKey) {
         _updatedAt: Date.now(),
       });
     } else {
-      // 신규: cardNo 부여 + 이름 자동 부여 + push
-      const _maxNo = state.casualties.reduce((m, c) => Math.max(m, c.cardNo || 0), 0);
-      const _newCardNo = _maxNo + 1;
-      // V2: 이름이 비어있으면 '#NNN -작성자' 자동 부여
+      // 신규: cardNo 부여(폼 지정값 우선, 없으면 자동) + 이름 자동 부여 + push
+      if (!(Number.isInteger(data.cardNo) && data.cardNo > 0)) {
+        const _maxNo = state.casualties.reduce((m, c) => Math.max(m, c.cardNo || 0), 0);
+        data.cardNo = _maxNo + 1;
+      }
+      // V2: 이름이 비어있으면 '#NNN -작성자' 자동 부여 — 지정 번호 기준
       if (!data.name || !data.name.trim()) {
-        data.name = `#${String(_newCardNo).padStart(3, '0')} -${author}`;
+        data.name = `#${String(data.cardNo).padStart(3, '0')} -${author}`;
         data._autoNamed = true;
       }
       const newRef = push(ref(db, incPath('casualties')));
       await set(newRef, {
         timestamp: Date.now(),
-        cardNo: _newCardNo,
         ...data,
         teamId,
         author,
@@ -1349,10 +1404,14 @@ async function saveMciCasualty(data, teamId, author, editKey) {
   const formKey = 'mciCasualty';
   setSaveStatus(formKey, { saving: true });
   try {
-    // V2: 이름이 비어있으면 '#NNN -작성자' 형식으로 자동 부여 (신규 카드만)
+    // 카드 번호: 폼에서 지정한 번호 우선(종이 분류표와 맞춤), 없으면 자동(최대+1)
+    if (!(Number.isInteger(data.cardNo) && data.cardNo > 0)) {
+      const _autoNo = state.mciCasualties.reduce((m, c) => Math.max(m, c.cardNo || 0), 0) + 1;
+      data.cardNo = _autoNo;
+    }
+    // V2: 이름이 비어있으면 '#NNN -작성자' 형식으로 자동 부여 (신규 카드만) — 지정 번호 기준
     if (!editKey && (!data.name || !data.name.trim())) {
-      const _maxNo = state.mciCasualties.reduce((m, c) => Math.max(m, c.cardNo || 0), 0);
-      data.name = `#${String(_maxNo + 1).padStart(3, '0')} -${author}`;
+      data.name = `#${String(data.cardNo).padStart(3, '0')} -${author}`;
       data._autoNamed = true;
     }
     if (editKey) {
@@ -1360,12 +1419,9 @@ async function saveMciCasualty(data, teamId, author, editKey) {
         ...data, teamId, author, _updatedAt: Date.now(),
       });
     } else {
-      // 카드 일련번호 부여 (#001, #002...)
-      const maxCardNum = state.mciCasualties.reduce((m, c) => Math.max(m, c.cardNo || 0), 0);
       const newRef = push(ref(db, incPath('mciCasualties')));
       await set(newRef, {
         timestamp: Date.now(),
-        cardNo: maxCardNum + 1,
         ...data, teamId, author,
       });
     }
@@ -1490,7 +1546,7 @@ function downloadExcel(masked = false) {
   // 6. MCI 사상자 카드 (있을 때만)
   const mciList = state.mciCasualties || [];
   if (mciList.length > 0) {
-    const mciHeader = ['연번','카드#','분류','이름','연령','성별','소아','발견장소','의식','호흡','맥박','수축기','이완기','SpO2','체온','주증상','손상기전','손상부위','처치','약물','이송병원','출발시각','도착시각','메모','등록자','등록시각'];
+    const mciHeader = ['연번','카드#','분류','이름','연령','성별','소아','발견장소','인계출동대','인계시각','의식','호흡','맥박','수축기','이완기','SpO2','체온','주증상','손상기전','손상부위','처치','약물','이송병원','출발시각','도착시각','메모','등록자','등록시각'];
     const mciRows = [mciHeader];
     mciList.forEach((c, i) => {
       const name = masked ? maskName(c.name) : (c.name || '');
@@ -1503,7 +1559,7 @@ function downloadExcel(masked = false) {
       const author = masked ? maskName(c.author) : (c.author || '');
       mciRows.push([
         i+1, cardNo, tr, name, c.age||'', c.gender||'', c.isPediatric ? 'Y' : '',
-        c.location||'',
+        c.location||'', c.handoverUnit||'', c.handoverTime||'',
         c.consciousness||'', c.rr||'', c.pulse||'', c.bpSys||'', c.bpDia||'', c.spo2||'', c.temp||'',
         symptom, c.mechanism||'', parts, treats, c.drugs||'',
         c.hospital||'', c.departTime||'', c.arriveTime||'', c.notes||'',
@@ -1511,7 +1567,7 @@ function downloadExcel(masked = false) {
       ]);
     });
     const ws6 = XLSX.utils.aoa_to_sheet(mciRows);
-    ws6['!cols'] = [{wch: 5}, {wch: 7}, {wch: 8}, {wch: 12}, {wch: 10}, {wch: 6}, {wch: 5}, {wch: 22}, {wch: 6}, {wch: 6}, {wch: 6}, {wch: 6}, {wch: 6}, {wch: 6}, {wch: 7}, {wch: 25}, {wch: 10}, {wch: 15}, {wch: 25}, {wch: 15}, {wch: 18}, {wch: 10}, {wch: 10}, {wch: 25}, {wch: 12}, {wch: 20}];
+    ws6['!cols'] = [{wch: 5}, {wch: 7}, {wch: 8}, {wch: 12}, {wch: 10}, {wch: 6}, {wch: 5}, {wch: 22}, {wch: 12}, {wch: 8}, {wch: 6}, {wch: 6}, {wch: 6}, {wch: 6}, {wch: 6}, {wch: 6}, {wch: 7}, {wch: 25}, {wch: 10}, {wch: 15}, {wch: 25}, {wch: 15}, {wch: 18}, {wch: 10}, {wch: 10}, {wch: 25}, {wch: 12}, {wch: 20}];
     XLSX.utils.book_append_sheet(wb, ws6, masked ? 'MCI사상자(마스킹)' : 'MCI사상자');
   }
 
@@ -1567,7 +1623,7 @@ async function archiveAndReset(label) {
   try {
     if (hasData) {
       // 1. archives에 백업
-      const archiveRef = push(ref(db, 'archives'));
+      const archiveRef = push(ref(db, rootPath('archives')));
       await set(archiveRef, {
         label: label || (snap.incident?.location || '미상 재난'),
         archivedAt: Date.now(),
@@ -1592,7 +1648,7 @@ async function archiveAndReset(label) {
 
 async function deleteArchive(key) {
   if (!assertCanWrite('백업 삭제')) return false;
-  try { await remove(ref(db, `archives/${key}`)); return true; }
+  try { await remove(ref(db, rootPath(`archives/${key}`))); return true; }
   catch (e) { alert('삭제 실패: ' + e.message); return false; }
 }
 
@@ -1647,7 +1703,7 @@ async function adminForceCloseIncident(incidentId, opts = {}) {
 
     // 2. 데이터 있으면 archives에 백업
     if (hasData) {
-      const archiveRef = push(ref(db, 'archives'));
+      const archiveRef = push(ref(db, rootPath('archives')));
       await set(archiveRef, {
         label: `${inc.title || '제목 없음'} · 관리자 강제 종료${opts.note ? ' · ' + opts.note : ''}`,
         archivedAt: Date.now(),
@@ -1779,6 +1835,7 @@ function render() {
   if (!state.session) {
     root.innerHTML = renderAuth();
     bindAuthEvents();
+    if (window.lucide) window.lucide.createIcons();
     return;
   }
 
@@ -1812,6 +1869,7 @@ function render() {
   if (!state.user) {
     root.innerHTML = renderUserSetup();
     bindUserSetupEvents();
+    if (window.lucide) window.lucide.createIcons();
     return;
   }
 
@@ -1899,34 +1957,34 @@ function renderUserSetup() {
         </div>
         <div class="bg-slate-900 rounded-2xl border border-slate-800 p-5 space-y-4">
           <div>
-            <label class="text-xs text-slate-400 mb-1.5 tracking-wide flex items-center gap-1">
-              <i data-lucide="users" class="w-3 h-3"></i>직책
+            <label class="text-sm text-slate-400 mb-1.5 tracking-wide flex items-center gap-1">
+              <i data-lucide="users" class="w-3.5 h-3.5"></i>직책
             </label>
             <div class="grid grid-cols-2 gap-2">
               ${TEAMS.map(t => `
-                <button data-team="${t.id}" class="team-btn p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1.5 ${
+                <button data-team="${t.id}" class="team-btn p-3 min-h-[4.75rem] rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-1.5 text-center ${
                   selectedTeam === t.id
                     ? 'bg-slate-950'
                     : 'border-slate-800 bg-slate-950 hover:border-slate-700'
                 }" style="${selectedTeam === t.id ? `border-color:${t.color};background:${t.color}15` : ''}">
-                  <i data-lucide="${t.icon}" class="w-5 h-5" style="color:${t.color}"></i>
-                  <div class="text-sm font-bold" style="${selectedTeam === t.id ? `color:${t.color}` : 'color:#cbd5e1'}">${t.name}</div>
+                  <i data-lucide="${t.icon}" class="w-6 h-6" style="color:${t.color}"></i>
+                  <div class="text-base font-bold" style="${selectedTeam === t.id ? `color:${t.color}` : 'color:#cbd5e1'}">${t.name}</div>
                 </button>
               `).join('')}
             </div>
           </div>
           <div>
-            <label class="text-xs text-slate-400 mb-1.5 tracking-wide flex items-center gap-1">
-              <i data-lucide="user-round" class="w-3 h-3"></i>호출명
+            <label class="text-sm text-slate-400 mb-1.5 tracking-wide flex items-center gap-1">
+              <i data-lucide="user-round" class="w-3.5 h-3.5"></i>호출명
             </label>
             <div class="relative">
               <i data-lucide="user-round" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none"></i>
               <input id="name-input" type="text" placeholder="예: 불현1급차" value="${state.tempName || ''}"
-                class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-red-500" />
+                class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2.5 text-base focus:outline-none focus:border-red-500" />
             </div>
           </div>
-          <button id="enter-btn" class="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:bg-slate-800 disabled:text-slate-600 font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2">
-            <i data-lucide="log-in" class="w-4 h-4"></i>상황판 진입
+          <button id="enter-btn" class="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:bg-slate-800 disabled:text-slate-600 font-bold text-base tracking-wide transition-all flex items-center justify-center gap-2">
+            <i data-lucide="log-in" class="w-5 h-5"></i>상황판 진입
           </button>
         </div>
       </div>
@@ -2129,6 +2187,37 @@ function renderDisplayPicker() {
   `;
 }
 
+// 한글 숫자(일~구십구) → 정수. '일'→1, '십'→10, '십삼'→13, '이십오'→25. 해석 불가면 NaN.
+function koreanNumToInt(s) {
+  const d = { 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 칠: 7, 팔: 8, 구: 9 };
+  const m = /^([일이삼사오육칠팔구])?(십)?([일이삼사오육칠팔구])?$/.exec(s || '');
+  if (!m || (!m[1] && !m[2] && !m[3])) return NaN;
+  let n = 0;
+  if (m[2]) n = (m[1] ? d[m[1]] : 1) * 10;       // (X)십 → X*10 (십 단독은 10)
+  else if (m[1]) n = d[m[1]];                     // 십 없이 한 자리
+  if (m[2] && m[3]) n += d[m[3]];                 // 십 뒤 일의 자리
+  else if (!m[2] && m[3] && !m[1]) n = d[m[3]];   // 안전망
+  return n || NaN;
+}
+
+// 발견장소 자유 텍스트에서 층 추출 — 사람마다 "지하1층 계단" / "2층" / "일층" / "3F" 등으로
+// 다르게 써도 지하 / N층 / 옥상 묶음으로 정규화 (숫자·한글 숫자 동일 분류).
+// 위치 미입력·층 표기 없음은 '미분류' — 모든 환자가 집계되어 층 합계 = 트리아지 총원.
+function floorOfLocation(loc) {
+  const s = String(loc || '').trim();
+  if (!s) return '미분류';
+  if (/지하|B\s*\d+/i.test(s)) return '지하';
+  if (/옥상|루프탑|RF/i.test(s)) return '옥상';
+  const m = /(\d+)\s*(?:층|F)/i.exec(s);                     // 숫자 + 층/F
+  if (m) return `${parseInt(m[1], 10)}층`;
+  const km = /([일이삼사오육칠팔구십]{1,3})\s*층/.exec(s);     // 한글 숫자 + 층
+  if (km) {
+    const n = koreanNumToInt(km[1]);
+    if (Number.isInteger(n) && n > 0) return `${n}층`;
+  }
+  return '미분류';
+}
+
 function renderDisplayMain() {
   // 인덱스(state.incidents)에서 재난 메타(title, type, agencyId, startedAt)를 우선 사용.
   // state.incident는 "사고 개요" 폼이 입력된 경우에만 값이 있어 보조로만 활용.
@@ -2170,8 +2259,24 @@ function renderDisplayMain() {
     .map(([name, d]) => ({ name, ...d }))
     .sort((a, b) => b.total - a.total);
 
+  // 발견 위치(층)별 집계 — 지하 → 1층 → 2층 … → 옥상 → 미분류 순 정렬.
+  // 긴급(I)과 사망(IV)은 칩에 뱃지로 강조 (둘 다 최우선 위험 표시)
+  const floorMap = {};
+  state.mciCasualties.forEach(c => {
+    const f = floorOfLocation(c.location);
+    if (!f) return;
+    if (!floorMap[f]) floorMap[f] = { total: 0, emergency: 0, dead: 0 };
+    floorMap[f].total++;
+    if (c.triage === 'emergency') floorMap[f].emergency++;
+    if (c.triage === 'dead') floorMap[f].dead++;
+  });
+  const _floorOrder = (n) => n === '지하' ? -1 : n === '옥상' ? 9000 : n === '미분류' ? 9999 : parseInt(n, 10);
+  const floors = Object.entries(floorMap).map(([name, d]) => ({ name, ...d }))
+    .sort((a, b) => _floorOrder(a.name) - _floorOrder(b.name));
+
   return `
-    <div class="h-screen bg-slate-950 text-slate-100 p-6 select-none flex flex-col overflow-hidden">
+    <!-- 좌우 여백: TV(와이드)일수록 넓게 — 콘텐츠가 화면 가장자리에 붙지 않도록 -->
+    <div class="h-screen bg-slate-950 text-slate-100 p-6 md:px-10 xl:px-16 2xl:px-24 select-none flex flex-col overflow-hidden">
 
       <!-- 헤더 -->
       <header class="flex-shrink-0 flex items-center justify-between mb-6 pb-4 border-b-2 border-slate-800 gap-4">
@@ -2202,12 +2307,19 @@ function renderDisplayMain() {
             <div id="display-date" class="text-[11px] text-slate-500 mt-1.5 tracking-widest font-medium">----</div>
           </div>
           <div class="flex flex-col gap-1.5">
-            <button id="display-change-incident" class="text-xs text-slate-300 hover:text-white px-3 py-1.5 rounded-lg bg-slate-800/70 hover:bg-slate-700 flex items-center gap-1" title="다른 재난 선택">
-              <i data-lucide="repeat" class="w-3.5 h-3.5"></i>재난 변경
-            </button>
-            <button id="display-logout" class="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-slate-800/70 hover:bg-slate-700 flex items-center gap-1" title="로그아웃">
-              <i data-lucide="log-out" class="w-3.5 h-3.5"></i>로그아웃
-            </button>
+            ${POPOUT_DISPLAY ? `
+              <!-- 팝아웃 창: 로그아웃하면 입력 창 세션까지 끊기므로 [창 닫기]만 제공 -->
+              <button id="display-close-popout" class="text-xs text-slate-300 hover:text-white px-3 py-1.5 rounded-lg bg-slate-800/70 hover:bg-slate-700 flex items-center gap-1" title="표출 창 닫기 (입력 창은 그대로 유지됩니다)">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>창 닫기
+              </button>
+            ` : `
+              <button id="display-change-incident" class="text-xs text-slate-300 hover:text-white px-3 py-1.5 rounded-lg bg-slate-800/70 hover:bg-slate-700 flex items-center gap-1" title="다른 재난 선택">
+                <i data-lucide="repeat" class="w-3.5 h-3.5"></i>재난 변경
+              </button>
+              <button id="display-logout" class="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-slate-800/70 hover:bg-slate-700 flex items-center gap-1" title="로그아웃">
+                <i data-lucide="log-out" class="w-3.5 h-3.5"></i>로그아웃
+              </button>
+            `}
           </div>
         </div>
       </header>
@@ -2220,6 +2332,22 @@ function renderDisplayMain() {
           <span class="text-base text-slate-400 font-normal">— 총</span>
           <span class="text-3xl font-black mono text-pink-300 leading-none">${totalCount}</span>
           <span class="text-base text-slate-400 font-normal">명</span>
+          <span class="flex-1"></span>
+          <!-- 발견 위치별 칩 — 제목줄 우측 빈 공간 활용. 층 합계 = 총원이라 바로 대조 가능.
+               긴급(I)·사망(IV)은 뱃지로 위험 강조 -->
+          ${floors.length > 0 ? `
+            <span class="self-center flex items-center gap-1.5 flex-wrap justify-end font-normal">
+              <span class="text-sm text-slate-400 mr-0.5">발견 위치별</span>
+              ${floors.map(f => `
+                <button data-display-floor="${escapeHtml(f.name)}" class="display-card cursor-pointer px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-pink-500 transition-colors flex items-baseline gap-1.5">
+                  <span class="text-sm font-bold">${escapeHtml(f.name)}</span>
+                  <span class="text-xl font-black mono leading-none text-slate-100">${f.total}</span>
+                  ${f.emergency > 0 ? `<span class="text-[10px] px-1 py-0.5 rounded font-black" style="background:#dc2626;color:#ffffff;">I ${f.emergency}</span>` : ''}
+                  ${f.dead > 0 ? `<span class="text-[10px] px-1 py-0.5 rounded font-black" style="background:#475569;color:#ffffff;">IV ${f.dead}</span>` : ''}
+                </button>
+              `).join('')}
+            </span>
+          ` : ''}
         </h2>
         <div class="grid grid-cols-4 gap-3">
           ${triageTotals.map(tr => {
@@ -2228,7 +2356,7 @@ function renderDisplayMain() {
             // 응급(노랑)만 진한 갈색 글씨. 나머지는 흰색.
             const txt = tr.id === 'urgent' ? '#451a03' : '#ffffff';
             return `
-            <button data-display-triage="${tr.id}" class="display-card triage-card-clickable rounded-2xl px-3 py-6 text-center transition-all cursor-pointer hover:brightness-110"
+            <button data-display-triage="${tr.id}" class="display-card triage-card-clickable rounded-2xl px-3 py-6 text-center transition-all cursor-pointer hover:brightness-110 flex flex-col items-center justify-center"
               data-triage-card="${tr.id}"
               style="background: ${cardBg}; border:2px solid ${tr.bg};">
               <div class="text-xl font-black tracking-wider mb-2" style="color:${txt};">${tr.shortName}·${tr.name}</div>
@@ -2237,7 +2365,7 @@ function renderDisplayMain() {
                 <div class="text-sm font-bold mt-2 flex items-center justify-center gap-1" style="color:${txt}; opacity:0.85;">
                   <i data-lucide="baby" class="w-4 h-4"></i>소아 ${tr.pediatricCount}
                 </div>
-              ` : '<div class="mt-2 text-sm">&nbsp;</div>'}
+              ` : ''}
             </button>
             `;
           }).join('')}
@@ -2300,7 +2428,7 @@ function renderDisplayMain() {
                 <!-- 트리아지별 환자 분포 -->
                 <div class="flex flex-wrap justify-center gap-1 w-full">
                   ${MCI_TRIAGE.map(tr => h.byTriage[tr.id] ? `
-                    <span class="text-[11px] px-1.5 py-0.5 rounded font-black" style="background:${tr.bg};color:${tr.color}">
+                    <span class="text-[11px] px-1.5 py-0.5 rounded font-black" style="${triageBadgeStyle(tr.id)}">
                       ${tr.shortName} ${h.byTriage[tr.id]}
                     </span>
                   ` : '').join('')}
@@ -2373,6 +2501,16 @@ function renderDisplayModal() {
         if (oa !== ob) return oa - ob;
         return (a.cardNo || 0) - (b.cardNo || 0);
       });
+  } else if (m.type === 'floor') {
+    title = `발견 위치 · ${m.value}`; color = '#ec4899';
+    subtitle = '해당 위치 발견 환자';
+    const triageOrder = { emergency: 0, urgent: 1, nonurgent: 2, dead: 3 };
+    patients = state.mciCasualties.filter(c => floorOfLocation(c.location) === m.value)
+      .sort((a, b) => {
+        const oa = triageOrder[a.triage] ?? 9, ob = triageOrder[b.triage] ?? 9;
+        if (oa !== ob) return oa - ob;
+        return (a.cardNo || 0) - (b.cardNo || 0);
+      });
   }
 
   return `
@@ -2397,7 +2535,7 @@ function renderDisplayModal() {
                 return `
                   <button data-display-patient="${c._key}" class="w-full text-left px-4 py-3 hover:bg-slate-800 transition-colors flex items-center gap-3 text-lg">
                     <span class="text-base text-slate-500 mono font-bold w-14 flex-shrink-0">${cardNo}</span>
-                    <span class="text-base px-2 py-1 rounded font-black flex-shrink-0" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.shortName || '?'}</span>
+                    <span class="text-base px-2 py-1 rounded font-black flex-shrink-0" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
                     ${c.isPediatric ? '<i data-lucide="baby" class="w-5 h-5 text-cyan-400 flex-shrink-0"></i>' : ''}
                     <span class="font-bold ${c._autoNamed ? 'italic text-slate-400' : 'text-slate-100'} flex-shrink-0">${escapeHtml(c.name || '-')}</span>
                     <span class="text-base text-slate-400 mono flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
@@ -2442,7 +2580,7 @@ function renderDisplayPatientCard(c) {
         <!-- 헤더 -->
         <div class="px-6 py-4 border-b-2 border-slate-800 flex items-center gap-3 flex-wrap">
           <span class="text-2xl mono font-bold text-slate-300">${cardNo}</span>
-          <span class="text-xl px-3 py-1 rounded-lg font-black" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.shortName || '?'} · ${tr?.name || '미분류'}</span>
+          <span class="text-xl px-3 py-1 rounded-lg font-black" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'} · ${tr?.name || '미분류'}</span>
           ${c.isPediatric ? '<span class="text-cyan-300 text-base px-2 py-1 rounded bg-cyan-950/50 flex items-center gap-1"><i data-lucide="baby" class="w-4 h-4"></i>소아</span>' : ''}
           <span class="text-2xl font-bold ${c._autoNamed ? 'italic text-slate-400' : 'text-slate-100'}">${escapeHtml(c.name || '-')}</span>
           <button id="display-modal-close" class="ml-auto text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800" aria-label="닫기">
@@ -2459,6 +2597,11 @@ function renderDisplayPatientCard(c) {
             <div class="col-span-2 bg-slate-950 rounded-xl p-4 border border-slate-800">
               <div class="text-xs text-slate-500 tracking-wider uppercase mb-1 flex items-center gap-1"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-pink-400"></i>발견장소</div>
               <div class="text-xl ${c.location ? 'text-pink-200' : 'text-slate-600'}">${escapeHtml(c.location || '미입력')}</div>
+              ${(c.handoverUnit || c.handoverTime) ? `
+                <div class="text-sm text-slate-400 mt-2 pt-2 border-t border-slate-800">
+                  인계: <span class="text-amber-300 font-medium">${escapeHtml(c.handoverUnit || '출동대 미상')}</span>${c.handoverTime ? ` · <span class="mono">${escapeHtml(c.handoverTime)}</span>` : ''}
+                </div>
+              ` : ''}
             </div>
           </div>
           <!-- 의식 + 생체징후 -->
@@ -2534,10 +2677,15 @@ function renderDisplayPatientCard(c) {
 
 // 표출 모드 이벤트 바인딩 — picker / main / modal
 function bindDisplayEvents() {
-  // 로그아웃 (picker · main 공통)
+  // 팝아웃 창 — [창 닫기]
+  const closePopout = document.getElementById('display-close-popout');
+  if (closePopout) closePopout.onclick = () => window.close();
+
+  // 로그아웃 (picker · main 공통) — 팝아웃에서는 localStorage(본 창 세션)를 건드리지 않고 창만 닫음
   ['display-logout', 'display-logout-picker'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.onclick = () => {
+      if (POPOUT_DISPLAY) { window.close(); return; }
       localStorage.removeItem('disaster_session');
       localStorage.removeItem('disaster_view2');
       localStorage.removeItem('disaster_currentIncidentId');
@@ -2549,22 +2697,22 @@ function bindDisplayEvents() {
     };
   });
 
-  // picker — 재난 선택
+  // picker — 재난 선택 (팝아웃에서는 localStorage에 기록하지 않음)
   document.querySelectorAll('.display-pick-incident').forEach(btn => {
     btn.onclick = () => {
       state.currentIncidentId = btn.dataset.id;
-      localStorage.setItem('disaster_currentIncidentId', btn.dataset.id);
+      if (!POPOUT_DISPLAY) localStorage.setItem('disaster_currentIncidentId', btn.dataset.id);
       rebindIncidentRealtime();
       render();
     };
   });
 
-  // main — 재난 변경 (picker로 복귀)
+  // main — 재난 변경 (picker로 복귀) — 팝아웃에서는 버튼 자체가 없지만 안전 가드 유지
   const changeBtn = document.getElementById('display-change-incident');
   if (changeBtn) changeBtn.onclick = () => {
     state.currentIncidentId = null;
     state.displayModal = null;
-    localStorage.removeItem('disaster_currentIncidentId');
+    if (!POPOUT_DISPLAY) localStorage.removeItem('disaster_currentIncidentId');
     rebindIncidentRealtime();
     render();
   };
@@ -2573,6 +2721,14 @@ function bindDisplayEvents() {
   document.querySelectorAll('[data-display-triage]').forEach(btn => {
     btn.onclick = () => {
       state.displayModal = { type: 'triage', value: btn.dataset.displayTriage };
+      render();
+    };
+  });
+
+  // 발견 위치(층) 칩 → 환자 목록 모달
+  document.querySelectorAll('[data-display-floor]').forEach(btn => {
+    btn.onclick = () => {
+      state.displayModal = { type: 'floor', value: btn.dataset.displayFloor };
       render();
     };
   });
@@ -3165,7 +3321,7 @@ async function openNewIncidentDialog() {
 async function createIncident(title, type, opts = {}) {
   if (!assertCanWrite('새 재난 시작')) return false;
   try {
-    const newRef = push(ref(db, 'incidents'));
+    const newRef = push(ref(db, rootPath('incidents')));
     const incidentId = newRef.key;
     const data = {
       agencyId: opts.agencyId || state.session.agencyId,
@@ -3248,6 +3404,10 @@ function renderMain() {
             </div>
           </div>
           <div class="flex items-center gap-2">
+            <!-- 표출 창 띄우기 — 노트북+TV 듀얼 모니터용. 폰에서는 의미가 없어 md 이상에서만 표시 -->
+            <button id="open-display-btn" class="hidden md:flex text-[11px] text-violet-300 px-3 py-1.5 rounded bg-violet-900/30 hover:bg-violet-900/50 border border-violet-700/40 items-center gap-1" title="상황판 표출 창을 새로 띄웁니다 — TV·프로젝터 화면으로 끌어다 놓고 F11(전체화면)을 누르세요. 이 창에서 입력하면 표출 창에 실시간 반영됩니다.">
+              <i data-lucide="monitor" class="w-3 h-3"></i>표출
+            </button>
             ${!observerMode ? `
               <button id="admin-btn" class="text-[11px] text-slate-300 px-3 py-1.5 rounded bg-slate-800/50 hover:bg-slate-700 flex items-center gap-1">
                 <i data-lucide="settings" class="w-3 h-3"></i>관리
@@ -3554,6 +3714,16 @@ function bindMainEvents() {
     formDrafts = { incident: null, damage: null, mobil: { agencies: null, vehicles: null }, action: '' };
     leaveIncident();
   };
+  // 표출 창 띄우기 — 같은 재난을 표출 모드로 보여주는 새 창 (TV로 끌어다 놓기)
+  const openDisplayBtn = document.getElementById('open-display-btn');
+  if (openDisplayBtn) {
+    openDisplayBtn.onclick = () => {
+      const url = `${location.pathname}?popout=display&incident=${encodeURIComponent(state.currentIncidentId || '')}`;
+      // 같은 이름 재사용 → 이미 떠 있으면 새로 안 만들고 그 창을 다시 가리킴
+      window.open(url, 'mciDisplayPopout', 'popup=yes,width=1600,height=900');
+    };
+  }
+
   // 관리 버튼은 observer에게는 숨겨져 있음 → null 체크
   const adminBtn = document.getElementById('admin-btn');
   if (adminBtn) {
@@ -3853,7 +4023,7 @@ function renderDashboard() {
                       <td class="px-2 py-2 font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'}">${displayName}</td>
                       <td class="px-2 py-2 text-center text-slate-400 mono">${displayAge}/${escapeHtml(c.gender || '-')}</td>
                       <td class="px-2 py-2 text-center">
-                        <span class="text-[10px] px-1.5 py-0.5 rounded font-bold" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.name || '?'}</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded font-bold" style="${triageBadgeStyle(tr?.id)}">${tr?.name || '?'}</span>
                       </td>
                       <td class="px-2 py-2 text-slate-300 max-w-[140px] truncate" title="${displaySymptom}">${displaySymptom}</td>
                       <td class="px-2 py-2 text-slate-300 max-w-[120px] truncate">${escapeHtml(c.hospital || '-')}</td>
@@ -4243,7 +4413,7 @@ function renderCasualtyForm() {
               const isCurrent = casualtyDraft._editKey === c._key;
               return `
                 <div class="flex items-center gap-2 p-2 rounded-lg ${isCurrent ? 'bg-amber-950/30 border border-amber-700/50' : 'bg-slate-950'}">
-                  <span class="text-[10px] px-1.5 py-0.5 rounded font-bold flex-shrink-0" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.name || '?'}</span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded font-bold flex-shrink-0" style="${triageBadgeStyle(tr?.id)}">${tr?.name || '?'}</span>
                   <span class="text-sm font-medium">${escapeHtml(c.name)}</span>
                   <span class="text-xs text-slate-500">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
                   <span class="text-xs text-slate-400 truncate flex-1">${escapeHtml(c.symptom || '')}</span>
@@ -4471,8 +4641,10 @@ function smallNumField(id, value) {
 // OCR로 자동 채워진 필드 — 노란 강조 후 사용자가 수정하면 false로 해제
 let mciOcrFlags = {};
 let mciDraft = {
+  cardNo: '',   // 카드 번호 (빈 값이면 자동 제안 번호 사용)
   name: '', age: '', gender: '', isPediatric: false,
   location: '', // 발견장소
+  handoverUnit: '', handoverTime: '',   // 인계해준 출동대명 · 인계 시간(HH:MM)
   triage: '',
   // 생체징후
   consciousness: '', // AVPU
@@ -4492,8 +4664,10 @@ let mciDraft = {
 
 function resetMciDraft() {
   mciDraft = {
-    name: '', age: '', gender: '', isPediatric: false,
+    cardNo: '',   // 카드 번호 (빈 값이면 자동 제안 번호 사용)
+  name: '', age: '', gender: '', isPediatric: false,
     location: '',
+    handoverUnit: '', handoverTime: '',
     triage: '',
     consciousness: '',
     rr: '', pulse: '', bpSys: '', bpDia: '', spo2: '', temp: '',
@@ -4510,8 +4684,10 @@ function resetMciDraft() {
 
 // V2: 일반 사상자 draft (mciDraft와 동일 구조 — 폼 통합, 데이터 분리)
 let csDraft = {
+  cardNo: '',   // 카드 번호 (빈 값이면 자동 제안 번호 사용)
   name: '', age: '', gender: '', isPediatric: false,
   location: '',
+  handoverUnit: '', handoverTime: '',
   triage: '',
   consciousness: '',
   rr: '', pulse: '', bpSys: '', bpDia: '', spo2: '', temp: '',
@@ -4524,8 +4700,10 @@ let csDraft = {
 };
 function resetCsDraft() {
   csDraft = {
-    name: '', age: '', gender: '', isPediatric: false,
+    cardNo: '',   // 카드 번호 (빈 값이면 자동 제안 번호 사용)
+  name: '', age: '', gender: '', isPediatric: false,
     location: '',
+    handoverUnit: '', handoverTime: '',
     triage: '',
     consciousness: '',
     rr: '', pulse: '', bpSys: '', bpDia: '', spo2: '', temp: '',
@@ -4567,15 +4745,33 @@ function renderMciCasualtyForm() {
   const visibleCards = userIsField
     ? _dataList.filter(c => c.author === state.user.name)
     : _dataList;
-  const recentCards = visibleCards.slice(-15).reverse();
+  // 좌측 패널에 누적 표시 — 등록된 사상자가 한눈에 들어오도록 전체 표시(최신순, 과부하 방지 상한 100)
+  const recentCards = visibleCards.slice(-100).reverse();
+
+  // 중복 카드 번호 감지(전체 카드 기준) — 목록에서 빨간 경고 표시로 정리 유도
+  const _noCounts = {};
+  _dataList.forEach(c => { if (c.cardNo) _noCounts[c.cardNo] = (_noCounts[c.cardNo] || 0) + 1; });
 
   // V2: 다음 자동 번호 미리보기 (재난방 전체 cardNo 누적 기준, 작성자 무관)
   const _curMaxNo = _dataList.reduce((m, c) => Math.max(m, c.cardNo || 0), 0);
   const nextAutoNum = _curMaxNo + 1;
   const nextAutoName = `#${String(nextAutoNum).padStart(3, '0')} -${state.user.name}`;
 
+  // 좌측 목록에서 클릭한 카드 — 우측에 상세보기로 표시 (같은 카드 재클릭/닫기로 해제)
+  let inspected = null;
+  if (state.inspectCardKey) {
+    inspected = _dataList.find(c => c._key === state.inspectCardKey) || null;
+    if (!inspected) state.inspectCardKey = null;   // 삭제 등으로 사라진 카드
+  }
+
   return `
-    <div class="px-4 py-4 space-y-4">
+    <div class="px-4 py-4">
+      <!-- 2단 레이아웃: PC(lg+)는 좌측에 등록 카드 목록(누적·스크롤), 우측에 입력 폼.
+           모바일은 기존처럼 폼 위 / 목록 아래 (order로 순서만 교체) -->
+      <div class="flex flex-col lg:flex-row lg:items-start lg:gap-4">
+
+      <!-- 우측: 입력 영역 -->
+      <div class="order-1 lg:order-2 flex-1 min-w-0 space-y-4">
 
       <!-- 직책 + 모드 안내 -->
       <div class="bg-slate-900 rounded-xl border border-slate-800 p-3 flex items-center justify-between gap-2">
@@ -4599,8 +4795,61 @@ function renderMciCasualtyForm() {
         </div>
       ` : ''}
 
+      <!-- 카드 상세보기 — 좌측 목록 클릭 시 폼 자리에 표시. 폼은 hidden으로만 숨겨
+           입력 중이던 내용(draft)과 이벤트 바인딩은 그대로 유지됨 -->
+      ${inspected ? (() => {
+        const c = inspected;
+        const tr = MCI_TRIAGE.find(t => t.id === c.triage);
+        const cardNoStr = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '-';
+        const avpu = AVPU.find(a => a.id === c.consciousness);
+        const vital = [
+          c.rr ? `RR ${escapeHtml(c.rr)}` : '', c.pulse ? `P ${escapeHtml(c.pulse)}` : '',
+          (c.bpSys && c.bpDia) ? `BP ${escapeHtml(c.bpSys)}/${escapeHtml(c.bpDia)}` : '',
+          c.spo2 ? `SpO₂ ${escapeHtml(c.spo2)}` : '', c.temp ? `T ${escapeHtml(c.temp)}°` : '',
+        ].filter(Boolean).join(' · ');
+        const editable = canEditCard(state.user, c);
+        const row = (label, val, cls = 'text-slate-200') => val ? `
+          <div class="bg-slate-950 rounded-lg p-2.5 border border-slate-800">
+            <div class="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">${label}</div>
+            <div class="text-sm ${cls}">${val}</div>
+          </div>` : '';
+        return `
+        <div class="bg-slate-900 rounded-2xl border-2 overflow-hidden" style="border-color:${tr?.color || '#334155'}">
+          <div class="px-4 py-3 border-b border-slate-800 flex items-center gap-2 flex-wrap">
+            <span class="mono text-sm font-bold text-slate-400">${cardNoStr}</span>
+            <span class="text-xs px-2 py-0.5 rounded font-black" style="${triageBadgeStyle(tr?.id)}">${tr ? `${tr.shortName}·${tr.name}` : '?'}</span>
+            ${c.isPediatric ? '<i data-lucide="baby" class="w-4 h-4 text-cyan-400"></i>' : ''}
+            <span class="text-base font-bold ${c._autoNamed ? 'italic text-slate-400' : ''}">${escapeHtml(c.name || '-')}</span>
+            <span class="text-sm text-slate-400">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
+            <span class="flex-1"></span>
+            ${editable ? `
+              <button data-mci-edit="${c._key}" class="mci-edit-btn px-2.5 py-1.5 rounded-lg bg-amber-600/20 border border-amber-600/50 text-amber-300 text-xs font-bold flex items-center gap-1">
+                <i data-lucide="pencil" class="w-3.5 h-3.5"></i>수정
+              </button>` : ''}
+            <button id="mci-inspect-close" class="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold flex items-center gap-1" aria-label="상세보기 닫기">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>닫기
+            </button>
+          </div>
+          <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            ${row('발견장소 · 인계', c.location || c.handoverUnit || c.handoverTime ? `
+              ${c.location ? `<span class="text-pink-200">${escapeHtml(c.location)}</span>` : '<span class="text-slate-600">장소 미입력</span>'}
+              ${(c.handoverUnit || c.handoverTime) ? `<span class="text-slate-500"> · 인계 </span><span class="text-amber-300">${escapeHtml(c.handoverUnit || '미상')}</span>${c.handoverTime ? ` <span class="mono text-slate-300">${escapeHtml(c.handoverTime)}</span>` : ''}` : ''}` : '')}
+            ${row('의식 · 생체징후', (avpu || vital) ? `${avpu ? `<span class="font-bold">${avpu.name}</span>` : ''}${avpu && vital ? ' · ' : ''}<span class="mono">${vital}</span>` : '')}
+            ${row('주증상', c.symptom ? escapeHtml(c.symptom) : '')}
+            ${row('손상기전 · 부위', (c.mechanism || (c.injuryParts || []).length) ? `${escapeHtml(c.mechanism || '')}${c.mechanism && (c.injuryParts || []).length ? ' · ' : ''}${escapeHtml((c.injuryParts || []).join(', '))}` : '')}
+            ${row('처치 · 약물', ((c.treatments || []).length || c.drugs) ? `${escapeHtml((c.treatments || []).join(', '))}${(c.treatments || []).length && c.drugs ? ' · ' : ''}${escapeHtml(c.drugs || '')}` : '')}
+            ${row('이송', c.notTransported
+              ? '<span class="text-violet-300 font-bold">미이송 (자체귀가)</span>'
+              : (c.hospital ? `<span class="text-emerald-300 font-bold">${escapeHtml(c.hospital)}</span>${c.departTime ? ` · 출발 <span class="mono">${escapeHtml(c.departTime)}</span>` : ''}${c.arriveTime ? ` · 도착 <span class="mono">${escapeHtml(c.arriveTime)}</span>` : ''}` : '<span class="text-amber-400">미배정</span>'))}
+            ${row('메모', c.notes ? escapeHtml(c.notes) : '')}
+            ${row('등록', `${escapeHtml(c.author || '-')}${c.timestamp ? ` · ${new Date(c.timestamp).toLocaleString('ko-KR')}` : ''}`, 'text-slate-400')}
+          </div>
+          <div class="px-4 pb-3 text-[11px] text-slate-500">좌측 목록에서 이 카드를 다시 누르거나 [닫기]를 누르면 입력 화면으로 돌아갑니다.</div>
+        </div>`;
+      })() : ''}
+
       <!-- 입력 폼 -->
-      <div class="bg-slate-900 rounded-2xl border ${isEditing ? 'border-amber-500' : 'border-slate-800'}">
+      <div class="bg-slate-900 rounded-2xl border ${isEditing ? 'border-amber-500' : 'border-slate-800'} ${inspected ? 'hidden' : ''}">
         <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
           <h3 class="text-sm font-bold flex items-center gap-2">
             <i data-lucide="${isEditing ? 'pencil' : 'user-round-plus'}" class="w-4 h-4 ${isEditing ? 'text-amber-400' : 'text-pink-400'}"></i>
@@ -4651,6 +4900,19 @@ function renderMciCasualtyForm() {
             </div>
           </div>
 
+          <!-- ②-0 카드 번호 (간이·풀 공통) — 종이 분류표 번호와 맞추도록 직접 수정 가능.
+               새 카드는 다음 번호 자동 제안, 수정 진입 시엔 기존 번호 표시 -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <label class="text-[11px] text-slate-400 tracking-wider uppercase flex-shrink-0" for="mci-cardNo">카드 번호</label>
+            <div class="relative w-28 flex-shrink-0">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 mono pointer-events-none">#</span>
+              <input id="mci-cardNo" type="number" min="1" max="999" inputmode="numeric"
+                value="${_draft.cardNo !== '' ? escapeHtml(String(_draft.cardNo)) : nextAutoNum}"
+                class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-7 pr-2 py-2 text-sm mono font-bold focus:outline-none focus:border-pink-500" />
+            </div>
+            <span class="text-[11px] text-slate-500">종이 분류표 번호와 다르면 숫자만 고치세요</span>
+          </div>
+
           <!-- ② 기본 정보 (간이·풀 공통) -->
           <div>
             <label class="text-[11px] text-slate-400 block mb-1.5 tracking-wider uppercase">
@@ -4687,14 +4949,21 @@ function renderMciCasualtyForm() {
             </div>
           </div>
 
-          <!-- ③ 발견장소 (간이·풀 공통) - 아파트·대공간에서 매우 중요 -->
+          <!-- ③ 발견장소 + 인계 출동대·시간 (간이·풀 공통, 1줄) — 입력칸 줄 수를 늘리지 않기 위해 한 줄 구성 -->
           <div>
             <label class="text-[11px] text-slate-400 block mb-1.5 tracking-wider uppercase flex items-center gap-1">
               <i data-lucide="map-pin" class="w-3 h-3 text-pink-400"></i>발견장소
+              <span class="text-slate-600 normal-case font-normal">· 인계 출동대 · 시간</span>
             </label>
-            <input id="mci-location" type="text" placeholder="예: 102동 1503호 안방 / 2층 계단 / 본관 로비"
-              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500" />
-            <p class="text-[10px] text-slate-600 mt-1">아파트·대공간 출동 시 동·호수까지 명확히</p>
+            <div class="flex gap-1.5">
+              <input id="mci-location" type="text" placeholder="예: 102동 1503호 / 2층 계단"
+                class="flex-1 min-w-0 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500" />
+              <input id="mci-handoverUnit" type="text" placeholder="인계 출동대"
+                class="w-28 flex-shrink-0 bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-pink-500" />
+              <input id="mci-handoverTime" type="text" inputmode="numeric" placeholder="시간"
+                class="w-16 flex-shrink-0 bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-sm mono text-center focus:outline-none focus:border-pink-500" />
+            </div>
+            <p class="text-[10px] text-slate-600 mt-1">장소는 동·호수까지 명확히 · 다른 출동대에게 인계받았으면 출동대명·시간(HHMM) 입력</p>
           </div>
 
           <!-- ④ 주증상 (간이·풀 공통) -->
@@ -4847,12 +5116,16 @@ function renderMciCasualtyForm() {
         </div>
       </div>
 
-      <!-- 등록된 카드 목록 -->
+      </div><!-- /우측 입력 영역 -->
+
+      <!-- 좌측(PC) / 하단(모바일): 등록된 카드 목록 — PC에서는 화면에 고정(sticky)되어
+           폼을 스크롤해도 항상 보이고, 목록이 길면 패널 안에서만 스크롤됨 -->
+      <aside class="order-2 lg:order-1 mt-4 lg:mt-0 lg:w-80 xl:w-96 lg:flex-shrink-0 lg:sticky lg:top-44 lg:max-h-[calc(100vh-12.5rem)] lg:overflow-y-auto scrollbar-thin ${recentCards.length === 0 ? 'hidden lg:block' : ''}">
       ${recentCards.length > 0 ? `
         <div class="bg-slate-900 rounded-2xl border border-slate-800 p-4">
           <h3 class="text-xs text-slate-500 tracking-wider uppercase mb-3 flex items-center justify-between">
-            <span>${userIsField ? '내가 등록한 카드' : '최근 등록 카드 (전체)'}</span>
-            <span class="text-slate-600 normal-case">${recentCards.length}개</span>
+            <span>${userIsField ? '내가 등록한 카드' : '등록된 카드 (전체)'}</span>
+            <span class="text-slate-600 normal-case">${visibleCards.length}개</span>
           </h3>
           <div class="space-y-1.5">
             ${recentCards.map(c => {
@@ -4861,34 +5134,56 @@ function renderMciCasualtyForm() {
               const editable = canEditCard(state.user, c);
               const isMine = c.author === state.user.name;
               const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '';
+              const isDupNo = c.cardNo && _noCounts[c.cardNo] > 1;   // 같은 번호 카드가 또 있음
+              const isInspected = state.inspectCardKey === c._key;   // 우측 상세보기로 열려 있는 카드
               return `
-                <div class="flex items-center gap-2 p-2 rounded-lg ${isCurrent ? 'bg-amber-950/30 border border-amber-700/50' : 'bg-slate-950'}">
-                  <span class="text-[9px] text-slate-600 mono w-9 flex-shrink-0">${cardNo}</span>
-                  <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.shortName || '?'}</span>
-                  <span class="text-sm font-medium ${c._autoNamed ? 'text-slate-400 italic' : ''}">${escapeHtml(c.name || '-')}</span>
-                  <span class="text-xs text-slate-500">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
-                  ${c.isPediatric ? '<i data-lucide="baby" class="w-3 h-3 text-cyan-400"></i>' : ''}
-                  <div class="flex-1 min-w-0 text-xs text-slate-400 truncate">
-                    ${c.location ? `<span class="text-pink-300">📍${escapeHtml(c.location)}</span> · ` : ''}${escapeHtml(c.symptom || '')}
+                <div data-key="${c._key}" class="mci-list-item cursor-pointer p-2 rounded-lg transition-colors ${
+                  isCurrent ? 'bg-amber-950/30 border border-amber-700/50'
+                  : isInspected ? 'bg-slate-900 border border-pink-500/70'
+                  : 'bg-slate-950 hover:bg-slate-900'
+                }" title="${isInspected ? '다시 누르면 입력 화면으로' : '누르면 상세 정보 보기'}">
+                  <!-- 1줄: 번호·분류·이름·연령 + 수정/삭제 -->
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <span class="text-[9px] mono flex-shrink-0 ${isDupNo ? 'text-red-400 font-extrabold' : 'text-slate-600'}"${isDupNo ? ' title="카드 번호 중복 — 수정으로 정리하세요"' : ''}>${cardNo}${isDupNo ? '⚠' : ''}</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
+                    <span class="text-sm font-medium truncate ${c._autoNamed ? 'text-slate-400 italic' : ''}">${escapeHtml(c.name || '-')}</span>
+                    <span class="text-xs text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
+                    ${c.isPediatric ? '<i data-lucide="baby" class="w-3 h-3 text-cyan-400 flex-shrink-0"></i>' : ''}
+                    <span class="flex-1"></span>
+                    ${editable ? `
+                      <button data-mci-edit="${c._key}" class="mci-edit-btn text-slate-500 hover:text-amber-400 flex-shrink-0 p-0.5" title="수정" aria-label="카드 수정">
+                        <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                      </button>
+                      <button data-mci-del="${c._key}" class="mci-del-btn text-slate-600 hover:text-red-400 flex-shrink-0 p-0.5" title="삭제" aria-label="카드 삭제">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                      </button>
+                    ` : `
+                      <i data-lucide="lock" class="w-3.5 h-3.5 text-slate-700 flex-shrink-0" title="다른 사람 카드"></i>
+                    `}
                   </div>
-                  ${c.hospital ? `<span class="text-[10px] text-emerald-400 px-1 rounded bg-emerald-950/40 flex-shrink-0">${escapeHtml(c.hospital)}</span>` : ''}
-                  ${!isMine ? `<span class="text-[9px] text-slate-600 truncate max-w-[60px] flex-shrink-0">${escapeHtml(c.author || '')}</span>` : ''}
-                  ${editable ? `
-                    <button data-mci-edit="${c._key}" class="mci-edit-btn text-slate-500 hover:text-amber-400 flex-shrink-0" title="수정" aria-label="카드 수정">
-                      <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-                    </button>
-                    <button data-mci-del="${c._key}" class="mci-del-btn text-slate-600 hover:text-red-400 flex-shrink-0" title="삭제" aria-label="카드 삭제">
-                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                    </button>
-                  ` : `
-                    <i data-lucide="lock" class="w-3.5 h-3.5 text-slate-700 flex-shrink-0" title="다른 사람 카드"></i>
-                  `}
+                  <!-- 2줄: 장소·증상 + 병원·작성자 (있을 때만) -->
+                  ${(c.location || c.symptom || c.hospital || !isMine) ? `
+                    <div class="flex items-center gap-1.5 mt-1 min-w-0">
+                      <div class="flex-1 min-w-0 text-xs text-slate-400 truncate">
+                        ${c.location ? `<span class="text-pink-300">📍${escapeHtml(c.location)}</span>` : ''}${c.location && c.symptom ? ' · ' : ''}${escapeHtml(c.symptom || '')}
+                      </div>
+                      ${c.hospital ? `<span class="text-[10px] text-emerald-400 px-1 rounded bg-emerald-950/40 flex-shrink-0">${escapeHtml(c.hospital)}</span>` : ''}
+                      ${!isMine ? `<span class="text-[9px] text-slate-600 truncate max-w-[70px] flex-shrink-0">${escapeHtml(c.author || '')}</span>` : ''}
+                    </div>
+                  ` : ''}
                 </div>
               `;
             }).join('')}
           </div>
         </div>
-      ` : ''}
+      ` : `
+        <div class="bg-slate-900 rounded-2xl border border-slate-800 p-4 text-center text-xs text-slate-500 leading-relaxed">
+          아직 등록된 카드가 없습니다.<br>저장하면 여기에 바로 쌓입니다.
+        </div>
+      `}
+      </aside>
+
+      </div><!-- /2단 레이아웃 -->
     </div>
   `;
 }
@@ -5301,6 +5596,11 @@ async function analyzeCapturedImage() {
 
   // 성공: mciDraft 갱신, OCR 플래그 병합, 모달 닫고 폼 다시 그림
   Object.assign(mciOcrFlags, flags);
+  // 간이 모드인데 생체징후 등 풀 카드 항목이 채워졌으면 풀 카드로 전환 (노란 강조가 보이도록)
+  const _fullOnlyKeys = ['rr','pulse','bpSys','bpDia','spo2','temp','consciousness','mechanism','hospital','notes'];
+  if (state.mciInputMode === 'simple' && _fullOnlyKeys.some(k => flags[k])) {
+    state.mciInputMode = 'full';
+  }
   closeCameraModal();
   render();
   setTimeout(() => alert(`${filledCount}개 필드가 자동 입력되었습니다. 노란색으로 강조된 부분을 꼭 확인해주세요.`), 100);
@@ -5322,6 +5622,64 @@ function initCameraModal() {
     if (e.target === modal) closeCameraModal();
   });
   // ESC 처리는 initGlobalEscHandler()에서 통합 관리
+}
+
+// ==================== 탭 스와이프 전환 (터치) ====================
+// 재난방 화면에서 좌우 스와이프로 탭 이동 (탭 버튼 클릭과 병행).
+// 오작동 방지: 가로 스크롤 가능한 영역(표 등)·입력칸·모달 열림·세로 스크롤 우세 시 무시.
+function initSwipeTabNav() {
+  let sx = 0, sy = 0, st = 0, tracking = false;
+
+  const anyModalOpen = () => {
+    const cam = document.getElementById('camera-modal');
+    const help = document.getElementById('help-modal');
+    return (cam && !cam.classList.contains('hidden'))
+        || (help && !help.classList.contains('hidden'))
+        || !!document.getElementById('display-modal-bg')
+        || !!document.getElementById('mci-card-modal-bg')
+        || !!document.getElementById('admin-modal-bg');
+  };
+
+  document.addEventListener('touchstart', (e) => {
+    tracking = false;
+    if (state.view2 !== 'incident' || !state.user) return;   // 재난방 화면에서만
+    if (isObserver()) return;                                 // 본부는 탭이 1개
+    if (anyModalOpen()) return;
+    if (e.touches.length !== 1) return;
+    const t = e.target;
+    if (!(t instanceof Element)) return;
+    if (t.closest('input, textarea, select')) return;        // 입력 중 커서 드래그 보호
+    // 가로 스크롤이 실제로 가능한 영역 안이면 그쪽 스크롤을 우선
+    let el = t;
+    while (el && el !== document.body) {
+      const cs = getComputedStyle(el);
+      if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 5) return;
+      el = el.parentElement;
+    }
+    sx = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+    st = Date.now();
+    tracking = true;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const dx = e.changedTouches[0].clientX - sx;
+    const dy = e.changedTouches[0].clientY - sy;
+    if (Date.now() - st > 600) return;                 // 길게 끄는 드래그는 무시
+    if (Math.abs(dx) < 70) return;                     // 최소 스와이프 거리
+    if (Math.abs(dx) < Math.abs(dy) * 1.5) return;     // 세로 스크롤 우세면 무시
+    const dir = dx < 0 ? 1 : -1;                       // 왼쪽으로 밀면 다음 탭
+    const tabs = state.mode === 'mci' ? ['situation', 'casualty'] : ['dashboard', 'input'];
+    const cur = state.mode === 'mci' ? state.mciTab : state.view;
+    const ni = tabs.indexOf(cur) + dir;
+    if (ni < 0 || ni >= tabs.length) return;           // 끝 탭에서는 그대로
+    if (state.mode === 'mci') state.mciTab = tabs[ni];
+    else state.view = tabs[ni];
+    render();
+    window.scrollTo({ top: 0 });
+  }, { passive: true });
 }
 
 // ==================== ESC 키 — 모달 통합 처리 ====================
@@ -5369,8 +5727,22 @@ function bindMciCasualtyEvents() {
     };
   }
 
+  // 카드 번호 — 입력하면 draft에 고정(재렌더에도 유지), 안 건드리면 렌더 시 자동 제안값 사용.
+  // 번호를 바꾸면 이름 자동부여 미리보기(placeholder)도 즉시 갱신.
+  const cardNoEl = document.getElementById('mci-cardNo');
+  if (cardNoEl) {
+    cardNoEl.oninput = (e) => {
+      _draft.cardNo = e.target.value;
+      const n = parseInt(e.target.value, 10);
+      const nameEl = document.getElementById('mci-name');
+      if (nameEl && Number.isInteger(n) && n > 0 && state.user) {
+        nameEl.placeholder = `#${String(n).padStart(3, '0')} -${state.user.name} 자동`;
+      }
+    };
+  }
+
   // 텍스트/숫자 input
-  ['name','age','rr','pulse','bpSys','bpDia','spo2','temp','symptom','drugs','hospital','departTime','arriveTime','notes','location'].forEach(k => {
+  ['name','age','rr','pulse','bpSys','bpDia','spo2','temp','symptom','drugs','hospital','departTime','arriveTime','notes','location','handoverUnit','handoverTime'].forEach(k => {
     const el = document.getElementById('mci-' + k);
     if (el) {
       el.value = _draft[k] || '';
@@ -5395,8 +5767,8 @@ function bindMciCasualtyEvents() {
     };
   }
 
-  // 시간 필드 자동 포맷팅 (HH:MM, 24시간제)
-  ['departTime', 'arriveTime'].forEach(k => {
+  // 시간 필드 자동 포맷팅 (HH:MM, 24시간제) — 인계 시간 포함
+  ['departTime', 'arriveTime', 'handoverTime'].forEach(k => {
     const el = document.getElementById('mci-' + k);
     if (!el) return;
     el.oninput = (e) => {
@@ -5588,15 +5960,28 @@ function bindMciCasualtyEvents() {
     };
   });
 
-  // 수정 취소
+  // 수정 취소 → 신규 등록 자세(간이)로 복귀
   const cancelBtn = document.getElementById('mci-cancel-edit');
   if (cancelBtn) {
-    cancelBtn.onclick = () => { resetCurrentDraft(); render(); };
+    cancelBtn.onclick = () => { resetCurrentDraft(); state.mciInputMode = 'simple'; render(); };
   }
 
   // 저장
   document.getElementById('mci-save-btn').onclick = async () => {
     if (!_draft.triage) { alert('트리아지를 먼저 선택하세요'); return; }
+    // 카드 번호 검증 — 입력칸의 현재 값(자동 제안값 포함)을 읽음
+    const _noRaw = (document.getElementById('mci-cardNo')?.value || '').trim();
+    const _no = parseInt(_noRaw, 10);
+    if (!Number.isInteger(_no) || _no < 1 || _no > 999) {
+      alert('카드 번호를 확인해주세요 (1~999)');
+      return;
+    }
+    // 중복 번호 경고 — 동시 입력 등으로 겹칠 수 있음. 확인 후 저장은 허용(현장 우선)
+    const _dupCard = _dataList.find(c => Number(c.cardNo) === _no && c._key !== _draft._editKey);
+    if (_dupCard) {
+      const _dupWho = _dupCard.name ? ` (${_dupCard.name})` : '';
+      if (!confirm(`이미 #${String(_no).padStart(3, '0')} 카드가 있습니다${_dupWho}.\n같은 번호가 두 장이 되면 환자가 섞일 수 있습니다.\n그래도 저장할까요?`)) return;
+    }
     // 생체징후 범위 검증 — 음수·오타·OCR 오인식 값 저장 차단
     const vitalErrs = validateVitals(_draft);
     if (vitalErrs.length) {
@@ -5604,11 +5989,14 @@ function bindMciCasualtyEvents() {
       return;
     }
     const ok = await saveSelectedCasualty({
+      cardNo: _no,
       name: (_draft.name || '').trim(),
       age: (_draft.age || '').trim(),
       gender: _draft.gender,
       isPediatric: _draft.isPediatric,
       location: (_draft.location || '').trim(),
+      handoverUnit: (_draft.handoverUnit || '').trim(),
+      handoverTime: _draft.handoverTime || '',
       triage: _draft.triage,
       consciousness: _draft.consciousness,
       rr: _draft.rr, pulse: _draft.pulse,
@@ -5627,6 +6015,7 @@ function bindMciCasualtyEvents() {
 
     if (ok) {
       resetCurrentDraft();
+      state.mciInputMode = 'simple';   // 저장 후 다음 신규 등록은 다시 간이로
       render();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -5643,9 +6032,11 @@ function bindMciCasualtyEvents() {
         return;
       }
       mciDraft = {
+        cardNo: c.cardNo ? String(c.cardNo) : '',
         name: c.name || '', age: c.age || '', gender: c.gender || '',
         isPediatric: !!c.isPediatric,
         location: c.location || '',
+        handoverUnit: c.handoverUnit || '', handoverTime: c.handoverTime || '',
         triage: c.triage || '',
         consciousness: c.consciousness || '',
         rr: c.rr || '', pulse: c.pulse || '',
@@ -5662,6 +6053,8 @@ function bindMciCasualtyEvents() {
         notes: c.notes || '',
         _editKey: btn.dataset.mciEdit,
       };
+      state.mciInputMode = 'full';   // 수정은 풀 카드로 — 생체징후·이송 등 상세 보완 단계
+      state.inspectCardKey = null;   // 상세보기 닫고 수정 폼 표시
       render();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -5679,6 +6072,20 @@ function bindMciCasualtyEvents() {
       await deleteSelectedCasualty(btn.dataset.mciDel);
     };
   });
+
+  // 목록 행 클릭 → 우측 상세보기 토글 (수정/삭제 버튼 클릭은 행 토글에서 제외)
+  document.querySelectorAll('.mci-list-item').forEach(el => {
+    el.onclick = (e) => {
+      if (e.target.closest('.mci-edit-btn') || e.target.closest('.mci-del-btn')) return;
+      const key = el.dataset.key;
+      state.inspectCardKey = (state.inspectCardKey === key) ? null : key;
+      render();
+    };
+  });
+
+  // 상세보기 [닫기] → 빠른 카드 추가로 복귀
+  const inspectClose = document.getElementById('mci-inspect-close');
+  if (inspectClose) inspectClose.onclick = () => { state.inspectCardKey = null; render(); };
 }
 
 // MCI 통합 상황판
@@ -5708,21 +6115,48 @@ function renderMciSituation() {
   });
   const hospitals = Object.entries(hospitalMap).map(([name, d]) => ({ name, ...d }));
 
+  // 발견 위치(층)별 집계 — 표출 모드와 동일 (지하→1층→…→옥상→미분류, 긴급·사망 뱃지)
+  const floorMap = {};
+  state.mciCasualties.forEach(c => {
+    const f = floorOfLocation(c.location);
+    if (!f) return;
+    if (!floorMap[f]) floorMap[f] = { total: 0, emergency: 0, dead: 0 };
+    floorMap[f].total++;
+    if (c.triage === 'emergency') floorMap[f].emergency++;
+    if (c.triage === 'dead') floorMap[f].dead++;
+  });
+  const _floorOrder = (n) => n === '지하' ? -1 : n === '옥상' ? 9000 : n === '미분류' ? 9999 : parseInt(n, 10);
+  const floors = Object.entries(floorMap).map(([name, d]) => ({ name, ...d }))
+    .sort((a, b) => _floorOrder(a.name) - _floorOrder(b.name));
+
   return `
     <div class="px-4 py-4 space-y-4">
 
       <!-- 트리아지 합계 -->
       <section class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
-        <div class="px-4 py-3.5 bg-gradient-to-r from-pink-950/40 to-transparent border-b border-slate-800 flex items-center gap-2">
+        <div class="px-4 py-3.5 bg-gradient-to-r from-pink-950/40 to-transparent border-b border-slate-800 flex items-center gap-2 flex-wrap">
           <div class="w-1 h-6 bg-pink-500 rounded-full"></div>
           <h2 class="text-lg font-bold tracking-tight">트리아지 합계</h2>
+          <!-- 발견 위치별 칩 — 표출 모드와 동일. 클릭 시 아래로 해당 위치 환자 목록 펼침 -->
+          ${floors.length > 0 ? `
+            <div class="flex items-center gap-1 flex-wrap ml-1">
+              ${floors.map(f => `
+                <button data-floor-chip="${escapeHtml(f.name)}" class="floor-chip-clickable px-2 py-0.5 rounded-md border text-xs flex items-baseline gap-1 transition-colors cursor-pointer ${state.expandedFloor === f.name ? 'border-pink-500 bg-pink-950/30' : 'border-slate-700 bg-slate-950 hover:border-pink-600'}" title="${state.expandedFloor === f.name ? '접기' : f.name + ' 발견 환자 목록 펼치기'}">
+                  <span class="font-bold">${escapeHtml(f.name)}</span>
+                  <span class="mono font-black text-sm text-slate-100">${f.total}</span>
+                  ${f.emergency > 0 ? `<span class="text-[10px] px-1 rounded font-black" style="background:#dc2626;color:#ffffff;">I${f.emergency}</span>` : ''}
+                  ${f.dead > 0 ? `<span class="text-[10px] px-1 rounded font-black" style="background:#475569;color:#ffffff;">IV${f.dead}</span>` : ''}
+                </button>
+              `).join('')}
+            </div>
+          ` : ''}
           <span class="ml-auto text-xs text-slate-400">총 <span class="font-bold text-slate-200">${totalCount}</span>명</span>
         </div>
         <div class="grid grid-cols-4 gap-2 p-3">
           ${triageTotals.map(tr => {
             const isExpanded = state.expandedTriage === tr.id;
             return `
-            <button data-triage-card="${tr.id}" class="triage-card-clickable rounded-xl px-2 py-4 text-center transition-all cursor-pointer hover:brightness-125"
+            <button data-triage-card="${tr.id}" class="triage-card-clickable rounded-xl px-2 py-4 text-center transition-all cursor-pointer hover:brightness-125 flex flex-col items-center justify-center"
               style="background:${tr.bg}50; border:1.5px solid ${tr.color}; ${isExpanded ? `outline:2px solid ${tr.color}; outline-offset:2px;` : ''}"
               title="${isExpanded ? '접기' : tr.name + ' 환자 목록 펼치기'}">
               <div class="text-xs sm:text-sm tracking-wider font-extrabold" style="color:${tr.color}">${tr.shortName}·${tr.name}</div>
@@ -5749,7 +6183,7 @@ function renderMciSituation() {
           return `
             <div class="border-t border-slate-800 bg-slate-950/70">
               <div class="px-4 py-2 flex items-center gap-2 text-xs border-b border-slate-900">
-                <span class="text-[10px] px-2 py-0.5 rounded font-black" style="background:${tr.bg};color:${tr.color}">${tr.shortName} · ${tr.name}</span>
+                <span class="text-[10px] px-2 py-0.5 rounded font-black" style="${triageBadgeStyle(tr.id)}">${tr.shortName} · ${tr.name}</span>
                 <span class="text-slate-400">환자 목록 <span class="mono text-slate-200 font-bold">${patients.length}</span>명</span>
                 <button id="triage-collapse-btn" class="ml-auto text-slate-500 hover:text-slate-200 text-[10px] flex items-center gap-0.5 px-2 py-1 rounded hover:bg-slate-900">
                   <i data-lucide="x" class="w-3 h-3"></i>닫기
@@ -5782,6 +6216,64 @@ function renderMciSituation() {
                             : (c.arriveTime
                                 ? `<span class="text-emerald-400">${escapeHtml(c.arriveTime)}</span>`
                                 : (c.departTime ? `<span class="text-amber-400">이송중</span>` : ''))}
+                        </div>
+                        <i data-lucide="chevron-right" class="w-3 h-3 text-slate-600 flex-shrink-0"></i>
+                      </button>
+                    `;
+                  }).join('')}
+                </div>
+              `}
+            </div>
+          `;
+        })()}
+
+        <!-- 발견 위치(층) 펼친 환자 목록 — 칩 클릭 시 -->
+        ${(() => {
+          if (!state.expandedFloor) return '';
+          const fName = state.expandedFloor;
+          if (!floors.some(f => f.name === fName)) return '';
+          const triageOrder = { emergency: 0, urgent: 1, nonurgent: 2, dead: 3 };
+          const patients = state.mciCasualties
+            .filter(c => floorOfLocation(c.location) === fName)
+            .slice()
+            .sort((a, b) => {
+              const oa = triageOrder[a.triage] ?? 9, ob = triageOrder[b.triage] ?? 9;
+              if (oa !== ob) return oa - ob;
+              return (a.cardNo || 0) - (b.cardNo || 0);
+            });
+          return `
+            <div class="border-t border-slate-800 bg-slate-950/70">
+              <div class="px-4 py-2 flex items-center gap-2 text-xs border-b border-slate-900">
+                <span class="text-[10px] px-2 py-0.5 rounded font-black bg-pink-950/60 text-pink-300">📍 ${escapeHtml(fName)}</span>
+                <span class="text-slate-400">발견 환자 <span class="mono text-slate-200 font-bold">${patients.length}</span>명</span>
+                <button id="floor-collapse-btn" class="ml-auto text-slate-500 hover:text-slate-200 text-[10px] flex items-center gap-0.5 px-2 py-1 rounded hover:bg-slate-900">
+                  <i data-lucide="x" class="w-3 h-3"></i>닫기
+                </button>
+              </div>
+              ${patients.length === 0 ? `
+                <div class="px-3 py-4 text-[11px] text-slate-500 text-center">해당 위치의 환자가 없습니다</div>
+              ` : `
+                <div class="divide-y divide-slate-900">
+                  ${patients.map(c => {
+                    const tr = MCI_TRIAGE.find(t => t.id === c.triage);
+                    const displayName    = state.briefingMode ? maskName(c.name)       : escapeHtml(c.name || '-');
+                    const displaySymptom = state.briefingMode ? maskSymptom(c.symptom) : escapeHtml(c.symptom || '');
+                    const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '';
+                    return `
+                      <button data-triage-patient="${c._key}" class="triage-patient-clickable w-full text-left px-3 py-2 hover:bg-slate-900 transition-colors flex items-center gap-2" title="클릭하여 카드 상세보기">
+                        <span class="text-[10px] text-slate-500 mono w-9 flex-shrink-0">${cardNo}</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
+                        ${c.isPediatric ? '<i data-lucide="baby" class="w-3 h-3 text-cyan-400 flex-shrink-0"></i>' : ''}
+                        <span class="text-sm font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''} flex-shrink-0">${displayName}</span>
+                        <span class="text-[10px] text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
+                        ${c.location ? `<span class="text-[11px] text-pink-300 truncate max-w-[160px] flex-shrink-0" title="${escapeHtml(c.location)}"><i data-lucide="map-pin" class="w-3 h-3 inline"></i>${escapeHtml(c.location)}</span>` : ''}
+                        <span class="flex-1 min-w-0 text-[11px] text-slate-500 truncate">${displaySymptom}</span>
+                        <div class="flex items-center gap-2 text-[10px] mono flex-shrink-0">
+                          ${c.notTransported
+                            ? '<span class="text-violet-400 font-bold">미이송</span>'
+                            : (c.hospital
+                                ? `<span class="text-emerald-300 truncate max-w-[100px]" title="${escapeHtml(c.hospital)}">${escapeHtml(c.hospital)}</span>`
+                                : '<span class="text-amber-400">미배정</span>')}
                         </div>
                         <i data-lucide="chevron-right" class="w-3 h-3 text-slate-600 flex-shrink-0"></i>
                       </button>
@@ -5860,7 +6352,7 @@ function renderMciSituation() {
                     return `
                       <button data-transport-patient="${c._key}" class="transport-patient-clickable w-full text-left px-3 py-2 hover:bg-slate-900 transition-colors flex items-center gap-2" title="클릭하여 카드 상세보기">
                         <span class="text-[10px] text-slate-500 mono w-9 flex-shrink-0">${cardNo}</span>
-                        <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.shortName || '?'}</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
                         ${c.isPediatric ? '<i data-lucide="baby" class="w-3 h-3 text-cyan-400 flex-shrink-0"></i>' : ''}
                         <span class="text-sm font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''} flex-shrink-0">${displayName}</span>
                         <span class="text-[10px] text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
@@ -5897,10 +6389,40 @@ function renderMciSituation() {
             <h2 class="text-lg font-bold tracking-tight">병원별 이송 현황</h2>
             <span class="ml-auto text-xs text-slate-400"><span class="font-bold text-slate-200">${hospitals.length}</span>개 병원</span>
           </div>
-          <div class="p-3 space-y-2">
-            ${hospitals.map(h => {
-              const isExpanded = state.expandedHospital === h.name;
-              // 해당 병원으로 이송된 환자 목록 (트리아지 우선순위 + 카드번호 순)
+          <div class="p-3">
+            <!-- 병원 카드 그리드 — 트리아지 합계처럼 병원 수에 따라 옆으로 자동 배치.
+                 auto-fit: 병원이 적으면 카드가 넓게, 많으면 자동 줄바꿈 -->
+            <div class="grid gap-2" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+              ${hospitals.map(h => {
+                const isExpanded = state.expandedHospital === h.name;
+                return `
+                <div data-hospital-row="${escapeHtml(h.name)}" class="hospital-row-clickable cursor-pointer rounded-xl border bg-slate-950 p-3 flex flex-col items-center text-center min-w-0 transition-colors ${isExpanded ? 'border-blue-500' : 'border-slate-800 hover:border-blue-700/60'}"
+                  ${isExpanded ? 'style="outline:2px solid rgba(59,130,246,.45); outline-offset:2px;"' : ''} title="${isExpanded ? '접기' : '환자 목록 펼치기'}">
+                  <div class="text-sm font-bold w-full truncate" title="${escapeHtml(h.name)}">${escapeHtml(h.name)}</div>
+                  <div class="flex items-baseline justify-center gap-1 mt-1">
+                    <span class="text-2xl font-black mono leading-none text-slate-100">${h.total}</span>
+                    <span class="text-[11px] text-slate-400">명</span>
+                  </div>
+                  <div class="text-[11px] text-emerald-400 font-bold mt-1 flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>도착 ${h.arrived}
+                  </div>
+                  <div class="flex flex-wrap justify-center gap-1 mt-1.5">
+                    ${MCI_TRIAGE.map(tr => h.byTriage[tr.id] ? `
+                      <span class="text-[10px] px-1.5 py-0.5 rounded font-bold" style="${triageBadgeStyle(tr.id)}">
+                        ${tr.shortName} ${h.byTriage[tr.id]}
+                      </span>
+                    ` : '').join('')}
+                  </div>
+                </div>
+                `;
+              }).join('')}
+            </div>
+
+            <!-- 펼친 병원의 환자 목록 — 그리드 아래 전체 폭 (트리아지 합계의 펼침과 같은 방식) -->
+            ${(() => {
+              if (!state.expandedHospital) return '';
+              const h = hospitals.find(x => x.name === state.expandedHospital);
+              if (!h) return '';
               const triageOrder = { emergency: 0, urgent: 1, nonurgent: 2, dead: 3 };
               const patients = state.mciCasualties
                 .filter(c => c.hospital === h.name)
@@ -5911,31 +6433,18 @@ function renderMciSituation() {
                   return (a.cardNo || 0) - (b.cardNo || 0);
                 });
               return `
-              <div class="bg-slate-950 rounded-lg border ${isExpanded ? 'border-blue-700/60' : 'border-slate-800'} overflow-hidden transition-colors">
-                <!-- 병원 헤더 (클릭 토글) -->
-                <div data-hospital-row="${escapeHtml(h.name)}" class="hospital-row-clickable p-3 cursor-pointer hover:bg-slate-900/60 transition-colors" title="${isExpanded ? '접기' : '환자 목록 펼치기'}">
-                  <div class="flex items-center justify-between mb-2">
-                    <div class="flex items-center gap-1.5 min-w-0">
-                      <i data-lucide="chevron-${isExpanded ? 'down' : 'right'}" class="w-3.5 h-3.5 text-slate-500 flex-shrink-0"></i>
-                      <div class="font-bold text-sm truncate">${escapeHtml(h.name)}</div>
-                    </div>
-                    <div class="text-xs text-slate-400 flex-shrink-0">
-                      <span class="mono font-bold text-slate-100">${h.total}</span>명 (도착 <span class="text-emerald-400 font-bold">${h.arrived}</span>)
-                    </div>
-                  </div>
-                  <div class="flex flex-wrap gap-1 ml-5">
-                    ${MCI_TRIAGE.map(tr => h.byTriage[tr.id] ? `
-                      <span class="text-[10px] px-1.5 py-0.5 rounded font-bold" style="background:${tr.bg};color:${tr.color}">
-                        ${tr.shortName} ${h.byTriage[tr.id]}
-                      </span>
-                    ` : '').join('')}
-                  </div>
+              <div class="mt-2 bg-slate-950 rounded-lg border border-blue-700/60 overflow-hidden">
+                <div class="px-3 py-2 flex items-center gap-2 text-xs border-b border-slate-900 bg-blue-950/30">
+                  <span class="font-bold text-blue-200">${escapeHtml(h.name)}</span>
+                  <span class="text-slate-400">환자 <span class="mono text-slate-200 font-bold">${patients.length}</span>명</span>
+                  <button id="hospital-collapse-btn" class="ml-auto text-slate-500 hover:text-slate-200 text-[10px] flex items-center gap-0.5 px-2 py-1 rounded hover:bg-slate-900">
+                    <i data-lucide="x" class="w-3 h-3"></i>닫기
+                  </button>
                 </div>
-                <!-- 환자 목록 (펼쳤을 때) -->
-                ${isExpanded ? (patients.length === 0 ? `
-                  <div class="border-t border-slate-800 px-3 py-3 text-[11px] text-slate-500 text-center">표시할 환자가 없습니다</div>
+                ${patients.length === 0 ? `
+                  <div class="px-3 py-3 text-[11px] text-slate-500 text-center">표시할 환자가 없습니다</div>
                 ` : `
-                  <div class="border-t border-slate-800 bg-slate-950/70 divide-y divide-slate-900">
+                  <div class="divide-y divide-slate-900">
                     ${patients.map(c => {
                       const tr = MCI_TRIAGE.find(t => t.id === c.triage);
                       const displayName    = state.briefingMode ? maskName(c.name)        : escapeHtml(c.name || '-');
@@ -5944,7 +6453,7 @@ function renderMciSituation() {
                       return `
                         <button data-hospital-patient="${c._key}" class="hospital-patient-clickable w-full text-left px-3 py-2 hover:bg-slate-900 transition-colors flex items-center gap-2" title="클릭하여 카드 상세보기">
                           <span class="text-[10px] text-slate-500 mono w-9 flex-shrink-0">${cardNo}</span>
-                          <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.shortName || '?'}</span>
+                          <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
                           ${c.isPediatric ? '<i data-lucide="baby" class="w-3 h-3 text-cyan-400 flex-shrink-0"></i>' : ''}
                           <span class="text-sm font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''} flex-shrink-0">${displayName}</span>
                           <span class="text-[10px] text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
@@ -5958,10 +6467,10 @@ function renderMciSituation() {
                       `;
                     }).join('')}
                   </div>
-                `) : ''}
+                `}
               </div>
               `;
-            }).join('')}
+            })()}
           </div>
         </section>
       ` : ''}
@@ -6019,7 +6528,7 @@ function renderMciSituation() {
                     <tr data-mci-row="${c._key}" class="mci-row-clickable border-t border-slate-800 hover:bg-slate-800/50 cursor-pointer transition-colors" title="클릭하여 카드 상세보기">
                       <td class="px-2.5 py-2.5 text-slate-400 mono font-bold">${cardNo}</td>
                       <td class="px-2.5 py-2.5 text-center">
-                        <span class="text-xs px-2 py-0.5 rounded font-black" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.shortName || '?'}</span>
+                        <span class="text-xs px-2 py-0.5 rounded font-black" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
                         ${c.isPediatric ? '<i data-lucide="baby" class="w-3.5 h-3.5 text-cyan-400 inline ml-1"></i>' : ''}
                       </td>
                       <td class="px-2.5 py-2.5 font-bold ${state.briefingMode ? 'mono text-slate-200' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''}">${displayName}</td>
@@ -6070,6 +6579,23 @@ function bindMciSituationEvents() {
       render();
     };
   });
+
+  // 병원별 이송 현황 — 펼친 환자 목록 [닫기]
+  const hospCollapse = document.getElementById('hospital-collapse-btn');
+  if (hospCollapse) hospCollapse.onclick = () => { state.expandedHospital = null; render(); };
+
+  // 발견 위치(층) 칩 클릭 → 환자 목록 토글
+  document.querySelectorAll('.floor-chip-clickable').forEach(btn => {
+    btn.onclick = () => {
+      const name = btn.dataset.floorChip;
+      state.expandedFloor = (state.expandedFloor === name) ? null : name;
+      render();
+    };
+  });
+
+  // 발견 위치(층) — 펼친 환자 목록 [닫기]
+  const floorCollapse = document.getElementById('floor-collapse-btn');
+  if (floorCollapse) floorCollapse.onclick = () => { state.expandedFloor = null; render(); };
 
   // 병원별 이송 현황 — 환자 행 클릭 → 카드 상세 모달
   document.querySelectorAll('.hospital-patient-clickable').forEach(btn => {
@@ -6184,7 +6710,7 @@ function renderMciCardDetailModal() {
         <!-- 헤더: 카드번호 + 트리아지 뱃지 + 닫기 -->
         <div class="px-4 py-3 border-b border-slate-800 flex items-center gap-2 flex-wrap">
           <span class="mono text-sm text-slate-300 font-bold">${cardNo}</span>
-          <span class="text-xs px-2 py-1 rounded font-black" style="background:${tr?.bg || '#1e293b'};color:${tr?.color || '#94a3b8'}">${tr?.shortName || '?'} · ${tr?.name || '미분류'}</span>
+          <span class="text-xs px-2 py-1 rounded font-black" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'} · ${tr?.name || '미분류'}</span>
           ${c.isPediatric ? '<span class="text-cyan-300 text-[11px] flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-cyan-950/50 border border-cyan-700/50"><i data-lucide="baby" class="w-3 h-3"></i>소아</span>' : ''}
           <span class="text-sm font-bold ${state.briefingMode ? 'mono text-slate-200' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''}">${displayName}</span>
           <button data-mci-card-modal-close class="ml-auto text-slate-500 hover:text-slate-200 p-1" aria-label="닫기">
@@ -6210,12 +6736,17 @@ function renderMciCardDetailModal() {
             </div>
           </section>
 
-          <!-- 발견장소 -->
+          <!-- 발견장소 · 인계 -->
           <section class="bg-slate-950 rounded-xl p-3 border border-slate-800">
             <div class="text-[10px] tracking-widest text-slate-500 uppercase mb-1 flex items-center gap-1">
               <i data-lucide="map-pin" class="w-3 h-3 text-pink-400"></i>발견장소
             </div>
             <div class="text-sm ${c.location ? 'text-pink-200' : 'text-slate-600'}">${escapeHtml(c.location || '미입력')}</div>
+            ${(c.handoverUnit || c.handoverTime) ? `
+              <div class="text-xs text-slate-400 mt-1.5 pt-1.5 border-t border-slate-800">
+                인계: <span class="text-amber-300 font-medium">${escapeHtml(c.handoverUnit || '출동대 미상')}</span>${c.handoverTime ? ` · <span class="mono">${escapeHtml(c.handoverTime)}</span>` : ''}
+              </div>
+            ` : ''}
           </section>
 
           <!-- 의식 + 생체징후 -->
@@ -6363,9 +6894,11 @@ function bindMciCardDetailModalEvents() {
         return;
       }
       mciDraft = {
+        cardNo: c.cardNo ? String(c.cardNo) : '',
         name: c.name || '', age: c.age || '', gender: c.gender || '',
         isPediatric: !!c.isPediatric,
         location: c.location || '',
+        handoverUnit: c.handoverUnit || '', handoverTime: c.handoverTime || '',
         triage: c.triage || '',
         consciousness: c.consciousness || '',
         rr: c.rr || '', pulse: c.pulse || '',
@@ -6824,6 +7357,14 @@ async function boot() {
   // 세션 복원 (P0: 새로고침 시 로비로 빠지지 않게)
   // session/view2/currentIncidentId 모두 복원하지 않으면 view2='auth'로 떨어져 로그인 다시 받음.
   // 명시적 "반 변경" / "로그아웃" 버튼으로만 세션 종료.
+  if (POPOUT_DISPLAY) {
+    // 표출 팝아웃: 세션 복원/저장 없이 메모리에서만 display 모드로 부팅 (읽기 전용)
+    state.session = { agencyId: 'display', agency: { id: 'display', name: '표출', role: 'display' }, role: 'display' };
+    state.authed = true;
+    state.view2 = 'display';
+    state.currentIncidentId = new URLSearchParams(location.search).get('incident') || null;
+    document.title = 'MCI 상황판 — 표출';
+  } else {
   try {
     const sessRaw = localStorage.getItem('disaster_session');
     if (sessRaw) state.session = JSON.parse(sessRaw);
@@ -6843,10 +7384,12 @@ async function boot() {
       if (state.user) state.mciInputMode = defaultInputMode(state.user.teamId);
     } catch {}
   }
+  }
   initOutdoorToggle();
   initHelpModal();
   initCameraModal();
   initGlobalEscHandler();
+  initSwipeTabNav();
   // 익명 인증 대기 — Firebase Rules가 auth!=null 요구하므로 인증 후 데이터 구독.
   // 오프라인이거나 5초 안에 응답 없으면 일단 진행 (캐시 화면 표시).
   await authReady;
