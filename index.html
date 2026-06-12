@@ -255,6 +255,14 @@
   }
   body.outdoor-mode .border-emerald-700\/50 { border-color: #047857 !important; }
 
+  /* BLUE — 파란 안내 패널·병원 펼침 헤더 (어두운 반투명 → 라이트 톤) */
+  body.outdoor-mode .bg-blue-950\/30,
+  body.outdoor-mode .bg-blue-950\/40 {
+    background-color: #dbeafe !important;
+    border-color: #2563eb !important;
+  }
+  body.outdoor-mode .text-blue-200 { color: #1e40af !important; }
+
   /* SKY — 본부 / observer */
   body.outdoor-mode .bg-sky-900\/40 {
     background-color: #e0f2fe !important;
@@ -6268,7 +6276,7 @@ function renderMciSituation() {
           return `
             <div class="border-t border-slate-800 bg-slate-950/70">
               <div class="px-4 py-2 flex items-center gap-2 text-xs border-b border-slate-900">
-                <span class="text-[10px] px-2 py-0.5 rounded font-black bg-pink-950/60 text-pink-300">📍 ${escapeHtml(fName)}</span>
+                <span class="text-[10px] px-2 py-0.5 rounded font-black" style="background:#db2777;color:#ffffff;">📍 ${escapeHtml(fName)}</span>
                 <span class="text-slate-400">발견 환자 <span class="mono text-slate-200 font-bold">${patients.length}</span>명</span>
                 <button id="floor-collapse-btn" class="ml-auto text-slate-500 hover:text-slate-200 text-[10px] flex items-center gap-0.5 px-2 py-1 rounded hover:bg-slate-900">
                   <i data-lucide="x" class="w-3 h-3"></i>닫기
