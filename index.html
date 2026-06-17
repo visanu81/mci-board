@@ -988,6 +988,30 @@ const TRIAGE_BADGE_STYLE = {
 };
 const triageBadgeStyle = (id) => TRIAGE_BADGE_STYLE[id] || 'background:#334155;color:#e2e8f0;';
 
+// 119 엠블럼(인라인 SVG) — 굵은 이탤릭 119만(스피드라인 제거: 작은 크기에서 깨져 보임).
+// fill:currentColor라 버튼(빨강)·배지(흰색) 어디서든 색 자동 적응. SVG라 문맥 폰트와 무관하게 크기·굵기 일정.
+function emblem119(extraStyle) {
+  return '<svg viewBox="0 0 34 20" fill="currentColor" aria-hidden="true" style="height:1.05em;width:auto;display:inline-block;vertical-align:-0.15em;' + (extraStyle || '') + '">'
+    + '<text x="17" y="17" text-anchor="middle" font-size="19" font-weight="900" font-style="italic" letter-spacing="-1" font-family="Pretendard, system-ui, sans-serif">119</text>'
+    + '</svg>';
+}
+
+// 배지용 통합 엠블럼 — "119 R.I.T"를 하나의 SVG로(119·R.I.T 동일 스타일 통일). fill currentColor.
+// viewBox는 fs20 이탤릭 "119 R.I.T" 실측 bbox(폭 80.1) 기준.
+function emblemRit() {
+  return '<svg viewBox="0 0 81 26" fill="currentColor" aria-hidden="true" style="height:1.1em;width:auto;display:inline-block;vertical-align:-0.2em;">'
+    + '<text x="0" y="20" font-size="20" font-weight="900" font-style="italic" letter-spacing="-0.5" font-family="Pretendard, system-ui, sans-serif">119 R.I.T</text>'
+    + '</svg>';
+}
+
+// R.I.T 배지 — 화재진압 중 다쳐 RIT(긴급구조대)가 구조한 소방관 환자 표시.
+// isFirefighter 카드는 어디에 표출되든 이름 옆에 이 배지가 따라붙는다. (119 R.I.T 통합 SVG)
+function ritBadge(c) {
+  return (c && c.isFirefighter)
+    ? '<span class="text-[11px] px-1.5 py-0.5 rounded align-middle whitespace-nowrap inline-flex items-center" style="background:#b91c1c;color:#ffffff;" title="R.I.T 구조 — 소방관(119) 환자">' + emblemRit() + '</span>'
+    : '';
+}
+
 // 생체징후 허용 범위 — 입력 폼의 min/max 속성과 동일하게 유지할 것.
 // (HTML min/max는 직접 타이핑·OCR 자동입력을 막지 못하므로 저장 시 여기서 최종 검증)
 const VITAL_RANGES = {
@@ -1133,6 +1157,248 @@ function incPath(suffix) {
   return rootPath(`incidents/${state.currentIncidentId}/${suffix}`);
 }
 
+// ==================== 오프라인 안전 큐(Outbox) ====================
+// 인터넷이 끊긴 동안 입력한 사상자 카드(신규·수정·삭제)를 localStorage에 영속 기록해,
+// 앱을 닫거나 새로고침해도 보존하고 재연결 시 자동 재전송한다.
+//  · 핵심 안전축: 신규 카드도 push 키를 미리 확정해 멱등 set → 두 번 보내도 중복 카드가 안 생김.
+//  · 대상: 사상자 카드 6경로만(자주+incPath 격리+단일노드 멱등). 그 외(사고개요/동원/관서코드/백업)는 제외.
+//  · 오프라인에서 set()은 거부가 아니라 무한 대기(hang)하므로: 오프라인 저장은 발사만 하고 기다리지 않음(낙관적 화면 반영),
+//    전송엔 12초 타임아웃을 둬 재전송 루프가 멈추지 않게 함. (실패해도 멱등이라 재전송 안전)
+const OUTBOX_KEY = 'mci_outbox_v1';
+const OUTBOX_MAX_OPS = 500;
+const OUTBOX_DEFAULT_MAX_TRIES = 8;
+const OUTBOX_SENT_TTL_MS = 60 * 1000;
+const OUTBOX_STALE_MS = 24 * 60 * 60 * 1000;
+const OUTBOX_SEND_TIMEOUT_MS = 12000;
+let _outboxReplaying = false;
+
+function _outboxLoad() {
+  try {
+    const raw = localStorage.getItem(OUTBOX_KEY);
+    if (!raw) return { v: 1, seq: 1, ops: {} };
+    const o = JSON.parse(raw);
+    if (!o || typeof o !== 'object' || !o.ops || typeof o.ops !== 'object') return { v: 1, seq: 1, ops: {} };
+    if (typeof o.seq !== 'number') o.seq = 1;
+    return o;
+  } catch { return { v: 1, seq: 1, ops: {} }; }   // 손상 시 가용성 우선(빈 큐)
+}
+function _outboxSave(o) {
+  if (POPOUT_DISPLAY) return;   // 표출 팝아웃은 큐를 쓰지 않음(본 창 세션 보호)
+  try {
+    localStorage.setItem(OUTBOX_KEY, JSON.stringify(o));
+  } catch (e) {
+    try { _outboxEvictForSpace(o); localStorage.setItem(OUTBOX_KEY, JSON.stringify(o)); } catch {}
+  }
+}
+function _newOpId() {
+  return `op_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+function outboxEnqueue({ kind, method, path, incidentId, payload, maxTries }) {
+  const o = _outboxLoad();
+  if (Object.keys(o.ops).length >= OUTBOX_MAX_OPS) _outboxEvictForSpace(o);
+  const opId = _newOpId();
+  const now = Date.now();
+  const entry = {
+    opId, seq: o.seq++, kind, method, path,
+    incidentId: incidentId || null,
+    status: 'pending', tries: 0,
+    maxTries: maxTries || OUTBOX_DEFAULT_MAX_TRIES,
+    lastError: null, createdAt: now, updatedAt: now, nextAttemptAt: 0,
+  };
+  if (method !== 'remove') {
+    // undefined 제거(RTDB set은 undefined throw) — JSON 왕복 정규화
+    entry.payload = JSON.parse(JSON.stringify(payload == null ? {} : payload));
+  }
+  o.ops[opId] = entry;
+  _outboxSave(o);
+  updateOutboxBadge();
+  return opId;
+}
+function outboxMark(opId, patch) {
+  const o = _outboxLoad();
+  if (!o.ops[opId]) return;
+  Object.assign(o.ops[opId], patch, { updatedAt: Date.now() });
+  _outboxSave(o);
+  updateOutboxBadge();
+}
+function outboxRemove(opId) {
+  const o = _outboxLoad();
+  if (o.ops[opId]) { delete o.ops[opId]; _outboxSave(o); updateOutboxBadge(); }
+}
+function outboxPendingCount() {   // 자동 재전송 대상(진행 중 포함) — 배지·interval 기준. failed 제외(공회전 방지)
+  return Object.values(_outboxLoad().ops).filter(x => x.status === 'pending' || x.status === 'sending').length;
+}
+function outboxFailedCount() {   // 자동 재시도 소진/권한거부 등 → 사용자 확인 필요(수동 재전송 대상)
+  return Object.values(_outboxLoad().ops).filter(x => x.status === 'failed').length;
+}
+function outboxDeleteCount() {
+  return Object.values(_outboxLoad().ops).filter(x => (x.status === 'pending' || x.status === 'sending') && x.method === 'remove').length;
+}
+function _outboxEvictForSpace(o) {
+  const ops = o.ops;
+  // 안전 원칙: 전송완료(sent)만 제거한다. 미전송 데이터(pending/failed)는 절대 자동 삭제·강등하지 않음(현장 데이터 보호).
+  // (set만 지우고 update만 남아 반쪽 노드가 생기는 사고, 미전송 카드 소실을 원천 차단)
+  for (const id of Object.keys(ops)) if (ops[id].status === 'sent') delete ops[id];
+  // 그래도 미전송이 비정상적으로 많으면 상한 초과 경고만 — 데이터는 그대로 두고 한도는 soft 처리.
+  if (Object.keys(ops).length > OUTBOX_MAX_OPS && window.__mciShowOutboxStatus) {
+    window.__mciShowOutboxStatus('미전송 항목이 매우 많습니다 — 연결을 확인하세요', 'err');
+  }
+}
+function outboxCleanup() {
+  const o = _outboxLoad();
+  const now = Date.now();
+  let changed = false;
+  for (const id of Object.keys(o.ops)) {
+    const x = o.ops[id];
+    if (x.status === 'sent' && now - x.updatedAt > OUTBOX_SENT_TTL_MS) { delete o.ops[id]; changed = true; }
+    // 24시간 강등은 '실제 전송을 시도했는데(tries>0) 오래 실패한' 것만. 한 번도 못 보낸 순수 오프라인 데이터는
+    // 절대 강등하지 않음 → 재연결 시 자동 재전송 기회를 박탈하지 않음.
+    else if (x.status === 'pending' && (x.tries || 0) > 0 && now - x.updatedAt > OUTBOX_STALE_MS) { x.status = 'failed'; x.lastError = '24시간 경과(재시도 실패)'; changed = true; }
+    // 앱 재시작 등으로 'sending'에 멈춘 항목 복구(15초 이상 경과분만 → 진행 중인 건 안 건드림)
+    else if (x.status === 'sending' && now - x.updatedAt > 15000) { x.status = 'pending'; changed = true; }
+  }
+  if (changed) _outboxSave(o);
+}
+
+// 단일 통로 — 모든 사상자 쓰기는 이 함수를 거친다.
+async function durableWrite({ kind, method, path, incidentId, payload }) {
+  if (POPOUT_DISPLAY) return { ok: false, queued: false };
+  if (!path) return { ok: false, queued: false };   // incPath null 방어(재난방 미선택)
+  const opId = outboxEnqueue({ kind, method, path, incidentId, payload });   // write-ahead: 항상 먼저 영속 기록
+  if (navigator.onLine) {
+    const ok = await _outboxSendOne(opId);                 // 온라인: 결과까지 대기(기존 UX, 12초 타임아웃)
+    return { ok, opId, queued: !ok };
+  }
+  _outboxSendOne(opId);   // 오프라인: 발사만(로컬 낙관적 반영) — await 안 함(set이 hang하므로). 즉시 성공 반환.
+  return { ok: true, opId, queued: true };
+}
+
+async function _outboxSendOne(opId) {
+  const o = _outboxLoad();
+  const op = o.ops[opId];
+  if (!op) return false;
+  if (op.status === 'sent') return true;
+  if (op.status === 'sending') return false;   // 이미 진행 중 → 이중 발사 차단
+  outboxMark(opId, { status: 'sending' });
+  try {
+    const r = ref(db, op.path);
+    const write = op.method === 'remove' ? remove(r)
+      : op.method === 'update' ? update(r, op.payload)
+      : set(r, op.payload);
+    // 오프라인/서버 미도달 시 set은 무한 대기 → 타임아웃으로 끊어 재전송 루프 보호(멱등이라 재전송 안전)
+    await Promise.race([
+      write,
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), OUTBOX_SEND_TIMEOUT_MS)),
+    ]);
+    outboxMark(opId, { status: 'sent', lastError: null });
+    return true;
+  } catch (e) {
+    const msg = (e && (e.code || e.message)) ? (e.code || e.message) : String(e);
+    // await 동안 수동 재전송/다른 트리거가 같은 op를 갱신했을 수 있다 → 디스크 최신값 기준, '내가 마킹한 sending'일 때만 반영
+    const cur = _outboxLoad().ops[opId];
+    if (!cur || cur.status !== 'sending') return false;
+    const permDenied = /permission_denied/i.test(msg);
+    const tries = (cur.tries || 0) + 1;
+    const failed = permDenied || tries >= (cur.maxTries || OUTBOX_DEFAULT_MAX_TRIES);
+    const backoff = Math.min(60000, 1000 * Math.pow(2, tries));
+    outboxMark(opId, {
+      status: failed ? 'failed' : 'pending',
+      tries, lastError: msg, nextAttemptAt: Date.now() + backoff,
+    });
+    return false;
+  }
+}
+
+// 큐 재전송 — boot/online/.info connected/주기타이머/수동버튼이 호출. seq 오름차순 직렬.
+async function replayOutbox(opts) {
+  const manual = !!(opts && opts.manual);
+  if (POPOUT_DISPLAY || _outboxReplaying) return;
+  if (!manual && !navigator.onLine) return;
+  _outboxReplaying = true;   // 첫 await 이전 동기 점유 → 부팅 중 동시 트리거가 겹쳐 돌지 않게(직렬 보장)
+  updateOutboxBadge();
+  let sentN = 0;
+  try {
+    try { await authReady; } catch {}   // 인증 후 전송(Rules가 auth!=null 요구)
+    // 수동 재전송: failed/멈춘 sending도 되살려 한 번 더 시도
+    if (manual) {
+      const o = _outboxLoad();
+      let ch = false;
+      Object.values(o.ops).forEach(x => {
+        if (x.status === 'failed' || x.status === 'sending') { x.status = 'pending'; x.tries = 0; x.nextAttemptAt = 0; x.lastError = null; ch = true; }
+      });
+      if (ch) _outboxSave(o);
+    }
+    const now = Date.now();
+    const ops = Object.values(_outboxLoad().ops)
+      .filter(x => x.status === 'pending')
+      .filter(x => manual || (x.nextAttemptAt || 0) <= now)
+      .filter(x => (x.tries || 0) < (x.maxTries || OUTBOX_DEFAULT_MAX_TRIES))
+      .sort((a, b) => a.seq - b.seq);   // 순서 보장
+    for (const op of ops) {
+      const ok = await _outboxSendOne(op.opId);
+      if (ok) sentN++;
+      else if (!navigator.onLine) break;   // 도중 끊기면 중단(나머지는 다음 트리거에)
+    }
+    outboxCleanup();
+    if (sentN > 0 && window.__mciShowOutboxStatus) window.__mciShowOutboxStatus(`미전송 ${sentN}건 전송 완료`, 'ok');
+  } finally {
+    _outboxReplaying = false;
+    updateOutboxBadge();
+  }
+}
+window.__mciReplayOutbox = replayOutbox;   // 디버그/IIFE용 노출
+
+// 미전송 배지(우하단) — pending>0일 때만. [지금 재전송] 버튼 포함. 비차단(alert 금지).
+function updateOutboxBadge() {
+  if (POPOUT_DISPLAY) return;
+  let el = document.getElementById('outbox-badge');
+  const n = outboxPendingCount();
+  const f = outboxFailedCount();
+  if (n + f === 0) { if (el) el.style.display = 'none'; return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'outbox-badge';
+    el.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:9999;display:flex;align-items:center;gap:8px;border-radius:9999px;padding:8px 14px;font-weight:800;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.45);max-width:92vw;';
+    const txt = document.createElement('span'); txt.id = 'outbox-badge-text';
+    const btn = document.createElement('button'); btn.id = 'outbox-badge-btn'; btn.type = 'button';
+    btn.style.cssText = 'background:#111827;color:#fff;border:none;border-radius:9999px;padding:3px 10px;font-weight:800;font-size:12px;cursor:pointer;flex:none;';
+    btn.textContent = '지금 재전송';
+    btn.onclick = () => replayOutbox({ manual: true });
+    el.append(txt, btn);
+    document.body.appendChild(el);
+  }
+  el.style.display = 'flex';
+  const off = !navigator.onLine;
+  el.style.background = off ? '#dc2626' : '#f59e0b';
+  el.style.color = off ? '#ffffff' : '#451a03';
+  const d = outboxDeleteCount();
+  const dtxt = d > 0 ? ` (삭제 ${d})` : '';
+  const ftxt = f > 0 ? ` · 확인 ${f}건` : '';
+  const sending = _outboxReplaying ? ' · 전송 중…' : '';
+  const ntxt = n > 0 ? `📦 미전송 ${n}건${dtxt}` : '📦';
+  document.getElementById('outbox-badge-text').textContent = `${ntxt}${ftxt}${sending}`;
+  const btn = document.getElementById('outbox-badge-btn');
+  btn.disabled = _outboxReplaying;
+  btn.style.opacity = _outboxReplaying ? '0.5' : '1';
+}
+
+// 비차단 토스트(전송 완료/공간부족 등)
+window.__mciShowOutboxStatus = (msg, kind) => {
+  if (POPOUT_DISPLAY) return;
+  let t = document.getElementById('outbox-toast');
+  if (!t) {
+    t = document.createElement('div'); t.id = 'outbox-toast';
+    t.style.cssText = 'position:fixed;left:50%;bottom:74px;transform:translateX(-50%);z-index:10001;border-radius:9999px;padding:9px 16px;font-weight:800;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.45);max-width:92vw;white-space:nowrap;';
+    document.body.appendChild(t);
+  }
+  t.style.background = kind === 'err' ? '#dc2626' : '#15803d';
+  t.style.color = '#ffffff';
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.display = 'none'; }, 3000);
+};
+
 // 실시간 구독 오류(권한 거부·규칙 변경 등) 공통 처리 — 조용히 멈추지 않게 상단 배너로 알림.
 // (네트워크 끊김은 onValue가 오류를 안 내고 큐잉하므로 기존 오프라인 배너가 담당)
 function handleSyncError(where) {
@@ -1200,6 +1466,14 @@ function bindRealtime() {
   }, handleSyncError('관서 코드'));
   // 재난방별 구독은 rebindIncidentRealtime()에서 처리
   rebindIncidentRealtime();
+
+  // Firebase 서버 실제 연결 상태 — 연결되면 오프라인 큐 자동 재전송(OS online보다 정확)
+  if (!POPOUT_DISPLAY) {
+    onValue(ref(db, '.info/connected'), (s) => {
+      if (s.val() === true) replayOutbox();
+      updateOutboxBadge();   // 연결 상태에 따라 배지 색 갱신
+    });
+  }
 }
 
 // V5 — Firebase /config/agencyCodes 가 비었을 때만 SEED 푸시 (멱등)
@@ -1431,26 +1705,29 @@ async function saveCasualty(data, teamId, author, editKey) {
     } else {
       data._autoNamed = false;
     }
+    let res;
     if (editKey) {
-      // 수정: 기존 키 유지
-      await update(ref(db, incPath(`casualties/${editKey}`)), {
-        ...data,
-        teamId,
-        author,
-        _updatedAt: Date.now(),
+      // 수정: 기존 키 유지 (오프라인 안전 큐 경유)
+      res = await durableWrite({
+        kind: 'casualty', method: 'update',
+        path: incPath(`casualties/${editKey}`),
+        incidentId: state.currentIncidentId,
+        payload: { ...data, teamId, author, _updatedAt: Date.now() },
       });
     } else {
-      const newRef = push(ref(db, incPath('casualties')));
-      await set(newRef, {
-        timestamp: Date.now(),
-        ...data,
-        teamId,
-        author,
+      // 신규: push 키를 미리 확정(오프라인에서도 생성) → 멱등 set (재전송돼도 중복 카드 없음)
+      const newKey = push(ref(db, incPath('casualties'))).key;
+      res = await durableWrite({
+        kind: 'casualty', method: 'set',
+        path: incPath(`casualties/${newKey}`),
+        incidentId: state.currentIncidentId,
+        payload: { timestamp: Date.now(), ...data, teamId, author },
       });
     }
-    setSaveStatus(formKey, { saving: false, savedAt: new Date() });
+    // 서버 미확정(오프라인/실패)이면 '전송 대기'로 정직하게 표시 — 데이터는 큐에 보존됨
+    setSaveStatus(formKey, { saving: false, savedAt: new Date(), queued: !!(res && res.queued) });
     setTimeout(() => clearSaveStatus(formKey), 2500);
-    return true;
+    return !!(res && (res.ok || res.queued));
   } catch (e) {
     setSaveStatus(formKey, { saving: false, error: e.message });
     return false;
@@ -1459,8 +1736,17 @@ async function saveCasualty(data, teamId, author, editKey) {
 
 async function deleteCasualty(key) {
   if (!assertCanWrite('사상자 카드 삭제')) return false;
-  try { await remove(ref(db, incPath(`casualties/${key}`))); return true; }
-  catch (e) { alert('삭제 실패: ' + e.message); return false; }
+  // 오프라인 안전 큐 경유 — 끊겨도 큐에 보관 후 재연결 시 자동 반영(차단성 alert 제거)
+  const res = await durableWrite({
+    kind: 'casualty', method: 'remove',
+    path: incPath(`casualties/${key}`),
+    incidentId: state.currentIncidentId,
+  });
+  // 온라인인데 서버가 거부(권한 등) → 낙관적으로 사라졌던 카드가 되살아남 → 비차단 안내
+  if (res && res.ok === false && navigator.onLine && window.__mciShowOutboxStatus) {
+    window.__mciShowOutboxStatus('삭제가 아직 반영되지 않았습니다 — 미전송함을 확인하세요', 'err');
+  }
+  return true;
 }
 
 // MCI 사상자
@@ -1485,20 +1771,29 @@ async function saveMciCasualty(data, teamId, author, editKey) {
     } else {
       data._autoNamed = false;
     }
+    let res;
     if (editKey) {
-      await update(ref(db, incPath(`mciCasualties/${editKey}`)), {
-        ...data, teamId, author, _updatedAt: Date.now(),
+      // 수정: 기존 키 유지 (오프라인 안전 큐 경유)
+      res = await durableWrite({
+        kind: 'mci', method: 'update',
+        path: incPath(`mciCasualties/${editKey}`),
+        incidentId: state.currentIncidentId,
+        payload: { ...data, teamId, author, _updatedAt: Date.now() },
       });
     } else {
-      const newRef = push(ref(db, incPath('mciCasualties')));
-      await set(newRef, {
-        timestamp: Date.now(),
-        ...data, teamId, author,
+      // 신규: push 키를 미리 확정 → 멱등 set (재전송돼도 중복 카드 없음)
+      const newKey = push(ref(db, incPath('mciCasualties'))).key;
+      res = await durableWrite({
+        kind: 'mci', method: 'set',
+        path: incPath(`mciCasualties/${newKey}`),
+        incidentId: state.currentIncidentId,
+        payload: { timestamp: Date.now(), ...data, teamId, author },
       });
     }
-    setSaveStatus(formKey, { saving: false, savedAt: new Date() });
+    // 서버 미확정(오프라인/실패)이면 '전송 대기'로 정직하게 표시 — 데이터는 큐에 보존됨
+    setSaveStatus(formKey, { saving: false, savedAt: new Date(), queued: !!(res && res.queued) });
     setTimeout(() => clearSaveStatus(formKey), 2500);
-    return true;
+    return !!(res && (res.ok || res.queued));
   } catch (e) {
     setSaveStatus(formKey, { saving: false, error: e.message });
     return false;
@@ -1507,8 +1802,17 @@ async function saveMciCasualty(data, teamId, author, editKey) {
 
 async function deleteMciCasualty(key) {
   if (!assertCanWrite('MCI 사상자 카드 삭제')) return false;
-  try { await remove(ref(db, incPath(`mciCasualties/${key}`))); return true; }
-  catch (e) { alert('삭제 실패: ' + e.message); return false; }
+  // 오프라인 안전 큐 경유 — 끊겨도 큐에 보관 후 재연결 시 자동 반영(차단성 alert 제거)
+  const res = await durableWrite({
+    kind: 'mci', method: 'remove',
+    path: incPath(`mciCasualties/${key}`),
+    incidentId: state.currentIncidentId,
+  });
+  // 온라인인데 서버가 거부(권한 등) → 낙관적으로 사라졌던 카드가 되살아남 → 비차단 안내
+  if (res && res.ok === false && navigator.onLine && window.__mciShowOutboxStatus) {
+    window.__mciShowOutboxStatus('삭제가 아직 반영되지 않았습니다 — 미전송함을 확인하세요', 'err');
+  }
+  return true;
 }
 
 // ==================== 데이터 내보내기 ====================
@@ -1741,7 +2045,7 @@ async function adminForceCloseIncident(incidentId, opts = {}) {
     const inc = state.incidents.find(i => i._key === incidentId);
     if (!inc) throw new Error('재난을 찾을 수 없습니다');
 
-    const base = `incidents/${incidentId}`;
+    const base = rootPath(`incidents/${incidentId}`);
     // 1. 재난방 데이터 일괄 fetch
     const [incData, damages, mobilizations, actions, casualties, mciCasualties] = await Promise.all([
       get(ref(db, `${base}/incident`)),
@@ -2621,7 +2925,7 @@ function renderDisplayModal() {
                     <span class="text-base text-slate-500 mono font-bold w-14 flex-shrink-0">${cardNo}</span>
                     <span class="text-base px-2 py-1 rounded font-black flex-shrink-0" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
                     ${c.isPediatric ? '<i data-lucide="baby" class="w-5 h-5 text-cyan-400 flex-shrink-0"></i>' : ''}
-                    <span class="font-bold ${c._autoNamed ? 'italic text-slate-400' : 'text-slate-100'} flex-shrink-0">${escapeHtml(c.name || '-')}</span>
+                    <span class="font-bold ${c._autoNamed ? 'italic text-slate-400' : 'text-slate-100'} flex-shrink-0">${escapeHtml(c.name || '-')}</span>${ritBadge(c)}
                     <span class="text-base text-slate-400 mono flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
                     ${c.location ? `<span class="text-base text-pink-300 truncate max-w-[260px] flex-shrink-0"><i data-lucide="map-pin" class="w-4 h-4 inline"></i>${escapeHtml(c.location)}</span>` : ''}
                     <span class="flex-1 min-w-0 text-base text-slate-300 truncate">${escapeHtml(c.symptom || '')}</span>
@@ -2666,7 +2970,7 @@ function renderDisplayPatientCard(c) {
           <span class="text-2xl mono font-bold text-slate-300">${cardNo}</span>
           <span class="text-xl px-3 py-1 rounded-lg font-black" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'} · ${tr?.name || '미분류'}</span>
           ${c.isPediatric ? '<span class="text-cyan-300 text-base px-2 py-1 rounded bg-cyan-950/50 flex items-center gap-1"><i data-lucide="baby" class="w-4 h-4"></i>소아</span>' : ''}
-          <span class="text-2xl font-bold ${c._autoNamed ? 'italic text-slate-400' : 'text-slate-100'}">${escapeHtml(c.name || '-')}</span>
+          <span class="text-2xl font-bold ${c._autoNamed ? 'italic text-slate-400' : 'text-slate-100'}">${escapeHtml(c.name || '-')}</span> ${ritBadge(c)}
           <button id="display-modal-close" class="ml-auto text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800" aria-label="닫기">
             <i data-lucide="x" class="w-7 h-7"></i>
           </button>
@@ -4104,7 +4408,7 @@ function renderDashboard() {
                   return `
                     <tr class="border-t border-slate-800 hover:bg-slate-950/40">
                       <td class="px-2 py-2 text-slate-500 mono">${i + 1}</td>
-                      <td class="px-2 py-2 font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'}">${displayName}</td>
+                      <td class="px-2 py-2 font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'}">${displayName} ${ritBadge(c)}</td>
                       <td class="px-2 py-2 text-center text-slate-400 mono">${displayAge}/${escapeHtml(c.gender || '-')}</td>
                       <td class="px-2 py-2 text-center">
                         <span class="text-[10px] px-1.5 py-0.5 rounded font-bold" style="${triageBadgeStyle(tr?.id)}">${tr?.name || '?'}</span>
@@ -4238,7 +4542,9 @@ function saveStatusBar(formKey) {
   const s = state.saveStatus[formKey];
   if (!s) return '<span class="text-slate-700">대기</span>';
   if (s.saving) return '<span class="text-amber-400 flex items-center justify-center gap-1.5 fade"><i data-lucide="refresh-cw" class="w-3.5 h-3.5 animate-spin"></i> 저장 중...</span>';
-  if (s.savedAt) return '<span class="text-emerald-400 flex items-center justify-center gap-1.5 fade"><i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> 저장 완료</span>';
+  if (s.savedAt) return s.queued
+    ? '<span class="text-amber-400 flex items-center justify-center gap-1.5 fade"><i data-lucide="cloud-off" class="w-3.5 h-3.5"></i> 저장됨 · 전송 대기</span>'
+    : '<span class="text-emerald-400 flex items-center justify-center gap-1.5 fade"><i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> 저장 완료</span>';
   if (s.error) return `<span class="text-red-400 flex items-center justify-center gap-1.5 fade"><i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> 실패: ${escapeHtml(s.error)}</span>`;
   return '<span class="text-slate-700">대기</span>';
 }
@@ -4498,7 +4804,7 @@ function renderCasualtyForm() {
               return `
                 <div class="flex items-center gap-2 p-2 rounded-lg ${isCurrent ? 'bg-amber-950/30 border border-amber-700/50' : 'bg-slate-950'}">
                   <span class="text-[10px] px-1.5 py-0.5 rounded font-bold flex-shrink-0" style="${triageBadgeStyle(tr?.id)}">${tr?.name || '?'}</span>
-                  <span class="text-sm font-medium">${escapeHtml(c.name)}</span>
+                  <span class="text-sm font-medium">${escapeHtml(c.name)}</span>${ritBadge(c)}
                   <span class="text-xs text-slate-500">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
                   <span class="text-xs text-slate-400 truncate flex-1">${escapeHtml(c.symptom || '')}</span>
                   <button data-edit-cs="${c._key}" class="edit-casualty text-slate-500 hover:text-amber-400 flex-shrink-0" title="수정" aria-label="사상자 수정">
@@ -4726,7 +5032,7 @@ function smallNumField(id, value) {
 let mciOcrFlags = {};
 let mciDraft = {
   cardNo: '',   // 카드 번호 (빈 값이면 자동 제안 번호 사용)
-  name: '', age: '', gender: '', isPediatric: false,
+  name: '', age: '', gender: '', isPediatric: false, isFirefighter: false,
   location: '', // 발견장소
   handoverUnit: '', handoverTime: '',   // 인계해준 출동대명 · 인계 시간(HH:MM)
   triage: '',
@@ -4749,7 +5055,7 @@ let mciDraft = {
 function resetMciDraft() {
   mciDraft = {
     cardNo: '',   // 카드 번호 (빈 값이면 자동 제안 번호 사용)
-  name: '', age: '', gender: '', isPediatric: false,
+  name: '', age: '', gender: '', isPediatric: false, isFirefighter: false,
     location: '',
     handoverUnit: '', handoverTime: '',
     triage: '',
@@ -4769,7 +5075,7 @@ function resetMciDraft() {
 // V2: 일반 사상자 draft (mciDraft와 동일 구조 — 폼 통합, 데이터 분리)
 let csDraft = {
   cardNo: '',   // 카드 번호 (빈 값이면 자동 제안 번호 사용)
-  name: '', age: '', gender: '', isPediatric: false,
+  name: '', age: '', gender: '', isPediatric: false, isFirefighter: false,
   location: '',
   handoverUnit: '', handoverTime: '',
   triage: '',
@@ -4785,7 +5091,7 @@ let csDraft = {
 function resetCsDraft() {
   csDraft = {
     cardNo: '',   // 카드 번호 (빈 값이면 자동 제안 번호 사용)
-  name: '', age: '', gender: '', isPediatric: false,
+  name: '', age: '', gender: '', isPediatric: false, isFirefighter: false,
     location: '',
     handoverUnit: '', handoverTime: '',
     triage: '',
@@ -4906,7 +5212,7 @@ function renderMciCasualtyForm() {
             <span class="mono text-sm font-bold text-slate-400">${cardNoStr}</span>
             <span class="text-xs px-2 py-0.5 rounded font-black" style="${triageBadgeStyle(tr?.id)}">${tr ? `${tr.shortName}·${tr.name}` : '?'}</span>
             ${c.isPediatric ? '<i data-lucide="baby" class="w-4 h-4 text-cyan-400"></i>' : ''}
-            <span class="text-base font-bold ${c._autoNamed ? 'italic text-slate-400' : ''}">${escapeHtml(c.name || '-')}</span>
+            <span class="text-base font-bold ${c._autoNamed ? 'italic text-slate-400' : ''}">${escapeHtml(c.name || '-')}</span> ${ritBadge(c)}
             <span class="text-sm text-slate-400">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
             <span class="flex-1"></span>
             ${editable ? `
@@ -5014,11 +5320,12 @@ function renderMciCasualtyForm() {
                   class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500" />
               </div>
               <div>
-                <label class="text-[10px] text-slate-500 block mb-0.5">성별</label>
-                <div class="grid grid-cols-3 gap-1">
-                  <button data-mci-gender="남" class="mci-gender-btn py-1.5 rounded-md border border-slate-800 bg-slate-950 text-xs text-slate-300">남</button>
-                  <button data-mci-gender="여" class="mci-gender-btn py-1.5 rounded-md border border-slate-800 bg-slate-950 text-xs text-slate-300">여</button>
-                  <button data-mci-gender="미상" class="mci-gender-btn py-1.5 rounded-md border border-slate-800 bg-slate-950 text-xs text-slate-300">미상</button>
+                <label class="text-[10px] text-slate-500 block mb-0.5">성별 <span class="text-slate-600">· 소방관(R.I.T)은 별도 표시</span></label>
+                <div class="flex flex-wrap gap-1">
+                  <button data-mci-gender="남" class="mci-gender-btn flex-none w-9 py-2 rounded-md border border-slate-800 bg-slate-950 text-xs text-slate-300">남</button>
+                  <button data-mci-gender="여" class="mci-gender-btn flex-none w-9 py-2 rounded-md border border-slate-800 bg-slate-950 text-xs text-slate-300">여</button>
+                  <button data-mci-gender="미상" class="mci-gender-btn flex-none w-11 py-2 rounded-md border border-slate-800 bg-slate-950 text-xs text-slate-300">미상</button>
+                  <button id="mci-firefighter-btn" type="button" title="화재진압 중 다친 소방관(R.I.T 구조) — 성별과 별개 표시" class="flex-1 py-2 rounded-md border border-slate-800 bg-slate-950 text-xs text-slate-300 flex items-center justify-center gap-1 whitespace-nowrap"><span style="color:#dc2626;">${emblem119()}</span> 소방관</button>
                 </div>
               </div>
             </div>
@@ -5030,7 +5337,7 @@ function renderMciCasualtyForm() {
               </div>
               <div>
                 <label class="text-[10px] text-slate-500 block mb-0.5">소아 여부</label>
-                <button id="mci-pediatric-btn" class="w-full py-1.5 rounded-md border border-slate-800 bg-slate-950 text-xs text-slate-300 flex items-center justify-center gap-1">
+                <button id="mci-pediatric-btn" class="w-full py-2 rounded-md border border-slate-800 bg-slate-950 text-xs text-slate-300 flex items-center justify-center gap-1">
                   <i data-lucide="baby" class="w-3 h-3"></i>소아 환자
                 </button>
               </div>
@@ -5234,7 +5541,7 @@ function renderMciCasualtyForm() {
                   <div class="flex items-center gap-1.5 min-w-0">
                     <span class="text-[9px] mono flex-shrink-0 ${isDupNo ? 'font-black px-1 rounded' : 'text-slate-600'}"${isDupNo ? ' style="background:#dc2626;color:#ffffff;" title="카드 번호 중복 — 정리 필요"' : ''}>${cardNo}${isDupNo ? ' ⚠중복' : ''}</span>
                     <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
-                    <span class="text-sm font-medium truncate ${c._autoNamed ? 'text-slate-400 italic' : ''}">${escapeHtml(c.name || '-')}</span>
+                    <span class="text-sm font-medium truncate ${c._autoNamed ? 'text-slate-400 italic' : ''}">${escapeHtml(c.name || '-')}</span>${ritBadge(c)}
                     <span class="text-xs text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
                     ${c.isPediatric ? '<i data-lucide="baby" class="w-3 h-3 text-cyan-400 flex-shrink-0"></i>' : ''}
                     <span class="flex-1"></span>
@@ -5997,6 +6304,24 @@ function bindMciCasualtyEvents() {
     };
   }
 
+  // 소방관(R.I.T) 토글 — 성별과 별개. 켜지면 어디든 R.I.T 배지가 따라붙음.
+  const ffBtn = document.getElementById('mci-firefighter-btn');
+  if (ffBtn) {
+    const ffOn = () => {
+      ffBtn.classList.remove('border-slate-800', 'bg-slate-950', 'text-slate-300');
+      ffBtn.classList.add('border-red-500', 'bg-red-950/40', 'text-red-200');
+    };
+    const ffOff = () => {
+      ffBtn.classList.remove('border-red-500', 'bg-red-950/40', 'text-red-200');
+      ffBtn.classList.add('border-slate-800', 'bg-slate-950', 'text-slate-300');
+    };
+    if (_draft.isFirefighter) ffOn();
+    ffBtn.onclick = () => {
+      _draft.isFirefighter = !_draft.isFirefighter;
+      if (_draft.isFirefighter) ffOn(); else ffOff();
+    };
+  }
+
   // AVPU
   document.querySelectorAll('.mci-avpu-btn').forEach(btn => {
     if (btn.dataset.mciAvpu === _draft.consciousness) {
@@ -6105,6 +6430,7 @@ function bindMciCasualtyEvents() {
       age: (_draft.age || '').trim(),
       gender: _draft.gender,
       isPediatric: _draft.isPediatric,
+      isFirefighter: !!_draft.isFirefighter,
       location: (_draft.location || '').trim(),
       handoverUnit: (_draft.handoverUnit || '').trim(),
       handoverTime: _draft.handoverTime || '',
@@ -6150,6 +6476,7 @@ function bindMciCasualtyEvents() {
         cardNo: c.cardNo ? String(c.cardNo) : '',
         name: c.name || '', age: c.age || '', gender: c.gender || '',
         isPediatric: !!c.isPediatric,
+        isFirefighter: !!c.isFirefighter,
         location: c.location || '',
         handoverUnit: c.handoverUnit || '', handoverTime: c.handoverTime || '',
         triage: c.triage || '',
@@ -6323,7 +6650,7 @@ function renderMciSituation() {
                       <button data-triage-patient="${c._key}" class="triage-patient-clickable w-full text-left px-3 py-2 hover:bg-slate-900 transition-colors flex items-center gap-2" title="클릭하여 카드 상세보기">
                         <span class="text-[10px] text-slate-500 mono w-9 flex-shrink-0">${cardNo}</span>
                         ${c.isPediatric ? '<i data-lucide="baby" class="w-3 h-3 text-cyan-400 flex-shrink-0"></i>' : ''}
-                        <span class="text-sm font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''} flex-shrink-0">${displayName}</span>
+                        <span class="text-sm font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''} flex-shrink-0">${displayName}</span>${ritBadge(c)}
                         <span class="text-[10px] text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
                         ${c.location ? `<span class="text-[11px] text-pink-300 truncate max-w-[160px] flex-shrink-0" title="${escapeHtml(c.location)}"><i data-lucide="map-pin" class="w-3 h-3 inline"></i>${escapeHtml(c.location)}</span>` : ''}
                         <span class="flex-1 min-w-0 text-[11px] text-slate-500 truncate">${displaySymptom}</span>
@@ -6386,7 +6713,7 @@ function renderMciSituation() {
                         <span class="text-[10px] text-slate-500 mono w-9 flex-shrink-0">${cardNo}</span>
                         <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
                         ${c.isPediatric ? '<i data-lucide="baby" class="w-3 h-3 text-cyan-400 flex-shrink-0"></i>' : ''}
-                        <span class="text-sm font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''} flex-shrink-0">${displayName}</span>
+                        <span class="text-sm font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''} flex-shrink-0">${displayName}</span>${ritBadge(c)}
                         <span class="text-[10px] text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
                         ${c.location ? `<span class="text-[11px] text-pink-300 truncate max-w-[160px] flex-shrink-0" title="${escapeHtml(c.location)}"><i data-lucide="map-pin" class="w-3 h-3 inline"></i>${escapeHtml(c.location)}</span>` : ''}
                         <span class="flex-1 min-w-0 text-[11px] text-slate-500 truncate">${displaySymptom}</span>
@@ -6476,7 +6803,7 @@ function renderMciSituation() {
                         <span class="text-[10px] text-slate-500 mono w-9 flex-shrink-0">${cardNo}</span>
                         <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
                         ${c.isPediatric ? '<i data-lucide="baby" class="w-3 h-3 text-cyan-400 flex-shrink-0"></i>' : ''}
-                        <span class="text-sm font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''} flex-shrink-0">${displayName}</span>
+                        <span class="text-sm font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''} flex-shrink-0">${displayName}</span>${ritBadge(c)}
                         <span class="text-[10px] text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
                         ${c.location ? `<span class="text-[11px] text-pink-300 truncate max-w-[140px] flex-shrink-0" title="${escapeHtml(c.location)}"><i data-lucide="map-pin" class="w-3 h-3 inline"></i>${escapeHtml(c.location)}</span>` : ''}
                         <span class="flex-1 min-w-0 text-[11px] text-slate-500 truncate">${displaySymptom}</span>
@@ -6577,7 +6904,7 @@ function renderMciSituation() {
                           <span class="text-[10px] text-slate-500 mono w-9 flex-shrink-0">${cardNo}</span>
                           <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
                           ${c.isPediatric ? '<i data-lucide="baby" class="w-3 h-3 text-cyan-400 flex-shrink-0"></i>' : ''}
-                          <span class="text-sm font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''} flex-shrink-0">${displayName}</span>
+                          <span class="text-sm font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''} flex-shrink-0">${displayName}</span>${ritBadge(c)}
                           <span class="text-[10px] text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
                           <span class="flex-1 min-w-0 text-[11px] text-slate-500 truncate">${displaySymptom}</span>
                           <div class="flex items-center gap-2 text-[10px] mono flex-shrink-0">
@@ -6654,7 +6981,7 @@ function renderMciSituation() {
                         <span class="text-xs px-2 py-0.5 rounded font-black" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
                         ${c.isPediatric ? '<i data-lucide="baby" class="w-3.5 h-3.5 text-cyan-400 inline ml-1"></i>' : ''}
                       </td>
-                      <td class="px-2.5 py-2.5 font-bold ${state.briefingMode ? 'mono text-slate-200' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''}">${displayName}</td>
+                      <td class="px-2.5 py-2.5 font-bold ${state.briefingMode ? 'mono text-slate-200' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''}">${displayName} ${ritBadge(c)}</td>
                       <td class="px-2.5 py-2.5 text-center text-slate-300 mono font-medium">${escapeHtml(c.age || '-')}/${escapeHtml(c.gender || '-')}</td>
                       <td class="px-2.5 py-2.5 text-slate-200 max-w-[160px] truncate" title="${escapeHtml(c.location || '')}">${escapeHtml(c.location || '-')}</td>
                       <td class="px-2.5 py-2.5 text-center">
@@ -6835,7 +7162,7 @@ function renderMciCardDetailModal() {
           <span class="mono text-sm text-slate-300 font-bold">${cardNo}</span>
           <span class="text-xs px-2 py-1 rounded font-black" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'} · ${tr?.name || '미분류'}</span>
           ${c.isPediatric ? '<span class="text-cyan-300 text-[11px] flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-cyan-950/50 border border-cyan-700/50"><i data-lucide="baby" class="w-3 h-3"></i>소아</span>' : ''}
-          <span class="text-sm font-bold ${state.briefingMode ? 'mono text-slate-200' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''}">${displayName}</span>
+          <span class="text-sm font-bold ${state.briefingMode ? 'mono text-slate-200' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''}">${displayName}</span> ${ritBadge(c)}
           <button data-mci-card-modal-close class="ml-auto text-slate-500 hover:text-slate-200 p-1" aria-label="닫기">
             <i data-lucide="x" class="w-5 h-5"></i>
           </button>
@@ -7020,6 +7347,7 @@ function bindMciCardDetailModalEvents() {
         cardNo: c.cardNo ? String(c.cardNo) : '',
         name: c.name || '', age: c.age || '', gender: c.gender || '',
         isPediatric: !!c.isPediatric,
+        isFirefighter: !!c.isFirefighter,
         location: c.location || '',
         handoverUnit: c.handoverUnit || '', handoverTime: c.handoverTime || '',
         triage: c.triage || '',
@@ -7545,6 +7873,16 @@ async function boot() {
   await authReady;
   bindRealtime();
   render();
+
+  // 오프라인 안전 큐: 부팅 시 미전송분 재전송 + 배지 + 온/오프라인 이벤트 + 주기 점검
+  if (!POPOUT_DISPLAY) {
+    outboxCleanup();
+    updateOutboxBadge();
+    if (navigator.onLine) replayOutbox();
+    window.addEventListener('online', () => { updateOutboxBadge(); replayOutbox(); });
+    window.addEventListener('offline', () => updateOutboxBadge());
+    setInterval(() => { if (navigator.onLine && outboxPendingCount() > 0) replayOutbox(); }, 15000);
+  }
 }
 
 boot();
