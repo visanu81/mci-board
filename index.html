@@ -2658,6 +2658,8 @@ function renderDisplayMain() {
   const _floorOrder = (n) => n === '지하' ? -1 : n === '옥상' ? 9000 : n === '미분류' ? 9999 : parseInt(n, 10);
   const floors = Object.entries(floorMap).map(([name, d]) => ({ name, ...d }))
     .sort((a, b) => _floorOrder(a.name) - _floorOrder(b.name));
+  // 소방관(R.I.T) 환자 수 — 1명 이상일 때만 헤더에 빨간 칩으로 강조
+  const ritCount = state.mciCasualties.filter(c => c.isFirefighter).length;
   // 최다 발생 위치(미분류 제외, 동률이면 모두) — 칩 배경 강조로 즉시 식별
   const _maxFloorTotal = Math.max(0, ...floors.filter(f => f.name !== '미분류').map(f => f.total));
   const isHotFloor = (f) => f.name !== '미분류' && _maxFloorTotal > 0 && f.total === _maxFloorTotal;
@@ -2721,6 +2723,13 @@ function renderDisplayMain() {
           <span class="text-3xl font-black mono text-pink-300 leading-none">${totalCount}</span>
           <span class="text-base text-slate-400 font-normal">명</span>
           <span class="flex-1"></span>
+          <!-- 소방관(R.I.T) 합계 칩 — 발견위치별 왼쪽. 대원 부상은 최우선이라 빨갛게, 1명 이상일 때만 -->
+          ${ritCount > 0 ? `
+            <span class="self-center inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-black text-base mr-1" style="background:#b91c1c;color:#ffffff;" title="화재진압 중 다친 소방관(R.I.T 구조) ${ritCount}명">
+              ${emblemRit()}
+              <span class="text-xl mono leading-none">${ritCount}</span>
+            </span>
+          ` : ''}
           <!-- 발견 위치별 칩 — 제목줄 우측 빈 공간 활용. 층 합계 = 총원이라 바로 대조 가능.
                긴급(I)·사망(IV)은 뱃지로 위험 강조 -->
           ${floors.length > 0 ? `
@@ -6574,6 +6583,8 @@ function renderMciSituation() {
   const _floorOrder = (n) => n === '지하' ? -1 : n === '옥상' ? 9000 : n === '미분류' ? 9999 : parseInt(n, 10);
   const floors = Object.entries(floorMap).map(([name, d]) => ({ name, ...d }))
     .sort((a, b) => _floorOrder(a.name) - _floorOrder(b.name));
+  // 소방관(R.I.T) 환자 수 — 1명 이상일 때만 헤더에 빨간 칩으로 강조
+  const ritCount = state.mciCasualties.filter(c => c.isFirefighter).length;
   // 최다 발생 위치(미분류 제외, 동률이면 모두) — 칩 배경 강조로 즉시 식별
   const _maxFloorTotal = Math.max(0, ...floors.filter(f => f.name !== '미분류').map(f => f.total));
   const isHotFloor = (f) => f.name !== '미분류' && _maxFloorTotal > 0 && f.total === _maxFloorTotal;
@@ -6586,6 +6597,12 @@ function renderMciSituation() {
         <div class="px-4 py-3.5 bg-gradient-to-r from-pink-950/40 to-transparent border-b border-slate-800 flex items-center gap-2 flex-wrap">
           <div class="w-1 h-6 bg-pink-500 rounded-full"></div>
           <h2 class="text-lg font-bold tracking-tight">트리아지 합계</h2>
+          <!-- 소방관(R.I.T) 합계 칩 — 발견위치별 왼쪽, 1명 이상일 때만 빨갛게 -->
+          ${ritCount > 0 ? `
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-black text-xs ml-1" style="background:#b91c1c;color:#ffffff;" title="화재진압 중 다친 소방관(R.I.T 구조) ${ritCount}명">
+              ${emblemRit()}<span class="mono">${ritCount}</span>
+            </span>
+          ` : ''}
           <!-- 발견 위치별 칩 — 표출 모드와 동일. 클릭 시 아래로 해당 위치 환자 목록 펼침 -->
           ${floors.length > 0 ? `
             <div class="flex items-center gap-1 flex-wrap ml-1">
