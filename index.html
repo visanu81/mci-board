@@ -1012,6 +1012,11 @@ function ritBadge(c) {
     : '';
 }
 
+// 미이송 사유 표시 — 자체귀가 / 임시영안소(사망자). 사유 없으면(레거시 카드) 자체귀가로 간주.
+function ntReasonLabel(c) {
+  return (c && c.notTransportedReason === '영안소') ? '임시영안소' : '자체귀가';
+}
+
 // 생체징후 허용 범위 — 입력 폼의 min/max 속성과 동일하게 유지할 것.
 // (HTML min/max는 직접 타이핑·OCR 자동입력을 막지 못하므로 저장 시 여기서 최종 검증)
 const VITAL_RANGES = {
@@ -1689,8 +1694,8 @@ async function saveCasualty(data, teamId, author, editKey) {
   const formKey = 'casualty';
   setSaveStatus(formKey, { saving: true });
   try {
-    // 병원이 입력돼 있으면 미이송(자체귀가)이 아님 — 통계 정합을 위해 강제 해제(병원 우선)
-    if ((data.hospital || '').trim()) data.notTransported = false;
+    // 병원이 입력돼 있으면 미이송이 아님 — 통계 정합을 위해 강제 해제(병원 우선, 사유도 비움)
+    if ((data.hospital || '').trim()) { data.notTransported = false; data.notTransportedReason = null; }
     // 카드 번호: 폼 지정값 우선, 없으면 자동(최대+1)
     if (!(Number.isInteger(data.cardNo) && data.cardNo > 0)) {
       const _maxNo = state.casualties.reduce((m, c) => Math.max(m, c.cardNo || 0), 0);
@@ -1755,8 +1760,8 @@ async function saveMciCasualty(data, teamId, author, editKey) {
   const formKey = 'mciCasualty';
   setSaveStatus(formKey, { saving: true });
   try {
-    // 병원이 입력돼 있으면 미이송(자체귀가)이 아님 — 통계 정합을 위해 강제 해제(병원 우선)
-    if ((data.hospital || '').trim()) data.notTransported = false;
+    // 병원이 입력돼 있으면 미이송이 아님 — 통계 정합을 위해 강제 해제(병원 우선, 사유도 비움)
+    if ((data.hospital || '').trim()) { data.notTransported = false; data.notTransportedReason = null; }
     // 카드 번호: 폼에서 지정한 번호 우선(종이 분류표와 맞춤), 없으면 자동(최대+1)
     if (!(Number.isInteger(data.cardNo) && data.cardNo > 0)) {
       const _autoNo = state.mciCasualties.reduce((m, c) => Math.max(m, c.cardNo || 0), 0) + 1;
@@ -2722,14 +2727,14 @@ function renderDisplayMain() {
           <span class="text-base text-slate-400 font-normal">— 총</span>
           <span class="text-3xl font-black mono text-pink-300 leading-none">${totalCount}</span>
           <span class="text-base text-slate-400 font-normal">명</span>
-          <span class="flex-1"></span>
-          <!-- 소방관(R.I.T) 합계 칩 — 발견위치별 왼쪽. 대원 부상은 최우선이라 빨갛게, 1명 이상일 때만 -->
+          <!-- 소방관(R.I.T) 합계 칩 — 총원 바로 옆. 대원 부상은 최우선이라 빨갛게, 1명 이상일 때만 -->
           ${ritCount > 0 ? `
-            <span class="self-center inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-black text-base mr-1" style="background:#b91c1c;color:#ffffff;" title="화재진압 중 다친 소방관(R.I.T 구조) ${ritCount}명">
+            <span class="self-center inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-black text-base ml-1" style="background:#b91c1c;color:#ffffff;" title="화재진압 중 다친 소방관(R.I.T 구조) ${ritCount}명">
               ${emblemRit()}
               <span class="text-xl mono leading-none">${ritCount}</span>
             </span>
           ` : ''}
+          <span class="flex-1"></span>
           <!-- 발견 위치별 칩 — 제목줄 우측 빈 공간 활용. 층 합계 = 총원이라 바로 대조 가능.
                긴급(I)·사망(IV)은 뱃지로 위험 강조 -->
           ${floors.length > 0 ? `
@@ -3042,7 +3047,7 @@ function renderDisplayPatientCard(c) {
             <div class="text-xs text-slate-500 tracking-wider uppercase mb-2 flex items-center gap-1"><i data-lucide="ambulance" class="w-3.5 h-3.5 text-blue-400"></i>이송 정보</div>
             ${c.notTransported ? `
               <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-violet-950/40 border border-violet-700/50 text-violet-200 text-lg font-bold mb-2">
-                <i data-lucide="home" class="w-5 h-5"></i>미이송 (자체귀가) — 병원 이송 없음
+                <i data-lucide="home" class="w-5 h-5"></i>미이송 (${ntReasonLabel(c)}) — 병원 이송 없음
               </div>
             ` : ''}
             <div class="grid grid-cols-3 gap-3">
@@ -5241,7 +5246,7 @@ function renderMciCasualtyForm() {
             ${row('손상기전 · 부위', (c.mechanism || (c.injuryParts || []).length) ? `${escapeHtml(c.mechanism || '')}${c.mechanism && (c.injuryParts || []).length ? ' · ' : ''}${escapeHtml((c.injuryParts || []).join(', '))}` : '')}
             ${row('처치 · 약물', ((c.treatments || []).length || c.drugs) ? `${escapeHtml((c.treatments || []).join(', '))}${(c.treatments || []).length && c.drugs ? ' · ' : ''}${escapeHtml(c.drugs || '')}` : '')}
             ${row('이송', c.notTransported
-              ? '<span class="text-violet-300 font-bold">미이송 (자체귀가)</span>'
+              ? `<span class="text-violet-300 font-bold">미이송 (${ntReasonLabel(c)})</span>`
               : (c.hospital ? `<span class="text-emerald-300 font-bold">${escapeHtml(c.hospital)}</span>${c.departTime ? ` · 출발 <span class="mono">${escapeHtml(c.departTime)}</span>` : ''}${c.arriveTime ? ` · 도착 <span class="mono">${escapeHtml(c.arriveTime)}</span>` : ''}` : '<span class="text-amber-400">미배정</span>'))}
             ${row('메모', c.notes ? escapeHtml(c.notes) : '')}
             ${row('등록', `${escapeHtml(c.author || '-')}${c.timestamp ? ` · ${new Date(c.timestamp).toLocaleString('ko-KR')}` : ''}`, 'text-slate-400')}
@@ -5468,11 +5473,16 @@ function renderMciCasualtyForm() {
             <div>
               <label class="text-[11px] text-slate-400 block mb-1.5 tracking-wider uppercase">이송 정보</label>
 
-              <!-- 미이송(자체귀가) 토글 -->
-              <button id="mci-not-transported-btn" class="w-full mb-2 py-2 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-300 flex items-center justify-center gap-1.5 transition-colors">
-                <i data-lucide="home" class="w-3.5 h-3.5"></i>
-                미이송 (자체귀가 — 병원 이송 없음)
-              </button>
+              <!-- 미이송 2종(병원 이송 없음): 자체귀가 / 임시영안소(사망자). 상호배타 토글 -->
+              <div class="text-[10px] text-slate-500 mb-1">미이송 (병원 이송 없음) — 해당 시 선택</div>
+              <div class="grid grid-cols-2 gap-2 mb-2">
+                <button id="mci-nt-home" type="button" class="py-2 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-300 flex items-center justify-center gap-1.5 transition-colors">
+                  <i data-lucide="home" class="w-3.5 h-3.5"></i>자체귀가
+                </button>
+                <button id="mci-nt-morgue" type="button" class="py-2 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-300 flex items-center justify-center gap-1.5 transition-colors">
+                  <i data-lucide="box" class="w-3.5 h-3.5"></i>임시영안소
+                </button>
+              </div>
 
               <div class="grid grid-cols-1 gap-2 mb-1">
                 <input id="mci-hospital" type="text" list="hospital-suggestions" autocomplete="off" placeholder="이송병원 (예: 동두천중앙병원)"
@@ -6171,14 +6181,14 @@ function bindMciCasualtyEvents() {
       el.oninput = (e) => {
         _draft[k] = e.target.value;
         if (mciOcrFlags[k]) { delete mciOcrFlags[k]; el.classList.remove('ocr-filled'); }
-        // 병원을 입력하면 미이송(자체귀가) 자동 해제 — 병원 있으면 이송한 것이므로
+        // 병원을 입력하면 미이송 자동 해제 — 병원 있으면 이송한 것이므로(사유도 비움, 두 버튼 모두 끔)
         if (k === 'hospital' && (e.target.value || '').trim() && _draft.notTransported) {
           _draft.notTransported = false;
-          const ntBtn2 = document.getElementById('mci-not-transported-btn');
-          if (ntBtn2) {
-            ntBtn2.classList.remove('border-violet-500', 'bg-violet-950/30', 'text-violet-200');
-            ntBtn2.classList.add('border-slate-800', 'bg-slate-950', 'text-slate-300');
-          }
+          _draft.notTransportedReason = '';
+          ['mci-nt-home', 'mci-nt-morgue'].forEach(id => {
+            const b = document.getElementById(id);
+            if (b) { b.classList.remove('border-violet-500', 'bg-violet-950/30', 'text-violet-200'); b.classList.add('border-slate-800', 'bg-slate-950', 'text-slate-300'); }
+          });
         }
       };
     }
@@ -6274,23 +6284,31 @@ function bindMciCasualtyEvents() {
     };
   });
 
-  // 미이송(자체귀가) 토글
-  const ntBtn = document.getElementById('mci-not-transported-btn');
-  if (ntBtn) {
-    const ntOn = () => {
-      ntBtn.classList.remove('border-slate-800', 'bg-slate-950', 'text-slate-300');
-      ntBtn.classList.add('border-violet-500', 'bg-violet-950/30', 'text-violet-200');
+  // 미이송 2종 토글: 자체귀가 / 임시영안소(사망자). 둘 다 notTransported=true, 사유는 notTransportedReason.
+  const ntHome = document.getElementById('mci-nt-home');
+  const ntMorgue = document.getElementById('mci-nt-morgue');
+  if (ntHome && ntMorgue) {
+    const setOn = (btn) => { btn.classList.remove('border-slate-800', 'bg-slate-950', 'text-slate-300'); btn.classList.add('border-violet-500', 'bg-violet-950/30', 'text-violet-200'); };
+    const setOff = (btn) => { btn.classList.remove('border-violet-500', 'bg-violet-950/30', 'text-violet-200'); btn.classList.add('border-slate-800', 'bg-slate-950', 'text-slate-300'); };
+    // 병원이 이미 입력돼 있으면 미이송 아님 — 초기 보정(병원 우선)
+    if ((_draft.hospital || '').trim()) { _draft.notTransported = false; _draft.notTransportedReason = ''; }
+    const syncNt = () => {
+      const r = _draft.notTransported ? (_draft.notTransportedReason || '자체귀가') : '';
+      (r === '자체귀가' ? setOn : setOff)(ntHome);
+      (r === '영안소' ? setOn : setOff)(ntMorgue);
     };
-    const ntOff = () => {
-      ntBtn.classList.remove('border-violet-500', 'bg-violet-950/30', 'text-violet-200');
-      ntBtn.classList.add('border-slate-800', 'bg-slate-950', 'text-slate-300');
+    syncNt();
+    ntHome.onclick = () => {
+      const wasHome = _draft.notTransported && (_draft.notTransportedReason || '자체귀가') === '자체귀가';
+      if (wasHome) { _draft.notTransported = false; _draft.notTransportedReason = ''; }
+      else { _draft.notTransported = true; _draft.notTransportedReason = '자체귀가'; }
+      syncNt();
     };
-    // 병원이 이미 입력돼 있으면 미이송 아님 — 초기 표시부터 해제(기존 모순 카드 수정 진입 시 보정)
-    if ((_draft.hospital || '').trim()) { _draft.notTransported = false; ntOff(); }
-    else if (_draft.notTransported) ntOn();
-    ntBtn.onclick = () => {
-      _draft.notTransported = !_draft.notTransported;
-      if (_draft.notTransported) ntOn(); else ntOff();
+    ntMorgue.onclick = () => {
+      const wasMorgue = _draft.notTransported && _draft.notTransportedReason === '영안소';
+      if (wasMorgue) { _draft.notTransported = false; _draft.notTransportedReason = ''; }
+      else { _draft.notTransported = true; _draft.notTransportedReason = '영안소'; }
+      syncNt();
     };
   }
 
@@ -6456,6 +6474,7 @@ function bindMciCasualtyEvents() {
       departTime: _draft.departTime,
       arriveTime: _draft.arriveTime,
       notTransported: !!_draft.notTransported,
+      notTransportedReason: _draft.notTransported ? (_draft.notTransportedReason || '자체귀가') : null,
       notes: (_draft.notes || '').trim(),
     }, state.user.teamId, state.user.name, _draft._editKey);
 
@@ -6501,6 +6520,7 @@ function bindMciCasualtyEvents() {
         departTime: c.departTime || '',
         arriveTime: c.arriveTime || '',
         notTransported: !!c.notTransported,
+        notTransportedReason: c.notTransportedReason || (c.notTransported ? '자체귀가' : ''),
         notes: c.notes || '',
         _editKey: btn.dataset.mciEdit,
       };
@@ -6597,15 +6617,17 @@ function renderMciSituation() {
         <div class="px-4 py-3.5 bg-gradient-to-r from-pink-950/40 to-transparent border-b border-slate-800 flex items-center gap-2 flex-wrap">
           <div class="w-1 h-6 bg-pink-500 rounded-full"></div>
           <h2 class="text-lg font-bold tracking-tight">트리아지 합계</h2>
-          <!-- 소방관(R.I.T) 합계 칩 — 발견위치별 왼쪽, 1명 이상일 때만 빨갛게 -->
+          <span class="text-xs text-slate-400 font-normal">— 총 <span class="text-base font-black mono text-pink-300 leading-none">${totalCount}</span> 명</span>
+          <!-- 소방관(R.I.T) 합계 칩 — 총원 바로 옆, 1명 이상일 때만 빨갛게 -->
           ${ritCount > 0 ? `
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-black text-xs ml-1" style="background:#b91c1c;color:#ffffff;" title="화재진압 중 다친 소방관(R.I.T 구조) ${ritCount}명">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-black text-xs" style="background:#b91c1c;color:#ffffff;" title="화재진압 중 다친 소방관(R.I.T 구조) ${ritCount}명">
               ${emblemRit()}<span class="mono">${ritCount}</span>
             </span>
           ` : ''}
-          <!-- 발견 위치별 칩 — 표출 모드와 동일. 클릭 시 아래로 해당 위치 환자 목록 펼침 -->
+          <!-- 발견 위치별 칩 — 우측정렬(표출과 동일). 클릭 시 아래로 해당 위치 환자 목록 펼침 -->
           ${floors.length > 0 ? `
-            <div class="flex items-center gap-1 flex-wrap ml-1">
+            <div class="flex items-center gap-1 flex-wrap ml-auto">
+              <span class="text-xs text-slate-400 mr-0.5">발견 위치별</span>
               ${floors.map(f => `
                 <button data-floor-chip="${escapeHtml(f.name)}" class="floor-chip-clickable px-2 py-0.5 rounded-md border text-xs flex items-baseline gap-1 transition-colors cursor-pointer ${state.expandedFloor === f.name ? 'border-pink-500 bg-pink-950/30' : 'border-slate-700 bg-slate-950 hover:border-pink-600'} ${isHotFloor(f) ? 'floor-chip-max' : ''}"${state.expandedFloor === f.name ? ' style="outline:2px solid #ec4899; outline-offset:1px;"' : ''} title="${isHotFloor(f) ? '환자 최다 발생 위치 — ' : ''}${state.expandedFloor === f.name ? '접기' : f.name + ' 발견 환자 목록 펼치기'}">
                   <span class="font-bold">${escapeHtml(f.name)}</span>
@@ -6616,7 +6638,6 @@ function renderMciSituation() {
               `).join('')}
             </div>
           ` : ''}
-          <span class="ml-auto text-xs text-slate-400">총 <span class="font-bold text-slate-200">${totalCount}</span>명</span>
         </div>
         <div class="grid grid-cols-4 gap-2 p-3">
           ${triageTotals.map(tr => {
@@ -6785,7 +6806,7 @@ function renderMciSituation() {
             label = '병원 도착'; color = '#34d399';
             patients = state.mciCasualties.filter(c => c.arriveTime && !c.notTransported);
           } else if (state.expandedTransport === 'not-transported') {
-            label = '미이송 (자체귀가)'; color = '#a78bfa';
+            label = '미이송 (자체귀가·임시영안소)'; color = '#a78bfa';
             patients = state.mciCasualties.filter(c => c.notTransported);
           } else {
             return '';
@@ -7286,7 +7307,7 @@ function renderMciCardDetailModal() {
             ${c.notTransported ? `
               <div class="flex items-center gap-2 px-2 py-2 rounded-md bg-violet-950/40 border border-violet-700/50 text-violet-200 text-sm font-bold mb-2">
                 <i data-lucide="home" class="w-4 h-4"></i>
-                미이송 (자체귀가) — 병원 이송 없음
+                미이송 (${ntReasonLabel(c)}) — 병원 이송 없음
               </div>
             ` : ''}
             <div class="grid grid-cols-3 gap-3 text-sm">
@@ -7380,6 +7401,7 @@ function bindMciCardDetailModalEvents() {
         departTime: c.departTime || '',
         arriveTime: c.arriveTime || '',
         notTransported: !!c.notTransported,
+        notTransportedReason: c.notTransportedReason || (c.notTransported ? '자체귀가' : ''),
         notes: c.notes || '',
         _editKey: c._key,
       };
