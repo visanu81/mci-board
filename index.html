@@ -1322,7 +1322,7 @@ function rebindIncidentRealtime() {
   // 사상자 (일반)
   _incidentUnsubFns.push(onValue(ref(db, `${base}/casualties`), snap => {
     const v = snap.val() || {};
-    const list = Object.entries(v).map(([k, val]) => ({ ...val, _key: k }));
+    const list = Object.entries(v).map(([k, val]) => ({ ...val, _key: k, ...(val.hospital && String(val.hospital).trim() ? { notTransported: false } : {}) }));
     list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
     state.casualties = list;
     render();
@@ -1330,7 +1330,8 @@ function rebindIncidentRealtime() {
   // MCI 사상자
   _incidentUnsubFns.push(onValue(ref(db, `${base}/mciCasualties`), snap => {
     const v = snap.val() || {};
-    const list = Object.entries(v).map(([k, val]) => ({ ...val, _key: k }));
+    // 정규화: 병원이 입력된 카드는 미이송이 아님(통계 정합) — 기존 모순 데이터도 즉시 교정
+    const list = Object.entries(v).map(([k, val]) => ({ ...val, _key: k, ...(val.hospital && String(val.hospital).trim() ? { notTransported: false } : {}) }));
     list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
     state.mciCasualties = list;
     render();
@@ -1414,6 +1415,8 @@ async function saveCasualty(data, teamId, author, editKey) {
   const formKey = 'casualty';
   setSaveStatus(formKey, { saving: true });
   try {
+    // 병원이 입력돼 있으면 미이송(자체귀가)이 아님 — 통계 정합을 위해 강제 해제(병원 우선)
+    if ((data.hospital || '').trim()) data.notTransported = false;
     // 카드 번호: 폼 지정값 우선, 없으면 자동(최대+1)
     if (!(Number.isInteger(data.cardNo) && data.cardNo > 0)) {
       const _maxNo = state.casualties.reduce((m, c) => Math.max(m, c.cardNo || 0), 0);
@@ -1466,6 +1469,8 @@ async function saveMciCasualty(data, teamId, author, editKey) {
   const formKey = 'mciCasualty';
   setSaveStatus(formKey, { saving: true });
   try {
+    // 병원이 입력돼 있으면 미이송(자체귀가)이 아님 — 통계 정합을 위해 강제 해제(병원 우선)
+    if ((data.hospital || '').trim()) data.notTransported = false;
     // 카드 번호: 폼에서 지정한 번호 우선(종이 분류표와 맞춤), 없으면 자동(최대+1)
     if (!(Number.isInteger(data.cardNo) && data.cardNo > 0)) {
       const _autoNo = state.mciCasualties.reduce((m, c) => Math.max(m, c.cardNo || 0), 0) + 1;
@@ -5850,6 +5855,15 @@ function bindMciCasualtyEvents() {
       el.oninput = (e) => {
         _draft[k] = e.target.value;
         if (mciOcrFlags[k]) { delete mciOcrFlags[k]; el.classList.remove('ocr-filled'); }
+        // 병원을 입력하면 미이송(자체귀가) 자동 해제 — 병원 있으면 이송한 것이므로
+        if (k === 'hospital' && (e.target.value || '').trim() && _draft.notTransported) {
+          _draft.notTransported = false;
+          const ntBtn2 = document.getElementById('mci-not-transported-btn');
+          if (ntBtn2) {
+            ntBtn2.classList.remove('border-violet-500', 'bg-violet-950/30', 'text-violet-200');
+            ntBtn2.classList.add('border-slate-800', 'bg-slate-950', 'text-slate-300');
+          }
+        }
       };
     }
   });
@@ -5955,7 +5969,9 @@ function bindMciCasualtyEvents() {
       ntBtn.classList.remove('border-violet-500', 'bg-violet-950/30', 'text-violet-200');
       ntBtn.classList.add('border-slate-800', 'bg-slate-950', 'text-slate-300');
     };
-    if (_draft.notTransported) ntOn();
+    // 병원이 이미 입력돼 있으면 미이송 아님 — 초기 표시부터 해제(기존 모순 카드 수정 진입 시 보정)
+    if ((_draft.hospital || '').trim()) { _draft.notTransported = false; ntOff(); }
+    else if (_draft.notTransported) ntOn();
     ntBtn.onclick = () => {
       _draft.notTransported = !_draft.notTransported;
       if (_draft.notTransported) ntOn(); else ntOff();
