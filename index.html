@@ -314,6 +314,13 @@
   body.outdoor-mode .text-cyan-400  { color: #0e7490 !important; }
   body.outdoor-mode .text-emerald-300 { color: #047857 !important; }
   body.outdoor-mode .text-emerald-400 { color: #059669 !important; }
+  /* 선택된 처치 칩(.mci-tx-btn + text-emerald-200) — 외부 모드에서 연한 초록이 묻히므로 진초록+흰글씨로 */
+  body.outdoor-mode .mci-tx-btn.text-emerald-200 {
+    background-color: #059669 !important;
+    border-color: #047857 !important;
+    color: #ffffff !important;
+    font-weight: 700;
+  }
   body.outdoor-mode .text-blue-300  { color: #1d4ed8 !important; }
   body.outdoor-mode .text-blue-400  { color: #2563eb !important; }
   body.outdoor-mode .text-purple-200 { color: #6b21a8 !important; }
