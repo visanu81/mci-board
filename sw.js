@@ -6,7 +6,7 @@
    ============================================================================= */
 
 // 캐시 이름 — 코드 수정 시 버전을 올려서 사용자 디바이스의 옛 캐시를 무효화
-const CACHE_VERSION = 'v29';
+const CACHE_VERSION = 'v30';
 const CACHE_NAME    = `mci-${CACHE_VERSION}`;
 
 // 사전 캐시 대상 (앱 셸)
@@ -52,9 +52,15 @@ self.addEventListener('fetch', (event) => {
     return;  // 그냥 통과 — 브라우저 기본 네트워크 처리
   }
 
-  // 2) 같은 출처(앱 셸 + 자체 파일): 캐시 우선
+  // 2) 같은 출처(자체 파일)
   if (url.origin === self.location.origin) {
-    event.respondWith(cacheFirst(req));
+    // 앱 화면(HTML)은 네트워크 우선 — 새 배포를 새로고침 1번에 반영, 오프라인이면 캐시로 폴백
+    if (req.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('/index.html')) {
+      event.respondWith(networkFirst(req));
+    } else {
+      // 아이콘·매니페스트 등 정적 자산은 캐시 우선
+      event.respondWith(cacheFirst(req));
+    }
     return;
   }
 
@@ -62,6 +68,27 @@ self.addEventListener('fetch', (event) => {
   //    한 번 받으면 다음부터 오프라인에서도 동작
   event.respondWith(cacheFirst(req));
 });
+
+// ─── 헬퍼: 네트워크 우선, 실패(오프라인)하면 캐시로 폴백 ───
+//     앱 화면(HTML)용 — 인터넷이 있으면 항상 최신 화면을 받아오고, 받은 건 캐시에 갱신해 둠.
+async function networkFirst(request) {
+  try {
+    const response = await fetch(request);
+    if (response && response.ok) {
+      const clone = response.clone();
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(request, clone).catch(() => {});  // 다음 오프라인 대비 캐시 갱신
+    }
+    return response;
+  } catch (err) {
+    // 오프라인 → 마지막으로 저장해 둔 화면 사용
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    // 그것도 없으면 루트 셸이라도
+    const shell = await caches.match('./index.html');
+    return shell || new Response('', { status: 504, statusText: 'Offline' });
+  }
+}
 
 // ─── 헬퍼: 캐시 우선, 없으면 네트워크에서 받고 캐시 저장 ───
 async function cacheFirst(request) {

@@ -775,10 +775,10 @@ const db = getDatabase(app);
 const auth = getAuth(app);
 
 // ==================== 데이터 네임스페이스 ====================
-// 같은 Firebase 안에서 데이터 공간을 구분한다.
-//   운영(이 파일):  DB_ROOT = ''     → incidents/, archives/, config/  (기존 운영 데이터 그대로)
-//   실험(mci2):    DB_ROOT = 'mci2' → mci2/incidents, mci2/archives, mci2/config
-// 모든 Firebase 경로는 rootPath()를 거친다.
+// 운영(mci)과 같은 Firebase를 쓰되 데이터 공간을 분리한다.
+//   운영:  DB_ROOT = ''     → incidents/, archives/, config/
+//   복제:  DB_ROOT = 'mci2' → mci2/incidents, mci2/archives, mci2/config
+// 모든 Firebase 경로는 rootPath()를 거친다. 운영으로 승격하려면 이 한 줄을 '' 로.
 const DB_ROOT = '';
 const rootPath = (p) => (DB_ROOT ? `${DB_ROOT}/${p}` : p);
 
@@ -1099,6 +1099,10 @@ const maskSymptom = (text) => {
   if (s.length <= 5) return '*'.repeat(s.length);
   return s.slice(0, 3) + '***';
 };
+// 화면(HTML) 표시용 마스킹 — 원본이 '<' 등으로 시작하면 마스킹돼도 메타문자가 남으므로 이스케이프해 삽입.
+// (엑셀/CSV 내보내기는 원문 마스킹값이 필요하므로 위 maskName/maskSymptom을 그대로 사용)
+const maskNameHtml = (name) => escapeHtml(maskName(name));
+const maskSymptomHtml = (text) => escapeHtml(maskSymptom(text));
 
 // ==================== Firebase 동기화 ====================
 // V2 — 재난방 데이터 구독 해제용
@@ -1108,6 +1112,15 @@ let _incidentUnsubFns = [];
 function incPath(suffix) {
   if (!state.currentIncidentId) return null;
   return rootPath(`incidents/${state.currentIncidentId}/${suffix}`);
+}
+
+// 실시간 구독 오류(권한 거부·규칙 변경 등) 공통 처리 — 조용히 멈추지 않게 상단 배너로 알림.
+// (네트워크 끊김은 onValue가 오류를 안 내고 큐잉하므로 기존 오프라인 배너가 담당)
+function handleSyncError(where) {
+  return (err) => {
+    console.warn(`[동기화] ${where} 구독 오류:`, err?.message || err);
+    if (window.__mciShowSyncError) window.__mciShowSyncError();
+  };
 }
 
 function bindRealtime() {
@@ -1139,7 +1152,7 @@ function bindRealtime() {
       }
     }
     render();
-  });
+  }, handleSyncError('재난 목록'));
   // V2 — archives (글로벌, 종료된 재난 백업)
   onValue(ref(db, rootPath('archives')), snap => {
     const v = snap.val() || {};
@@ -1147,7 +1160,7 @@ function bindRealtime() {
     list.sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0));
     state.archives = list;
     render();
-  });
+  }, handleSyncError('보관함'));
   // V5 — 관서 코드: Firebase 동기화 + 비어있으면 SEED로 초기 1회 채움
   onValue(ref(db, rootPath('config/agencyCodes')), snap => {
     const v = snap.val();
@@ -1165,7 +1178,7 @@ function bindRealtime() {
     });
     AGENCY_CODES = map;
     render();
-  });
+  }, handleSyncError('관서 코드'));
   // 재난방별 구독은 rebindIncidentRealtime()에서 처리
   rebindIncidentRealtime();
 }
@@ -1268,17 +1281,17 @@ function rebindIncidentRealtime() {
   _incidentUnsubFns.push(onValue(ref(db, `${base}/incident`), snap => {
     state.incident = snap.val();
     render();
-  }));
+  }, handleSyncError('사고개요')));
   // 피해
   _incidentUnsubFns.push(onValue(ref(db, `${base}/damages`), snap => {
     state.damages = snap.val() || {};
     render();
-  }));
+  }, handleSyncError('피해현황')));
   // 동원
   _incidentUnsubFns.push(onValue(ref(db, `${base}/mobilizations`), snap => {
     state.mobilizations = snap.val() || {};
     render();
-  }));
+  }, handleSyncError('동원현황')));
   // 조치사항
   _incidentUnsubFns.push(onValue(ref(db, `${base}/actions`), snap => {
     const v = snap.val() || {};
@@ -1286,7 +1299,7 @@ function rebindIncidentRealtime() {
     list.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     state.actions = list;
     render();
-  }));
+  }, handleSyncError('조치사항')));
   // 사상자 (일반)
   _incidentUnsubFns.push(onValue(ref(db, `${base}/casualties`), snap => {
     const v = snap.val() || {};
@@ -1294,7 +1307,7 @@ function rebindIncidentRealtime() {
     list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
     state.casualties = list;
     render();
-  }));
+  }, handleSyncError('사상자 명단')));
   // MCI 사상자
   _incidentUnsubFns.push(onValue(ref(db, `${base}/mciCasualties`), snap => {
     const v = snap.val() || {};
@@ -1302,7 +1315,7 @@ function rebindIncidentRealtime() {
     list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
     state.mciCasualties = list;
     render();
-  }));
+  }, handleSyncError('MCI 사상자')));
 }
 
 async function saveIncident(data) {
@@ -1382,6 +1395,20 @@ async function saveCasualty(data, teamId, author, editKey) {
   const formKey = 'casualty';
   setSaveStatus(formKey, { saving: true });
   try {
+    // 카드 번호: 폼 지정값 우선, 없으면 자동(최대+1)
+    if (!(Number.isInteger(data.cardNo) && data.cardNo > 0)) {
+      const _maxNo = state.casualties.reduce((m, c) => Math.max(m, c.cardNo || 0), 0);
+      data.cardNo = _maxNo + 1;
+    }
+    // 이름 자동 부여/갱신 — 비었거나 '#NNN -작성자' 자동이름 형태면 현재 번호 기준으로 (재)생성.
+    // (수정 시 번호를 바꾸면 자동이름도 새 번호로 따라감. 실제 이름을 넣은 카드는 건드리지 않음)
+    const _nm = (data.name || '').trim();
+    if (!_nm || /^#\d{1,3}\s*-/.test(_nm)) {
+      data.name = `#${String(data.cardNo).padStart(3, '0')} -${author}`;
+      data._autoNamed = true;
+    } else {
+      data._autoNamed = false;
+    }
     if (editKey) {
       // 수정: 기존 키 유지
       await update(ref(db, incPath(`casualties/${editKey}`)), {
@@ -1391,16 +1418,6 @@ async function saveCasualty(data, teamId, author, editKey) {
         _updatedAt: Date.now(),
       });
     } else {
-      // 신규: cardNo 부여(폼 지정값 우선, 없으면 자동) + 이름 자동 부여 + push
-      if (!(Number.isInteger(data.cardNo) && data.cardNo > 0)) {
-        const _maxNo = state.casualties.reduce((m, c) => Math.max(m, c.cardNo || 0), 0);
-        data.cardNo = _maxNo + 1;
-      }
-      // V2: 이름이 비어있으면 '#NNN -작성자' 자동 부여 — 지정 번호 기준
-      if (!data.name || !data.name.trim()) {
-        data.name = `#${String(data.cardNo).padStart(3, '0')} -${author}`;
-        data._autoNamed = true;
-      }
       const newRef = push(ref(db, incPath('casualties')));
       await set(newRef, {
         timestamp: Date.now(),
@@ -1435,10 +1452,14 @@ async function saveMciCasualty(data, teamId, author, editKey) {
       const _autoNo = state.mciCasualties.reduce((m, c) => Math.max(m, c.cardNo || 0), 0) + 1;
       data.cardNo = _autoNo;
     }
-    // V2: 이름이 비어있으면 '#NNN -작성자' 형식으로 자동 부여 (신규 카드만) — 지정 번호 기준
-    if (!editKey && (!data.name || !data.name.trim())) {
+    // 이름 자동 부여/갱신 — 이름이 비었거나 '#NNN -작성자' 자동이름 형태면 현재 번호 기준으로 (재)생성.
+    // (수정 시 번호를 바꾸면 자동이름도 새 번호로 따라감. 사용자가 실제 이름을 넣은 카드는 건드리지 않음)
+    const _nm = (data.name || '').trim();
+    if (!_nm || /^#\d{1,3}\s*-/.test(_nm)) {
       data.name = `#${String(data.cardNo).padStart(3, '0')} -${author}`;
       data._autoNamed = true;
+    } else {
+      data._autoNamed = false;
     }
     if (editKey) {
       await update(ref(db, incPath(`mciCasualties/${editKey}`)), {
@@ -1490,6 +1511,12 @@ function buildSnapshot() {
 }
 
 function downloadExcel(masked = false) {
+  // 엑셀 모듈(XLSX)은 외부 CDN — 오프라인/차단 시 로드 안 됐을 수 있음. 조용히 죽지 않게 안내.
+  if (typeof XLSX === 'undefined') {
+    alert('엑셀 모듈을 불러오지 못했습니다.\n인터넷 연결을 확인하고 다시 시도하거나, CSV로 내려받아 주세요.');
+    return;
+  }
+  try {
   const snap = buildSnapshot();
   const wb = XLSX.utils.book_new();
 
@@ -1601,6 +1628,10 @@ function downloadExcel(masked = false) {
   const incName = (inc.location || '재난현장').slice(0, 20).replace(/[\\/:*?"<>|]/g, '');
   const filename = `재난상황보고_${incName}_${dateStr}${masked ? '_마스킹' : ''}.xlsx`;
   XLSX.writeFile(wb, filename);
+  } catch (e) {
+    console.error('[엑셀] 생성 실패:', e);
+    alert('엑셀 파일 생성 중 오류가 발생했습니다.\nCSV로 내려받아 주세요.\n\n(' + (e?.message || e) + ')');
+  }
 }
 
 function downloadCsv(masked = false) {
@@ -4043,9 +4074,9 @@ function renderDashboard() {
               <tbody>
                 ${state.casualties.map((c, i) => {
                   const tr = TRIAGE.find(t => t.id === c.triage);
-                  const displayName = state.briefingMode ? maskName(c.name) : escapeHtml(c.name);
+                  const displayName = state.briefingMode ? maskNameHtml(c.name) : escapeHtml(c.name);
                   const displayAge = c.age || '-';
-                  const displaySymptom = state.briefingMode ? maskSymptom(c.symptom) : escapeHtml(c.symptom || '-');
+                  const displaySymptom = state.briefingMode ? maskSymptomHtml(c.symptom) : escapeHtml(c.symptom || '-');
                   return `
                     <tr class="border-t border-slate-800 hover:bg-slate-950/40">
                       <td class="px-2 py-2 text-slate-500 mono">${i + 1}</td>
@@ -4090,7 +4121,7 @@ function renderDashboard() {
                     <div class="flex items-center gap-2 mb-0.5 flex-wrap">
                       <span class="text-[10px] mono text-slate-400">${fmtHM(date)}</span>
                       ${team ? `<span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style="background:${team.color}20;color:${team.color}">${team.name}</span>` : ''}
-                      ${a.author ? `<span class="text-[10px] text-slate-500">· ${escapeHtml(state.briefingMode ? maskName(a.author) : a.author)}</span>` : ''}
+                      ${a.author ? `<span class="text-[10px] text-slate-500">· ${escapeHtml(state.briefingMode ? maskNameHtml(a.author) : a.author)}</span>` : ''}
                     </div>
                     <p class="text-sm text-slate-100 leading-snug">${escapeHtml(a.content)}</p>
                   </div>
@@ -4774,8 +4805,11 @@ function renderMciCasualtyForm() {
   const visibleCards = userIsField
     ? _dataList.filter(c => c.author === state.user.name)
     : _dataList;
-  // 좌측 패널에 누적 표시 — 등록된 사상자가 한눈에 들어오도록 전체 표시(최신순, 과부하 방지 상한 100)
-  const recentCards = visibleCards.slice(-100).reverse();
+  // 좌측 패널에 누적 표시 — 카드 번호 오름차순(#001부터). 번호를 고치면 즉시 제자리로 정렬됨.
+  // (visibleCards가 _dataList 원본일 수 있어 복사본을 정렬 — 원본 순서 보존)
+  const recentCards = [...visibleCards]
+    .sort((a, b) => (a.cardNo || 0) - (b.cardNo || 0))
+    .slice(0, 100);   // 과부하 방지 상한 100 (#001부터 위로)
 
   // 중복 카드 번호 감지(전체 카드 기준) — 목록에서 빨간 경고 표시로 정리 유도
   const _noCounts = {};
@@ -6176,8 +6210,8 @@ function renderMciSituation() {
                 <button data-floor-chip="${escapeHtml(f.name)}" class="floor-chip-clickable px-2 py-0.5 rounded-md border text-xs flex items-baseline gap-1 transition-colors cursor-pointer ${state.expandedFloor === f.name ? 'border-pink-500 bg-pink-950/30' : 'border-slate-700 bg-slate-950 hover:border-pink-600'} ${isHotFloor(f) ? 'floor-chip-max' : ''}"${state.expandedFloor === f.name ? ' style="outline:2px solid #ec4899; outline-offset:1px;"' : ''} title="${isHotFloor(f) ? '환자 최다 발생 위치 — ' : ''}${state.expandedFloor === f.name ? '접기' : f.name + ' 발견 환자 목록 펼치기'}">
                   <span class="font-bold">${escapeHtml(f.name)}</span>
                   <span class="mono font-black text-sm text-slate-100">${f.total}</span>
-                  ${f.emergency > 0 ? `<span class="text-[10px] px-1 rounded font-black" style="background:#dc2626;color:#ffffff;">I${f.emergency}</span>` : ''}
-                  ${f.dead > 0 ? `<span class="text-[10px] px-1 rounded font-black" style="background:#475569;color:#ffffff;">IV${f.dead}</span>` : ''}
+                  ${f.emergency > 0 ? `<span class="text-[10px] px-1 rounded font-black" style="background:#dc2626;color:#ffffff;">I ${f.emergency}</span>` : ''}
+                  ${f.dead > 0 ? `<span class="text-[10px] px-1 rounded font-black" style="background:#475569;color:#ffffff;">IV ${f.dead}</span>` : ''}
                 </button>
               `).join('')}
             </div>
@@ -6226,8 +6260,8 @@ function renderMciSituation() {
               ` : `
                 <div class="divide-y divide-slate-900">
                   ${patients.map(c => {
-                    const displayName    = state.briefingMode ? maskName(c.name)       : escapeHtml(c.name || '-');
-                    const displaySymptom = state.briefingMode ? maskSymptom(c.symptom) : escapeHtml(c.symptom || '');
+                    const displayName    = state.briefingMode ? maskNameHtml(c.name)       : escapeHtml(c.name || '-');
+                    const displaySymptom = state.briefingMode ? maskSymptomHtml(c.symptom) : escapeHtml(c.symptom || '');
                     const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '';
                     return `
                       <button data-triage-patient="${c._key}" class="triage-patient-clickable w-full text-left px-3 py-2 hover:bg-slate-900 transition-colors flex items-center gap-2" title="클릭하여 카드 상세보기">
@@ -6288,8 +6322,8 @@ function renderMciSituation() {
                 <div class="divide-y divide-slate-900">
                   ${patients.map(c => {
                     const tr = MCI_TRIAGE.find(t => t.id === c.triage);
-                    const displayName    = state.briefingMode ? maskName(c.name)       : escapeHtml(c.name || '-');
-                    const displaySymptom = state.briefingMode ? maskSymptom(c.symptom) : escapeHtml(c.symptom || '');
+                    const displayName    = state.briefingMode ? maskNameHtml(c.name)       : escapeHtml(c.name || '-');
+                    const displaySymptom = state.briefingMode ? maskSymptomHtml(c.symptom) : escapeHtml(c.symptom || '');
                     const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '';
                     return `
                       <button data-triage-patient="${c._key}" class="triage-patient-clickable w-full text-left px-3 py-2 hover:bg-slate-900 transition-colors flex items-center gap-2" title="클릭하여 카드 상세보기">
@@ -6378,8 +6412,8 @@ function renderMciSituation() {
                 <div class="divide-y divide-slate-900">
                   ${patients.map(c => {
                     const tr = MCI_TRIAGE.find(t => t.id === c.triage);
-                    const displayName    = state.briefingMode ? maskName(c.name)       : escapeHtml(c.name || '-');
-                    const displaySymptom = state.briefingMode ? maskSymptom(c.symptom) : escapeHtml(c.symptom || '');
+                    const displayName    = state.briefingMode ? maskNameHtml(c.name)       : escapeHtml(c.name || '-');
+                    const displaySymptom = state.briefingMode ? maskSymptomHtml(c.symptom) : escapeHtml(c.symptom || '');
                     const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '';
                     return `
                       <button data-transport-patient="${c._key}" class="transport-patient-clickable w-full text-left px-3 py-2 hover:bg-slate-900 transition-colors flex items-center gap-2" title="클릭하여 카드 상세보기">
@@ -6479,8 +6513,8 @@ function renderMciSituation() {
                   <div class="divide-y divide-slate-900">
                     ${patients.map(c => {
                       const tr = MCI_TRIAGE.find(t => t.id === c.triage);
-                      const displayName    = state.briefingMode ? maskName(c.name)        : escapeHtml(c.name || '-');
-                      const displaySymptom = state.briefingMode ? maskSymptom(c.symptom)  : escapeHtml(c.symptom || '');
+                      const displayName    = state.briefingMode ? maskNameHtml(c.name)        : escapeHtml(c.name || '-');
+                      const displaySymptom = state.briefingMode ? maskSymptomHtml(c.symptom)  : escapeHtml(c.symptom || '');
                       const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '';
                       return `
                         <button data-hospital-patient="${c._key}" class="hospital-patient-clickable w-full text-left px-3 py-2 hover:bg-slate-900 transition-colors flex items-center gap-2" title="클릭하여 카드 상세보기">
@@ -6543,9 +6577,9 @@ function renderMciSituation() {
               <tbody>
                 ${state.mciCasualties.map((c, i) => {
                   const tr = MCI_TRIAGE.find(t => t.id === c.triage);
-                  const displayName = state.briefingMode ? maskName(c.name) : escapeHtml(c.name || '-');
-                  const displayAuthor = state.briefingMode ? maskName(c.author) : escapeHtml(c.author || '-');
-                  const displaySymptom = state.briefingMode ? maskSymptom(c.symptom) : escapeHtml(c.symptom || '-');
+                  const displayName = state.briefingMode ? maskNameHtml(c.name) : escapeHtml(c.name || '-');
+                  const displayAuthor = state.briefingMode ? maskNameHtml(c.author) : escapeHtml(c.author || '-');
+                  const displaySymptom = state.briefingMode ? maskSymptomHtml(c.symptom) : escapeHtml(c.symptom || '-');
                   const vital = [
                     c.rr ? `RR ${escapeHtml(c.rr)}` : '',
                     c.pulse ? `P ${escapeHtml(c.pulse)}` : '',
@@ -6713,9 +6747,9 @@ function renderMciCardDetailModal() {
   const editable = canEditCard(state.user, c);
 
   // 마스킹 적용 (브리핑 모드)
-  const displayName    = state.briefingMode ? maskName(c.name)        : escapeHtml(c.name || '-');
-  const displayAuthor  = state.briefingMode ? maskName(c.author)      : escapeHtml(c.author || '-');
-  const displaySymptom = state.briefingMode ? maskSymptom(c.symptom)  : escapeHtml(c.symptom || '');
+  const displayName    = state.briefingMode ? maskNameHtml(c.name)        : escapeHtml(c.name || '-');
+  const displayAuthor  = state.briefingMode ? maskNameHtml(c.author)      : escapeHtml(c.author || '-');
+  const displaySymptom = state.briefingMode ? maskSymptomHtml(c.symptom)  : escapeHtml(c.symptom || '');
 
   const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '-';
 
@@ -7437,10 +7471,49 @@ boot();
      로컬 file:// 환경에서는 자동 비활성화됨.
 ================================================================ -->
 <script>
+  // ── 새 버전 알림 토스트 ──
+  // 새 버전이 다운로드되면 화면 하단에 "눌러서 새로고침" 알림을 띄운다.
+  // 훈련 입력 중 화면이 멋대로 바뀌면 위험하므로 자동 새로고침은 하지 않는다.
+  function showUpdateToast() {
+    if (document.getElementById('update-toast')) return;
+    const toast = document.createElement('div');
+    toast.id = 'update-toast';
+    toast.setAttribute('role', 'alert');
+    // 라이트/다크 모드 CSS 영향을 받지 않도록 인라인 스타일 고정 (공사장 노랑+검정)
+    toast.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:10000;display:flex;align-items:center;gap:10px;background:#facc15;color:#111827;border:2px solid #111827;border-radius:9999px;padding:10px 18px;font-weight:800;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);cursor:pointer;max-width:92vw;white-space:nowrap;';
+    toast.innerHTML = '<span>🔄 새 버전 준비됨 — 눌러서 새로고침</span>'
+      + '<button type="button" aria-label="알림 닫기" style="background:#111827;color:#facc15;border:none;border-radius:9999px;width:22px;height:22px;line-height:1;font-weight:900;cursor:pointer;flex:none;padding:0;">✕</button>';
+    toast.addEventListener('click', (e) => {
+      if (e.target.closest('button')) { toast.remove(); return; }  // ✕는 닫기만
+      location.reload();
+    });
+    document.body.appendChild(toast);
+  }
+  window.__mciShowUpdateToast = showUpdateToast;  // 검증용 전역 노출
+
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js')
-        .then(reg => console.log('[PWA] Service Worker 등록 완료:', reg.scope))
+        .then(reg => {
+          console.log('[PWA] Service Worker 등록 완료:', reg.scope);
+
+          // 이 페이지가 이미 SW 제어를 받는 상태에서(=재방문) 새 SW가 설치 완료되면
+          // 새 버전이 준비된 것 → 알림. 첫 설치(controller 없음)에는 안 띄움.
+          function watchInstalling(sw) {
+            if (!sw) return;
+            sw.addEventListener('statechange', () => {
+              if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+                showUpdateToast();
+              }
+            });
+          }
+          if (reg.waiting && navigator.serviceWorker.controller) showUpdateToast();
+          watchInstalling(reg.installing);
+          reg.addEventListener('updatefound', () => watchInstalling(reg.installing));
+
+          // TV 상황판처럼 오래 켜두는 화면도 알림을 받도록 30분마다 갱신 확인
+          setInterval(() => { reg.update().catch(() => {}); }, 30 * 60 * 1000);
+        })
         .catch(err => console.warn('[PWA] Service Worker 등록 실패:', err));
     });
   }
@@ -7568,6 +7641,16 @@ boot();
       clearTimeout(hideTimer);
       hideTimer = setTimeout(() => banner.classList.add('hidden'), 3000);
     }
+
+    // 실시간 구독 오류(권한 거부·규칙 변경 등) 안내 — handleSyncError에서 호출
+    function showSyncError() {
+      clearTimeout(hideTimer);
+      inner.classList.remove('bg-emerald-600');
+      inner.classList.add('bg-red-600');
+      text.textContent = '⚠️ 데이터 동기화 오류 — 권한 또는 연결 문제로 최신 정보가 안 보일 수 있습니다. 새로고침하거나 다시 로그인해 주세요.';
+      banner.classList.remove('hidden');
+    }
+    window.__mciShowSyncError = showSyncError;
 
     window.addEventListener('offline', showOffline);
     window.addEventListener('online', showRestored);
