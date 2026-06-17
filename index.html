@@ -1088,6 +1088,7 @@ let state = {
   expandedTriage: null,             // 트리아지 합계 — 펼쳐서 환자 목록을 보고 있는 트리아지 id (null = 접힘)
   expandedTransport: null,          // 트리아지 합계 — 이송 상태 펼침: 'pending' | 'in-transit' | 'arrived' | null
   expandedFloor: null,              // 트리아지 합계 — 발견 위치(층) 칩 펼침: 층 이름 | null
+  expandedRit: false,               // 트리아지 합계 — 소방관(R.I.T) 칩 펼침
   outdoorMode: false,               // 외부(야외) 모드 — true면 흰 배경 + 진한 글씨로 햇빛에서도 시인성 확보
   // 표출(TV) 모드 — view2='display' 일 때 사용
   displayModal: null,               // { type: 'triage'|'transport'|'hospital'|'patient', value: ... }
@@ -2729,10 +2730,10 @@ function renderDisplayMain() {
           <span class="text-base text-slate-400 font-normal">명</span>
           <!-- 소방관(R.I.T) 합계 칩 — 총원 바로 옆. 대원 부상은 최우선이라 빨갛게, 1명 이상일 때만 -->
           ${ritCount > 0 ? `
-            <span class="self-center inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-black text-base ml-1" style="background:#b91c1c;color:#ffffff;" title="화재진압 중 다친 소방관(R.I.T 구조) ${ritCount}명">
+            <button data-display-rit type="button" class="display-card self-center inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-black text-base ml-1 cursor-pointer hover:brightness-110 transition" style="background:#b91c1c;color:#ffffff;" title="소방관(R.I.T) ${ritCount}명 — 클릭하여 목록">
               ${emblemRit()}
               <span class="text-xl mono leading-none">${ritCount}</span>
-            </span>
+            </button>
           ` : ''}
           <span class="flex-1"></span>
           <!-- 발견 위치별 칩 — 제목줄 우측 빈 공간 활용. 층 합계 = 총원이라 바로 대조 가능.
@@ -2908,6 +2909,16 @@ function renderDisplayModal() {
     subtitle = '해당 위치 발견 환자';
     const triageOrder = { emergency: 0, urgent: 1, nonurgent: 2, dead: 3 };
     patients = state.mciCasualties.filter(c => floorOfLocation(c.location) === m.value)
+      .sort((a, b) => {
+        const oa = triageOrder[a.triage] ?? 9, ob = triageOrder[b.triage] ?? 9;
+        if (oa !== ob) return oa - ob;
+        return (a.cardNo || 0) - (b.cardNo || 0);
+      });
+  } else if (m.type === 'rit') {
+    title = '소방관 (R.I.T)'; color = '#dc2626';
+    subtitle = '화재진압 중 부상 — RIT 구조';
+    const triageOrder = { emergency: 0, urgent: 1, nonurgent: 2, dead: 3 };
+    patients = state.mciCasualties.filter(c => c.isFirefighter)
       .sort((a, b) => {
         const oa = triageOrder[a.triage] ?? 9, ob = triageOrder[b.triage] ?? 9;
         if (oa !== ob) return oa - ob;
@@ -3131,6 +3142,14 @@ function bindDisplayEvents() {
   document.querySelectorAll('[data-display-floor]').forEach(btn => {
     btn.onclick = () => {
       state.displayModal = { type: 'floor', value: btn.dataset.displayFloor };
+      render();
+    };
+  });
+
+  // 소방관(R.I.T) 칩 → 소방관 환자 목록 모달
+  document.querySelectorAll('[data-display-rit]').forEach(btn => {
+    btn.onclick = () => {
+      state.displayModal = { type: 'rit' };
       render();
     };
   });
@@ -6620,9 +6639,9 @@ function renderMciSituation() {
           <span class="text-xs text-slate-400 font-normal">— 총 <span class="text-base font-black mono text-pink-300 leading-none">${totalCount}</span> 명</span>
           <!-- 소방관(R.I.T) 합계 칩 — 총원 바로 옆, 1명 이상일 때만 빨갛게 -->
           ${ritCount > 0 ? `
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-black text-xs" style="background:#b91c1c;color:#ffffff;" title="화재진압 중 다친 소방관(R.I.T 구조) ${ritCount}명">
+            <button data-rit-chip type="button" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-black text-xs cursor-pointer hover:brightness-110 transition ${state.expandedRit ? 'ring-2 ring-white/70' : ''}" style="background:#b91c1c;color:#ffffff;" title="소방관(R.I.T) ${ritCount}명 — 클릭하여 목록">
               ${emblemRit()}<span class="mono">${ritCount}</span>
-            </span>
+            </button>
           ` : ''}
           <!-- 발견 위치별 칩 — 우측정렬(표출과 동일). 클릭 시 아래로 해당 위치 환자 목록 펼침 -->
           ${floors.length > 0 ? `
@@ -6739,6 +6758,60 @@ function renderMciSituation() {
               </div>
               ${patients.length === 0 ? `
                 <div class="px-3 py-4 text-[11px] text-slate-500 text-center">해당 위치의 환자가 없습니다</div>
+              ` : `
+                <div class="divide-y divide-slate-900">
+                  ${patients.map(c => {
+                    const tr = MCI_TRIAGE.find(t => t.id === c.triage);
+                    const displayName    = state.briefingMode ? maskNameHtml(c.name)       : escapeHtml(c.name || '-');
+                    const displaySymptom = state.briefingMode ? maskSymptomHtml(c.symptom) : escapeHtml(c.symptom || '');
+                    const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '';
+                    return `
+                      <button data-triage-patient="${c._key}" class="triage-patient-clickable w-full text-left px-3 py-2 hover:bg-slate-900 transition-colors flex items-center gap-2" title="클릭하여 카드 상세보기">
+                        <span class="text-[10px] text-slate-500 mono w-9 flex-shrink-0">${cardNo}</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
+                        ${c.isPediatric ? '<i data-lucide="baby" class="w-3 h-3 text-cyan-400 flex-shrink-0"></i>' : ''}
+                        <span class="text-sm font-medium ${state.briefingMode ? 'mono text-slate-300' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''} flex-shrink-0">${displayName}</span>${ritBadge(c)}
+                        <span class="text-[10px] text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
+                        ${c.location ? `<span class="text-[11px] text-pink-300 truncate max-w-[160px] flex-shrink-0" title="${escapeHtml(c.location)}"><i data-lucide="map-pin" class="w-3 h-3 inline"></i>${escapeHtml(c.location)}</span>` : ''}
+                        <span class="flex-1 min-w-0 text-[11px] text-slate-500 truncate">${displaySymptom}</span>
+                        <div class="flex items-center gap-2 text-[10px] mono flex-shrink-0">
+                          ${c.notTransported
+                            ? '<span class="text-violet-400 font-bold">미이송</span>'
+                            : (c.hospital
+                                ? `<span class="text-emerald-300 truncate max-w-[100px]" title="${escapeHtml(c.hospital)}">${escapeHtml(c.hospital)}</span>`
+                                : '<span class="text-amber-400">미배정</span>')}
+                        </div>
+                        <i data-lucide="chevron-right" class="w-3 h-3 text-slate-600 flex-shrink-0"></i>
+                      </button>
+                    `;
+                  }).join('')}
+                </div>
+              `}
+            </div>
+          `;
+        })()}
+
+        <!-- 소방관(R.I.T) 펼친 환자 목록 — R.I.T 칩 클릭 시 -->
+        ${(() => {
+          if (!state.expandedRit) return '';
+          const triageOrder = { emergency: 0, urgent: 1, nonurgent: 2, dead: 3 };
+          const patients = state.mciCasualties.filter(c => c.isFirefighter).slice()
+            .sort((a, b) => {
+              const oa = triageOrder[a.triage] ?? 9, ob = triageOrder[b.triage] ?? 9;
+              if (oa !== ob) return oa - ob;
+              return (a.cardNo || 0) - (b.cardNo || 0);
+            });
+          return `
+            <div class="border-t border-slate-800 bg-slate-950/70">
+              <div class="px-4 py-2 flex items-center gap-2 text-xs border-b border-slate-900">
+                <span class="px-2 py-0.5 rounded font-black inline-flex items-center" style="background:#b91c1c;color:#ffffff;">${emblemRit()}</span>
+                <span class="text-slate-400">소방관(R.I.T) <span class="mono text-slate-200 font-bold">${patients.length}</span>명</span>
+                <button id="rit-collapse-btn" class="ml-auto text-slate-500 hover:text-slate-200 text-[10px] flex items-center gap-0.5 px-2 py-1 rounded hover:bg-slate-900">
+                  <i data-lucide="x" class="w-3 h-3"></i>닫기
+                </button>
+              </div>
+              ${patients.length === 0 ? `
+                <div class="px-3 py-4 text-[11px] text-slate-500 text-center">소방관 환자가 없습니다</div>
               ` : `
                 <div class="divide-y divide-slate-900">
                   ${patients.map(c => {
@@ -7072,11 +7145,18 @@ function bindMciSituationEvents() {
   const hospCollapse = document.getElementById('hospital-collapse-btn');
   if (hospCollapse) hospCollapse.onclick = () => { state.expandedHospital = null; render(); };
 
+  // 소방관(R.I.T) 칩 → 소방관 환자 목록 펼침/접기 (층 펼침과 같은 영역, 상호배타)
+  const ritChip = document.getElementById('rit-chip') || document.querySelector('[data-rit-chip]');
+  if (ritChip) ritChip.onclick = () => { state.expandedRit = !state.expandedRit; if (state.expandedRit) state.expandedFloor = null; render(); };
+  const ritCollapse = document.getElementById('rit-collapse-btn');
+  if (ritCollapse) ritCollapse.onclick = () => { state.expandedRit = false; render(); };
+
   // 발견 위치(층) 칩 클릭 → 환자 목록 토글
   document.querySelectorAll('.floor-chip-clickable').forEach(btn => {
     btn.onclick = () => {
       const name = btn.dataset.floorChip;
       state.expandedFloor = (state.expandedFloor === name) ? null : name;
+      if (state.expandedFloor) state.expandedRit = false;   // 같은 영역 — R.I.T 펼침과 상호배타
       render();
     };
   });
