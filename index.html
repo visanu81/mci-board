@@ -7418,6 +7418,32 @@ function initOutdoorToggle() {
   }
 }
 
+// ==================== 한글 입력 우선 ====================
+// 텍스트 입력칸에 lang="ko"를 부여해 모바일 키보드(안드로이드 Gboard·삼성키보드 등)가
+// 한글로 먼저 뜨게 유도. 숫자/시간/이메일 등은 제외(숫자 키패드 유지). 화면이 자주
+// 다시 그려지므로 MutationObserver로 새로 생긴 칸에도 자동 적용한다.
+// (참고: iOS 사파리는 lang 힌트를 거의 무시 — 기기 키보드 설정/마지막 사용 언어를 따름)
+function applyKoreanIme(root) {
+  (root || document).querySelectorAll('input:not([lang]), textarea:not([lang])').forEach(el => {
+    const type = (el.getAttribute('type') || 'text').toLowerCase();
+    if (['number', 'tel', 'email', 'url', 'password', 'date', 'time', 'datetime-local', 'search'].includes(type)) return;
+    const im = (el.getAttribute('inputmode') || '').toLowerCase();
+    if (['numeric', 'decimal', 'tel', 'email', 'url'].includes(im)) return;
+    el.setAttribute('lang', 'ko');
+  });
+}
+function initKoreanIme() {
+  let pending = false;
+  const obs = new MutationObserver(() => {
+    if (pending) return;
+    pending = true;
+    // setTimeout 사용 — 비활성/백그라운드 탭(표출 화면 등)에서도 확실히 실행됨(rAF는 throttle됨)
+    setTimeout(() => { pending = false; applyKoreanIme(document.body); }, 50);
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
+  applyKoreanIme(document.body);  // 초기 1회
+}
+
 // ==================== 초기 부팅 ====================
 async function boot() {
   // 세션 복원 (P0: 새로고침 시 로비로 빠지지 않게)
@@ -7456,6 +7482,7 @@ async function boot() {
   initCameraModal();
   initGlobalEscHandler();
   initSwipeTabNav();
+  initKoreanIme();
   // 익명 인증 대기 — Firebase Rules가 auth!=null 요구하므로 인증 후 데이터 구독.
   // 오프라인이거나 5초 안에 응답 없으면 일단 진행 (캐시 화면 표시).
   await authReady;
