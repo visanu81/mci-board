@@ -4072,7 +4072,7 @@ function renderDashboard() {
                 </tr>
               </thead>
               <tbody>
-                ${state.casualties.map((c, i) => {
+                ${[...state.casualties].sort((a, b) => (a.cardNo || 0) - (b.cardNo || 0)).map((c, i) => {
                   const tr = TRIAGE.find(t => t.id === c.triage);
                   const displayName = state.briefingMode ? maskNameHtml(c.name) : escapeHtml(c.name);
                   const displayAge = c.age || '-';
@@ -6575,7 +6575,7 @@ function renderMciSituation() {
                 </tr>
               </thead>
               <tbody>
-                ${state.mciCasualties.map((c, i) => {
+                ${[...state.mciCasualties].sort((a, b) => (a.cardNo || 0) - (b.cardNo || 0)).map((c, i) => {
                   const tr = MCI_TRIAGE.find(t => t.id === c.triage);
                   const displayName = state.briefingMode ? maskNameHtml(c.name) : escapeHtml(c.name || '-');
                   const displayAuthor = state.briefingMode ? maskNameHtml(c.author) : escapeHtml(c.author || '-');
