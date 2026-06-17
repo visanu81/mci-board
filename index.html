@@ -1105,6 +1105,24 @@ const maskSymptom = (text) => {
 const maskNameHtml = (name) => escapeHtml(maskName(name));
 const maskSymptomHtml = (text) => escapeHtml(maskSymptom(text));
 
+// 비차단 토스트(하단 중앙) — 일반 알림용(번호 중복 등). 입력 흐름을 막는 alert 대체.
+window.__mciToast = (msg, kind) => {
+  try {
+    let t = document.getElementById('mci-toast');
+    if (!t) {
+      t = document.createElement('div'); t.id = 'mci-toast';
+      t.style.cssText = 'position:fixed;left:50%;bottom:74px;transform:translateX(-50%);z-index:10001;border-radius:9999px;padding:9px 16px;font-weight:800;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.45);max-width:92vw;text-align:center;';
+      document.body.appendChild(t);
+    }
+    t.style.background = kind === 'err' ? '#dc2626' : (kind === 'warn' ? '#f59e0b' : '#15803d');
+    t.style.color = kind === 'warn' ? '#451a03' : '#ffffff';
+    t.textContent = msg;
+    t.style.display = 'block';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.style.display = 'none'; }, 3500);
+  } catch {}
+};
+
 // ==================== Firebase 동기화 ====================
 // V2 — 재난방 데이터 구독 해제용
 let _incidentUnsubFns = [];
@@ -4974,7 +4992,8 @@ function renderMciCasualtyForm() {
                 value="${_draft.cardNo !== '' ? escapeHtml(String(_draft.cardNo)) : nextAutoNum}"
                 class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-7 pr-2 py-2 text-sm mono font-bold focus:outline-none focus:border-pink-500" />
             </div>
-            <span class="text-[11px] text-slate-500">종이 분류표 번호와 다르면 숫자만 고치세요</span>
+            <span id="mci-cardNo-hint" class="text-[11px] text-slate-500">종이 분류표 번호와 다르면 숫자만 고치세요</span>
+            <span id="mci-cardNo-dup" class="hidden text-[11px] font-black px-2 py-0.5 rounded" style="background:#dc2626;color:#ffffff;"></span>
           </div>
 
           <!-- ② 기본 정보 (간이·풀 공통) -->
@@ -5208,7 +5227,7 @@ function renderMciCasualtyForm() {
                 }" title="${isInspected ? '다시 누르면 입력 화면으로' : '누르면 상세 정보 보기'}">
                   <!-- 1줄: 번호·분류·이름·연령 + 수정/삭제 -->
                   <div class="flex items-center gap-1.5 min-w-0">
-                    <span class="text-[9px] mono flex-shrink-0 ${isDupNo ? 'text-red-400 font-extrabold' : 'text-slate-600'}"${isDupNo ? ' title="카드 번호 중복 — 수정으로 정리하세요"' : ''}>${cardNo}${isDupNo ? '⚠' : ''}</span>
+                    <span class="text-[9px] mono flex-shrink-0 ${isDupNo ? 'font-black px-1 rounded' : 'text-slate-600'}"${isDupNo ? ' style="background:#dc2626;color:#ffffff;" title="카드 번호 중복 — 정리 필요"' : ''}>${cardNo}${isDupNo ? ' ⚠중복' : ''}</span>
                     <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
                     <span class="text-sm font-medium truncate ${c._autoNamed ? 'text-slate-400 italic' : ''}">${escapeHtml(c.name || '-')}</span>
                     <span class="text-xs text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
@@ -5795,6 +5814,20 @@ function bindMciCasualtyEvents() {
   // 번호를 바꾸면 이름 자동부여 미리보기(placeholder)도 즉시 갱신.
   const cardNoEl = document.getElementById('mci-cardNo');
   if (cardNoEl) {
+    // 실시간 중복 경고 — 저장은 막지 않고, 이미 있는 번호면 빨갛게 알려줌(편집 중 충돌 인지)
+    const refreshCardNoDup = () => {
+      const dupEl = document.getElementById('mci-cardNo-dup');
+      if (!dupEl) return;
+      const n = parseInt(cardNoEl.value, 10);
+      const other = (Number.isInteger(n) && n > 0)
+        ? _dataList.find(c => Number(c.cardNo) === n && c._key !== _draft._editKey) : null;
+      if (other) {
+        dupEl.textContent = `⚠ 이미 #${String(n).padStart(3, '0')} 있음 (${other.name || '이름없음'}) · 저장은 됩니다`;
+        dupEl.classList.remove('hidden');
+      } else {
+        dupEl.classList.add('hidden');
+      }
+    };
     cardNoEl.oninput = (e) => {
       _draft.cardNo = e.target.value;
       const n = parseInt(e.target.value, 10);
@@ -5802,7 +5835,9 @@ function bindMciCasualtyEvents() {
       if (nameEl && Number.isInteger(n) && n > 0 && state.user) {
         nameEl.placeholder = `#${String(n).padStart(3, '0')} -${state.user.name} 자동`;
       }
+      refreshCardNoDup();
     };
+    refreshCardNoDup();   // 초기 1회(수정 진입 시 기존 번호가 이미 겹쳐 있으면 즉시 표시)
   }
 
   // 텍스트/숫자 input
@@ -6040,12 +6075,8 @@ function bindMciCasualtyEvents() {
       alert('카드 번호를 확인해주세요 (1~999)');
       return;
     }
-    // 중복 번호 경고 — 동시 입력 등으로 겹칠 수 있음. 확인 후 저장은 허용(현장 우선)
+    // 중복 번호: 막지 않는다(현장 우선). 저장 후 비차단 토스트로 알리고, 명단에서 빨갛게 표시.
     const _dupCard = _dataList.find(c => Number(c.cardNo) === _no && c._key !== _draft._editKey);
-    if (_dupCard) {
-      const _dupWho = _dupCard.name ? ` (${_dupCard.name})` : '';
-      if (!confirm(`이미 #${String(_no).padStart(3, '0')} 카드가 있습니다${_dupWho}.\n같은 번호가 두 장이 되면 환자가 섞일 수 있습니다.\n그래도 저장할까요?`)) return;
-    }
     // 생체징후 범위 검증 — 음수·오타·OCR 오인식 값 저장 차단
     const vitalErrs = validateVitals(_draft);
     if (vitalErrs.length) {
@@ -6078,6 +6109,10 @@ function bindMciCasualtyEvents() {
     }, state.user.teamId, state.user.name, _draft._editKey);
 
     if (ok) {
+      // 중복 번호였으면 저장은 하되 비차단 안내(목록에서도 빨갛게 표시됨)
+      if (_dupCard && window.__mciToast) {
+        window.__mciToast(`⚠️ #${String(_no).padStart(3, '0')}는 이미 있는 번호 — 명단에서 빨갛게 표시됩니다`, 'warn');
+      }
       resetCurrentDraft();
       state.mciInputMode = 'simple';   // 저장 후 다음 신규 등록은 다시 간이로
       render();
@@ -6161,6 +6196,10 @@ function renderMciSituation() {
     pediatricCount: state.mciCasualties.filter(c => c.triage === tr.id && c.isPediatric).length,
   }));
   const totalCount = state.mciCasualties.length;
+
+  // 중복 카드 번호 집계 — 명단 표에서 빨갛게 표시(동시·오프라인 입력으로 겹친 번호 정리 유도)
+  const _sitNoCounts = {};
+  state.mciCasualties.forEach(c => { if (c.cardNo) _sitNoCounts[c.cardNo] = (_sitNoCounts[c.cardNo] || 0) + 1; });
 
   // 이송 상태 분류 (notTransported는 우선 처리 — 미이송으로 빠짐)
   const notTransported = state.mciCasualties.filter(c => c.notTransported);
@@ -6591,9 +6630,10 @@ function renderMciSituation() {
                   const tx = Array.isArray(c.treatments) ? c.treatments.slice(0, 3).join('·') : '';
                   const txMore = Array.isArray(c.treatments) && c.treatments.length > 3 ? ` +${c.treatments.length - 3}` : '';
                   const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : `${i + 1}`;
+                  const isDupNo = c.cardNo && _sitNoCounts[c.cardNo] > 1;   // 같은 번호 카드가 또 있음
                   return `
                     <tr data-mci-row="${c._key}" class="mci-row-clickable border-t border-slate-800 hover:bg-slate-800/50 cursor-pointer transition-colors" title="클릭하여 카드 상세보기">
-                      <td class="px-2.5 py-2.5 text-slate-400 mono font-bold">${cardNo}</td>
+                      <td class="px-2.5 py-2.5 mono font-bold ${isDupNo ? '' : 'text-slate-400'}">${isDupNo ? `<span class="px-1.5 py-0.5 rounded" style="background:#dc2626;color:#ffffff;" title="중복 번호 — 정리 필요">${cardNo} ⚠중복</span>` : cardNo}</td>
                       <td class="px-2.5 py-2.5 text-center">
                         <span class="text-xs px-2 py-0.5 rounded font-black" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
                         ${c.isPediatric ? '<i data-lucide="baby" class="w-3.5 h-3.5 text-cyan-400 inline ml-1"></i>' : ''}
