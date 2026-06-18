@@ -1955,7 +1955,7 @@ function downloadExcel(masked = false) {
         i+1, cardNo, tr, name, c.age||'', c.gender||'', c.isPediatric ? 'Y' : '',
         c.location||'', c.handoverUnit||'', c.handoverTime||'',
         c.consciousness||'', c.rr||'', c.pulse||'', c.bpSys||'', c.bpDia||'', c.spo2||'', c.temp||'',
-        symptom, c.mechanism||'', parts, treats, c.drugs||'',
+        symptom, mechText(c.mechanism), parts, treats, c.drugs||'',
         c.hospital||'', c.departTime||'', c.arriveTime||'', c.notes||'',
         author, ts,
       ]);
@@ -3043,7 +3043,7 @@ function renderDisplayPatientCard(c) {
             </div>
             <div class="bg-slate-950 rounded-xl p-4 border border-slate-800">
               <div class="text-xs text-slate-500 tracking-wider uppercase mb-1">손상기전 / 부위</div>
-              <div class="text-lg text-slate-100">${escapeHtml(c.mechanism || '-')}</div>
+              <div class="text-lg text-slate-100">${escapeHtml(mechText(c.mechanism) || '-')}</div>
               <div class="flex flex-wrap gap-1 mt-1">
                 ${(Array.isArray(c.injuryParts) ? c.injuryParts : []).map(p => `
                   <span class="text-sm px-2 py-0.5 rounded bg-amber-950/40 border border-amber-700/40 text-amber-200">${escapeHtml(p)}</span>
@@ -5080,7 +5080,7 @@ let mciDraft = {
   consciousness: '', // AVPU
   rr: '', pulse: '', bpSys: '', bpDia: '', spo2: '', temp: '',  // temp: 체온(°C)
   // 평가
-  symptom: '', mechanism: '', injuryParts: [],
+  symptom: '', mechanism: [], injuryParts: [],
   // 처치
   treatments: [],
   drugs: '',
@@ -5092,6 +5092,15 @@ let mciDraft = {
   _editKey: null,
 };
 
+// 손상기전: 화면은 다중선택(배열), DB는 쉼표 문자열로 저장(Firebase 규칙이 mechanism=문자열 강제).
+// 문자열("낙상, 관통상")·배열·구버전 단일값 모두 배열로 정규화. 빈 값은 [] / '' 로.
+function mechList(v) {
+  if (Array.isArray(v)) return v.filter(Boolean);
+  if (typeof v === 'string' && v.trim()) return v.split(',').map(s => s.trim()).filter(Boolean);
+  return [];
+}
+function mechText(v) { return mechList(v).join(', '); }
+
 function resetMciDraft() {
   mciDraft = {
     cardNo: '',   // 카드 번호 (빈 값이면 자동 제안 번호 사용)
@@ -5101,7 +5110,7 @@ function resetMciDraft() {
     triage: '',
     consciousness: '',
     rr: '', pulse: '', bpSys: '', bpDia: '', spo2: '', temp: '',
-    symptom: '', mechanism: '', injuryParts: [],
+    symptom: '', mechanism: [], injuryParts: [],
     treatments: [],
     drugs: '',
     hospital: '', departTime: '', arriveTime: '',
@@ -5121,7 +5130,7 @@ let csDraft = {
   triage: '',
   consciousness: '',
   rr: '', pulse: '', bpSys: '', bpDia: '', spo2: '', temp: '',
-  symptom: '', mechanism: '', injuryParts: [],
+  symptom: '', mechanism: [], injuryParts: [],
   treatments: [],
   drugs: '',
   hospital: '', departTime: '', arriveTime: '',
@@ -5137,7 +5146,7 @@ function resetCsDraft() {
     triage: '',
     consciousness: '',
     rr: '', pulse: '', bpSys: '', bpDia: '', spo2: '', temp: '',
-    symptom: '', mechanism: '', injuryParts: [],
+    symptom: '', mechanism: [], injuryParts: [],
     treatments: [],
     drugs: '',
     hospital: '', departTime: '', arriveTime: '',
@@ -5269,7 +5278,7 @@ function renderMciCasualtyForm() {
               ${(c.handoverUnit || c.handoverTime) ? `<span class="text-slate-500"> · 인계 </span><span class="text-amber-300">${escapeHtml(c.handoverUnit || '미상')}</span>${c.handoverTime ? ` <span class="mono text-slate-300">${escapeHtml(c.handoverTime)}</span>` : ''}` : ''}` : '')}
             ${row('의식 · 생체징후', (avpu || vital) ? `${avpu ? `<span class="font-bold">${avpu.name}</span>` : ''}${avpu && vital ? ' · ' : ''}<span class="mono">${vital}</span>` : '')}
             ${row('주증상', c.symptom ? escapeHtml(c.symptom) : '')}
-            ${row('손상기전 · 부위', (c.mechanism || (c.injuryParts || []).length) ? `${escapeHtml(c.mechanism || '')}${c.mechanism && (c.injuryParts || []).length ? ' · ' : ''}${escapeHtml((c.injuryParts || []).join(', '))}` : '')}
+            ${row('손상기전 · 부위', (mechText(c.mechanism) || (c.injuryParts || []).length) ? `${escapeHtml(mechText(c.mechanism))}${mechText(c.mechanism) && (c.injuryParts || []).length ? ' · ' : ''}${escapeHtml((c.injuryParts || []).join(', '))}` : '')}
             ${row('처치 · 약물', ((c.treatments || []).length || c.drugs) ? `${escapeHtml((c.treatments || []).join(', '))}${(c.treatments || []).length && c.drugs ? ' · ' : ''}${escapeHtml(c.drugs || '')}` : '')}
             ${row('이송', c.notTransported
               ? `<span class="text-violet-300 font-bold">미이송 (${ntReasonLabel(c)})</span>`
@@ -5465,7 +5474,7 @@ function renderMciCasualtyForm() {
 
             <!-- ⑦ 손상기전 -->
             <div>
-              <label class="text-[11px] text-slate-400 block mb-1.5 tracking-wider uppercase">손상기전</label>
+              <label class="text-[11px] text-slate-400 block mb-1.5 tracking-wider uppercase">손상기전 (다중선택)</label>
               <div class="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
                 ${MECHANISM.map(m => `
                   <button data-mci-mech="${m}" class="mci-mech-btn py-1.5 rounded-md border border-slate-800 bg-slate-950 text-xs text-slate-300">${m}</button>
@@ -5553,6 +5562,14 @@ function renderMciCasualtyForm() {
             ${isEditing ? '카드 수정 저장' : (inputMode === 'simple' ? '빠른 카드 저장' : '사상자 카드 저장')}
           </button>
           <div class="text-xs text-center min-h-[20px]">${saveStatusBar('mciCasualty')}</div>
+
+          <!-- 플로팅 저장(빠른 수정용): 화면을 따라다님. 하단 저장과 동일 동작. 상세보기(hidden) 시 자동 숨김 -->
+          <button id="mci-save-fab" type="button"
+            class="fixed right-4 flex items-center gap-1.5 px-5 py-3 rounded-full font-bold text-sm text-white ${isEditing ? 'bg-amber-600 hover:bg-amber-700' : 'bg-pink-600 hover:bg-pink-700'} transition-colors"
+            style="bottom:84px;z-index:30;box-shadow:0 6px 20px rgba(0,0,0,.5)"
+            title="${isEditing ? '카드 수정 저장' : '사상자 카드 저장'}" aria-label="${isEditing ? '카드 수정 저장' : '사상자 카드 저장'}">
+            <i data-lucide="${isEditing ? 'save' : 'check'}" class="w-4 h-4"></i>${isEditing ? '수정 저장' : '저장'}
+          </button>
         </div>
       </div>
 
@@ -5975,8 +5992,9 @@ function applyClaudeOcrFields(f) {
   fillNum('bpDia', f.bpDia);
   fillNum('spo2', f.spo2);
   fillNum('temp', f.temp);
-  if (typeof f.mechanism === 'string' && MECHANISM.includes(f.mechanism) && !draft.mechanism) {
-    draft.mechanism = f.mechanism; flags.mechanism = true;
+  if (typeof f.mechanism === 'string' && MECHANISM.includes(f.mechanism)) {
+    if (!Array.isArray(draft.mechanism)) draft.mechanism = mechList(draft.mechanism);
+    if (!draft.mechanism.includes(f.mechanism)) { draft.mechanism.push(f.mechanism); flags.mechanism = true; }
   }
   fillStr('hospital', f.hospital);
   fillStr('notes', f.notes);
@@ -6392,19 +6410,22 @@ function bindMciCasualtyEvents() {
     };
   });
 
-  // 손상기전 (단일)
+  // 손상기전 (다중) — 손상부위와 동일하게 여러 개 선택 가능
+  if (!Array.isArray(_draft.mechanism)) _draft.mechanism = mechList(_draft.mechanism);
   document.querySelectorAll('.mci-mech-btn').forEach(btn => {
-    if (btn.dataset.mciMech === _draft.mechanism) {
+    if (_draft.mechanism.includes(btn.dataset.mciMech)) {
       btn.classList.remove('border-slate-800', 'bg-slate-950', 'text-slate-300');
       btn.classList.add('border-pink-500', 'bg-pink-950/30', 'text-white');
     }
     btn.onclick = () => {
-      _draft.mechanism = btn.dataset.mciMech === _draft.mechanism ? '' : btn.dataset.mciMech;
-      document.querySelectorAll('.mci-mech-btn').forEach(b => {
-        b.classList.remove('border-pink-500', 'bg-pink-950/30', 'text-white');
-        b.classList.add('border-slate-800', 'bg-slate-950', 'text-slate-300');
-      });
-      if (_draft.mechanism) {
+      const v = btn.dataset.mciMech;
+      const idx = _draft.mechanism.indexOf(v);
+      if (idx >= 0) {
+        _draft.mechanism.splice(idx, 1);
+        btn.classList.remove('border-pink-500', 'bg-pink-950/30', 'text-white');
+        btn.classList.add('border-slate-800', 'bg-slate-950', 'text-slate-300');
+      } else {
+        _draft.mechanism.push(v);
         btn.classList.remove('border-slate-800', 'bg-slate-950', 'text-slate-300');
         btn.classList.add('border-pink-500', 'bg-pink-950/30', 'text-white');
       }
@@ -6492,7 +6513,7 @@ function bindMciCasualtyEvents() {
       rr: _draft.rr, pulse: _draft.pulse,
       bpSys: _draft.bpSys, bpDia: _draft.bpDia, spo2: _draft.spo2, temp: _draft.temp,
       symptom: (_draft.symptom || '').trim(),
-      mechanism: _draft.mechanism,
+      mechanism: mechText(_draft.mechanism),   // DB엔 문자열 저장(규칙: mechanism=string), 화면은 다중선택
       injuryParts: _draft.injuryParts,
       treatments: _draft.treatments,
       drugs: (_draft.drugs || '').trim(),
@@ -6516,6 +6537,10 @@ function bindMciCasualtyEvents() {
     }
   };
 
+  // 플로팅 저장 버튼 — 하단 저장과 동일 동작(검증·저장 로직 재사용). 저장 중엔 비활성과 동일하게 동작
+  const _saveFab = document.getElementById('mci-save-fab');
+  if (_saveFab) _saveFab.onclick = () => document.getElementById('mci-save-btn')?.click();
+
   // 수정 진입
   document.querySelectorAll('.mci-edit-btn').forEach(btn => {
     btn.onclick = () => {
@@ -6538,7 +6563,7 @@ function bindMciCasualtyEvents() {
         rr: c.rr || '', pulse: c.pulse || '',
         bpSys: c.bpSys || '', bpDia: c.bpDia || '', spo2: c.spo2 || '', temp: c.temp || '',
         symptom: c.symptom || '',
-        mechanism: c.mechanism || '',
+        mechanism: mechList(c.mechanism),
         injuryParts: Array.isArray(c.injuryParts) ? [...c.injuryParts] : [],
         treatments: Array.isArray(c.treatments) ? [...c.treatments] : [],
         drugs: c.drugs || '',
@@ -7359,7 +7384,7 @@ function renderMciCardDetailModal() {
               </div>
               <div>
                 <div class="text-[10px] text-slate-500 mb-0.5">손상기전</div>
-                <div class="${c.mechanism ? 'text-slate-200' : 'text-slate-600'}">${escapeHtml(c.mechanism || '미입력')}</div>
+                <div class="${mechText(c.mechanism) ? 'text-slate-200' : 'text-slate-600'}">${escapeHtml(mechText(c.mechanism) || '미입력')}</div>
               </div>
               <div>
                 <div class="text-[10px] text-slate-500 mb-1">손상부위</div>
@@ -7480,7 +7505,7 @@ function bindMciCardDetailModalEvents() {
         rr: c.rr || '', pulse: c.pulse || '',
         bpSys: c.bpSys || '', bpDia: c.bpDia || '', spo2: c.spo2 || '', temp: c.temp || '',
         symptom: c.symptom || '',
-        mechanism: c.mechanism || '',
+        mechanism: mechList(c.mechanism),
         injuryParts: Array.isArray(c.injuryParts) ? [...c.injuryParts] : [],
         treatments: Array.isArray(c.treatments) ? [...c.treatments] : [],
         drugs: c.drugs || '',
