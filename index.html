@@ -5914,8 +5914,8 @@ function extractFieldsFromOcr(text) {
 // 손글씨·체크표시·동그라미까지 판독되어 Tesseract보다 인식률이 크게 높음.
 // 오프라인이거나 서버/키 미설정 등으로 실패하면 기존 Tesseract OCR로 자동 폴백.
 
-// 이미지 축소(긴 변 1568px) + JPEG 재압축 — 전송량과 분석 비용 절약
-function downscaleImageBlob(blob, maxDim = 1568, quality = 0.85) {
+// 이미지 축소(긴 변 2048px) + JPEG 재압축 — 작은 손글씨(혈압·맥박 등) 판독 위해 해상도·품질 상향
+function downscaleImageBlob(blob, maxDim = 2048, quality = 0.92) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
     const img = new Image();
