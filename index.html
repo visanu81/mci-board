@@ -6008,6 +6008,7 @@ function applyClaudeOcrFields(f) {
     if (!draft.mechanism.includes(f.mechanism)) { draft.mechanism.push(f.mechanism); flags.mechanism = true; }
   }
   fillStr('hospital', f.hospital);
+  fillStr('departTime', f.departTime);
   fillStr('notes', f.notes);
   return flags;
 }

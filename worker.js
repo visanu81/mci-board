@@ -36,7 +36,7 @@ const OCR_SCHEMA = {
   required: [
     'triage', 'name', 'age', 'gender', 'isPediatric', 'location', 'symptom',
     'consciousness', 'rr', 'pulse', 'bpSys', 'bpDia', 'spo2', 'temp',
-    'mechanism', 'hospital', 'notes',
+    'mechanism', 'hospital', 'departTime', 'notes',
   ],
   properties: {
     triage:        { enum: ['emergency', 'urgent', 'nonurgent', 'dead', null] },
@@ -45,7 +45,7 @@ const OCR_SCHEMA = {
     gender:        { enum: ['남', '여', null] },
     isPediatric:   { type: ['boolean', 'null'] },
     location:      { type: ['string', 'null'], description: '발견 장소' },
-    symptom:       { type: ['string', 'null'], description: '주증상' },
+    symptom:       { type: ['string', 'null'], description: '주요 손상/주증상 (예: "후두부 열상", "우측 다리골절")' },
     consciousness: { enum: ['A', 'V', 'P', 'U', null] },
     rr:            { type: ['string', 'null'], description: '호흡수, 숫자만' },
     pulse:         { type: ['string', 'null'], description: '맥박, 숫자만' },
@@ -53,26 +53,41 @@ const OCR_SCHEMA = {
     bpDia:         { type: ['string', 'null'], description: '이완기 혈압, 숫자만' },
     spo2:          { type: ['string', 'null'], description: 'SpO2 %, 숫자만' },
     temp:          { type: ['string', 'null'], description: '체온 °C, 숫자만(소수 가능)' },
-    mechanism:     { type: ['string', 'null'], description: '손상기전' },
-    hospital:      { type: ['string', 'null'], description: '이송병원' },
+    mechanism:     { type: ['string', 'null'], description: '손상기전(있으면)' },
+    hospital:      { type: ['string', 'null'], description: '이송의료기관명' },
+    departTime:    { type: ['string', 'null'], description: '이송(출발)시간, "HH:MM" 형식' },
     notes:         { type: ['string', 'null'], description: '처치 내용 등 기타 특이사항' },
   },
 };
 
-const OCR_PROMPT = `이 사진은 한국 소방의 다수사상자(MCI) 현장에서 사용하는 종이 사상자 분류표(트리아지 카드)입니다.
-손글씨, 체크박스(✓·V), 동그라미 표시를 모두 판독하여 카드에 실제 기재된 정보만 JSON으로 추출하세요.
+const OCR_PROMPT = `이 사진은 한국 소방의 다수사상자(MCI) 현장에서 쓰는 종이 「중증도분류표」(트리아지 카드)입니다. 카드에 실제 기재·표시된 정보만 JSON으로 추출하세요. 없거나 불확실하면 null — 절대 추측하지 마세요.
 
-규칙:
-- 카드에 없거나 판독이 어려운 항목은 null. 절대 추측해서 채우지 마세요.
-- triage: 긴급/적색/빨강/I/Immediate → "emergency", 응급/황색/노랑/II/Delayed → "urgent", 비응급/녹색/초록/III/Minor → "nonurgent", 사망/지연(사망)/흑색/검정/IV/Expectant/Deceased → "dead". 체크·동그라미·색칠 등으로 선택 표시된 분류를 고르세요.
-- age: 숫자만 (예: "47"). "40대"로 적혀 있으면 "40".
-- gender: "남" 또는 "여".
-- isPediatric: 연령이 14세 이하로 확인되면 true, 성인으로 확인되면 false, 불명확하면 null.
-- consciousness(의식수준): AVPU 중 하나. GCS 점수만 적혀 있으면 환산 — 14~15 → "A", 9~13 → "V", 4~8 → "P", 3 → "U".
-- 생체징후는 숫자 문자열만: rr(호흡수), pulse(맥박), bpSys/bpDia(혈압 — "120/80"이면 bpSys "120", bpDia "80"), spo2(%), temp(체온 °C).
-- mechanism(손상기전): 가능하면 다음 중 하나로 — 낙상, 교통사고, 추락, 둔상, 관통상, 연소가스, 화상, 중독, 익수, 감전, 폭발, 압좌, 동상, 기타.
-- location: 환자 발견 장소. symptom: 주증상. hospital: 이송병원명. notes: 처치 내용 등 기타 특이사항.
-- 개인정보 보호: 주민등록번호·전화번호·주소는 추출하지 말고 해당 항목을 null로 두세요.`;
+[카드 양식 — 위에서 아래 순서]
+1) 상단 4칸 격자: ①보행여부(가능/불가능) ②호흡(정상/비정상) ③맥박(정상/비정상) ④의식(정상/비정상). 각 칸에서 선택된 단어 위에 V(체크) 또는 O(동그라미) 표시가 있음. ★V와 O는 모두 "선택됨"으로 동일하게 해석.
+2) 분류자 / 분류시간 / 이름 ___ 나이 ___세 성별(남·여 중 표시) / 발견장소 ___
+3) 인체도 + "주요 손상별 및 처치" 손글씨 → symptom (예: "후두부 열상", "우측 다리골절").
+4) 생체징후: 혈압 ___/___ (앞=bpSys, 뒤=bpDia), 호흡 ___ (rr), 맥박 ___ (pulse), 의식 A/V/P/U 중 표시된 글자 (consciousness).
+5) 구급차 119/119 / 이송의료기관 ___ (hospital) / 이송(출발)시간 __:__ (departTime).
+6) 맨 아래 색띠(사망=검정, 긴급=빨강, 응급=노랑, 비응급=녹색)와 우상단 색점 = 최종 분류 표시.
+
+[triage 판정 — 순서대로]
+1. 맨 아래 색띠나 우상단 색점에 선택 표시(체크·동그라미·색칠·절취)가 있으면 그 색으로: 검정→"dead", 빨강→"emergency", 노랑→"urgent", 녹색→"nonurgent".
+2. 명시적 색 표시가 없으면 상단 격자로 판정:
+   - 보행 "가능" → "nonurgent"
+   - 보행 "불가능" + (호흡·맥박·의식 중 하나라도 "비정상") → "emergency"
+   - 보행 "불가능" + 호흡·맥박·의식 모두 "정상" → "urgent"
+   - 호흡 없음/사망 명시 → "dead"
+
+[필드 규칙]
+- age: 숫자만("42"). "40대"면 "40". gender: "남" 또는 "여". isPediatric: 14세 이하 확인 시 true.
+- consciousness: 생체징후의 A/V/P/U 중 표시된 글자. GCS만 있으면 14~15→"A", 9~13→"V", 4~8→"P", 3→"U".
+- rr·pulse·bpSys·bpDia·spo2·temp·age 는 숫자 문자열만. 혈압 "130/90"이면 bpSys "130", bpDia "90".
+- symptom: "주요 손상별 및 처치" 손글씨 그대로. mechanism: 명확한 손상기전 단어가 있으면(낙상·교통사고·추락·둔상·관통상·연소가스·화상·중독·익수·감전·폭발·압좌·동상) 그 값, 없으면 null.
+- hospital: 이송의료기관명. departTime: 이송(출발)시간 "HH:MM".
+- 개인정보(주민번호·전화·주소)는 추출하지 말 것.
+
+[예시] 상단 격자에서 보행"가능"·호흡"정상"·맥박"정상"·의식"정상"에 표시, 이름 김천수, 나이 42, 성별 남, 발견장소 2층 탈의실, 주요손상 "우측 다리골절", 혈압 130/90, 호흡 24, 맥박 89, 의식 A, 이송의료기관 의정부성모병원, 이송시간 15:12 인 카드의 정답:
+{"triage":"nonurgent","name":"김천수","age":"42","gender":"남","isPediatric":false,"location":"2층 탈의실","symptom":"우측 다리골절","consciousness":"A","rr":"24","pulse":"89","bpSys":"130","bpDia":"90","spo2":null,"temp":null,"mechanism":null,"hospital":"의정부성모병원","departTime":"15:12","notes":null}`;
 
 export default {
   async fetch(request, env) {
