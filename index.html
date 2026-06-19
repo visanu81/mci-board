@@ -2673,6 +2673,11 @@ function renderDisplayMain() {
     .sort((a, b) => _floorOrder(a.name) - _floorOrder(b.name));
   // 소방관(R.I.T) 환자 수 — 1명 이상일 때만 헤더에 빨간 칩으로 강조
   const ritCount = state.mciCasualties.filter(c => c.isFirefighter).length;
+  // 성별 카운트 — 남/여, 나머지(미상·미선택)는 etcGender로 흡수해 남+여+미상=총원
+  const maleCount = state.mciCasualties.filter(c => c.gender === '남').length;
+  const femaleCount = state.mciCasualties.filter(c => c.gender === '여').length;
+  const etcGender = Math.max(0, totalCount - maleCount - femaleCount);
+  const genderText = `· 남 ${maleCount} · 여 ${femaleCount}` + (etcGender > 0 ? ` · 미상 ${etcGender}` : '');
   // 최다 발생 위치(미분류 제외, 동률이면 모두) — 칩 배경 강조로 즉시 식별
   const _maxFloorTotal = Math.max(0, ...floors.filter(f => f.name !== '미분류').map(f => f.total));
   const isHotFloor = (f) => f.name !== '미분류' && _maxFloorTotal > 0 && f.total === _maxFloorTotal;
@@ -2735,6 +2740,7 @@ function renderDisplayMain() {
           <span class="text-base text-slate-400 font-normal">— 총</span>
           <span class="text-3xl font-black mono text-pink-300 leading-none">${totalCount}</span>
           <span class="text-base text-slate-400 font-normal">명</span>
+          <span class="text-base text-slate-400 font-normal ml-1.5">${genderText}</span>
           <!-- 소방관(R.I.T) 합계 칩 — 총원 바로 옆. 대원 부상은 최우선이라 빨갛게, 1명 이상일 때만 -->
           ${ritCount > 0 ? `
             <button data-display-rit type="button" class="display-card self-center inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-black text-base ml-1 cursor-pointer hover:brightness-110 transition" style="background:#b91c1c;color:#ffffff;" title="소방관(R.I.T) ${ritCount}명 — 클릭하여 목록">
@@ -6661,6 +6667,11 @@ function renderMciSituation() {
     .sort((a, b) => _floorOrder(a.name) - _floorOrder(b.name));
   // 소방관(R.I.T) 환자 수 — 1명 이상일 때만 헤더에 빨간 칩으로 강조
   const ritCount = state.mciCasualties.filter(c => c.isFirefighter).length;
+  // 성별 카운트 — 남/여, 나머지(미상·미선택)는 etcGender로 흡수해 남+여+미상=총원
+  const maleCount = state.mciCasualties.filter(c => c.gender === '남').length;
+  const femaleCount = state.mciCasualties.filter(c => c.gender === '여').length;
+  const etcGender = Math.max(0, totalCount - maleCount - femaleCount);
+  const genderText = `· 남 ${maleCount} · 여 ${femaleCount}` + (etcGender > 0 ? ` · 미상 ${etcGender}` : '');
   // 최다 발생 위치(미분류 제외, 동률이면 모두) — 칩 배경 강조로 즉시 식별
   const _maxFloorTotal = Math.max(0, ...floors.filter(f => f.name !== '미분류').map(f => f.total));
   const isHotFloor = (f) => f.name !== '미분류' && _maxFloorTotal > 0 && f.total === _maxFloorTotal;
@@ -6674,6 +6685,7 @@ function renderMciSituation() {
           <div class="w-1 h-6 bg-pink-500 rounded-full"></div>
           <h2 class="text-lg font-bold tracking-tight">트리아지 합계</h2>
           <span class="text-xs text-slate-400 font-normal">— 총 <span class="text-base font-black mono text-pink-300 leading-none">${totalCount}</span> 명</span>
+          <span class="text-xs text-slate-400 font-normal ml-1">${genderText}</span>
           <!-- 소방관(R.I.T) 합계 칩 — 총원 바로 옆, 1명 이상일 때만 빨갛게 -->
           ${ritCount > 0 ? `
             <button data-rit-chip type="button" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-black text-xs cursor-pointer hover:brightness-110 transition ${state.expandedRit ? 'ring-2 ring-white/70' : ''}" style="background:#b91c1c;color:#ffffff;" title="소방관(R.I.T) ${ritCount}명 — 클릭하여 목록">
