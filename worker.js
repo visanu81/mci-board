@@ -22,9 +22,9 @@ const FIREBASE_JWK_URL =
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
-// 기본 모델 — Haiku로 비용 절감(건당 약 1/3). 인쇄 양식 카드라 정확도 충분.
-// 정확도가 부족하면 Worker 환경변수 OCR_MODEL=claude-sonnet-4-6 으로 즉시 상향 가능.
-const DEFAULT_MODEL = 'claude-haiku-4-5';
+// 기본 모델 — 손글씨 카드(이름·병원명) 판독 정확도가 핵심이라 Sonnet 사용.
+// (Haiku로 내려봤더니 이름/병원명을 자주 틀려 복구함. 비용은 Anthropic 월 지출 한도로 관리.)
+const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
 const MAX_IMAGE_BASE64_CHARS = 5_000_000;   // base64 약 5MB ≈ 원본 3.7MB (Anthropic 한도 5MB 이내)
 const RATE_LIMIT_PER_MIN = 12;              // uid당 분당 분석 횟수 (현장 사용엔 충분, 남용 방지)
