@@ -5195,11 +5195,13 @@ function renderMciCasualtyForm() {
   const visibleCards = userIsField
     ? _dataList.filter(c => c.author === state.user.name)
     : _dataList;
-  // 좌측 패널에 누적 표시 — 카드 번호 오름차순(#001부터). 번호를 고치면 즉시 제자리로 정렬됨.
-  // (visibleCards가 _dataList 원본일 수 있어 복사본을 정렬 — 원본 순서 보존)
+  // 좌측 패널 정렬 방향 — 'asc'(번호 오름차순, 기본) / 'desc'(마지막 번호부터). 사용자가 토글, localStorage에 저장(엑셀처럼 유지).
+  let _cardSortDesc = false;
+  try { _cardSortDesc = localStorage.getItem('mci_card_sort') === 'desc'; } catch (e) {}
+  // 누적 카드 목록을 선택한 방향으로 정렬(복사본 — 원본 순서 보존). 번호를 고치면 즉시 제자리로.
   const recentCards = [...visibleCards]
-    .sort((a, b) => (a.cardNo || 0) - (b.cardNo || 0))
-    .slice(0, 100);   // 과부하 방지 상한 100 (#001부터 위로)
+    .sort((a, b) => _cardSortDesc ? (b.cardNo || 0) - (a.cardNo || 0) : (a.cardNo || 0) - (b.cardNo || 0))
+    .slice(0, 100);   // 과부하 방지 상한 100
 
   // 중복 카드 번호 감지(전체 카드 기준) — 목록에서 빨간 경고 표시로 정리 유도
   const _noCounts = {};
@@ -5591,9 +5593,14 @@ function renderMciCasualtyForm() {
       <aside class="order-2 lg:order-1 mt-4 lg:mt-0 lg:w-80 xl:w-96 lg:flex-shrink-0 lg:sticky lg:top-44 lg:max-h-[calc(100vh-12.5rem)] lg:overflow-y-auto scrollbar-thin ${recentCards.length === 0 ? 'hidden lg:block' : ''}">
       ${recentCards.length > 0 ? `
         <div class="bg-slate-900 rounded-2xl border border-slate-800 p-4">
-          <h3 class="text-xs text-slate-500 tracking-wider uppercase mb-3 flex items-center justify-between">
-            <span>${userIsField ? '내가 등록한 카드' : '등록된 카드 (전체)'}</span>
-            <span class="text-slate-600 normal-case">${visibleCards.length}개</span>
+          <h3 class="text-xs text-slate-500 tracking-wider uppercase mb-3 flex items-center justify-between gap-2">
+            <span class="truncate">${userIsField ? '내가 등록한 카드' : '등록된 카드 (전체)'}</span>
+            <span class="flex items-center gap-1.5 flex-shrink-0 normal-case">
+              <button id="mci-card-sort" class="flex items-center gap-1 text-[10px] font-bold text-slate-300 bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 hover:bg-slate-800 active:bg-slate-700" title="번호 정렬 순서 바꾸기 (오름차순 ↔ 내림차순)" aria-label="카드 번호 정렬 순서 전환">
+                <i data-lucide="${_cardSortDesc ? 'arrow-down-wide-narrow' : 'arrow-up-narrow-wide'}" class="w-3 h-3"></i>${_cardSortDesc ? '내림차순' : '오름차순'}
+              </button>
+              <span class="text-slate-600">${visibleCards.length}개</span>
+            </span>
           </h3>
           <div class="space-y-1.5">
             ${recentCards.map(c => {
@@ -6195,6 +6202,18 @@ function bindMciCasualtyEvents() {
   if (fullBtn) {
     fullBtn.onclick = () => {
       state.mciInputMode = 'full'; render();
+    };
+  }
+
+  // 좌측 등록카드 목록 정렬 순서 토글(번호 오름차순 ↔ 내림차순) — 선택을 localStorage에 저장(엑셀처럼 유지)
+  const cardSortBtn = document.getElementById('mci-card-sort');
+  if (cardSortBtn) {
+    cardSortBtn.onclick = () => {
+      let cur = 'asc';
+      try { cur = (localStorage.getItem('mci_card_sort') === 'desc') ? 'desc' : 'asc'; } catch (e) {}
+      const next = cur === 'desc' ? 'asc' : 'desc';
+      try { localStorage.setItem('mci_card_sort', next); } catch (e) {}
+      render();
     };
   }
 
