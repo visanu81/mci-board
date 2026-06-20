@@ -6651,6 +6651,9 @@ function renderMciSituation() {
     pediatricCount: state.mciCasualties.filter(c => c.triage === tr.id && c.isPediatric).length,
   }));
   const totalCount = state.mciCasualties.length;
+  // 사상자 명단 정렬 방향 — 입력화면 좌측 목록과 같은 설정 공유(localStorage 'mci_card_sort'). 'desc'면 마지막 번호부터.
+  let _cardSortDesc = false;
+  try { _cardSortDesc = localStorage.getItem('mci_card_sort') === 'desc'; } catch (e) {}
 
   // 중복 카드 번호 집계 — 명단 표에서 빨갛게 표시(동시·오프라인 입력으로 겹친 번호 정리 유도)
   const _sitNoCounts = {};
@@ -7119,7 +7122,12 @@ function renderMciSituation() {
           ` : `
             <span class="ml-2 text-[11px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold tracking-wider">마스킹</span>
           `}
-          <span class="ml-auto text-xs text-slate-400">총 <span class="font-bold text-slate-200">${state.mciCasualties.length}</span>명</span>
+          <span class="ml-auto flex items-center gap-2">
+            <button id="mci-sit-sort" class="flex items-center gap-1 text-[11px] font-bold text-slate-300 bg-slate-950 border border-slate-700 rounded px-2 py-0.5 hover:bg-slate-800 active:bg-slate-700" title="번호 정렬 순서 바꾸기 (오름차순 ↔ 내림차순)" aria-label="명단 번호 정렬 순서 전환">
+              <i data-lucide="${_cardSortDesc ? 'arrow-down-wide-narrow' : 'arrow-up-narrow-wide'}" class="w-3.5 h-3.5"></i>${_cardSortDesc ? '내림차순' : '오름차순'}
+            </button>
+            <span class="text-xs text-slate-400">총 <span class="font-bold text-slate-200">${state.mciCasualties.length}</span>명</span>
+          </span>
         </div>
         ${state.mciCasualties.length === 0 ? `
           <div class="p-8 text-center text-slate-400 text-base">아직 등록된 사상자 카드가 없습니다</div>
@@ -7143,7 +7151,7 @@ function renderMciSituation() {
                 </tr>
               </thead>
               <tbody>
-                ${[...state.mciCasualties].sort((a, b) => (a.cardNo || 0) - (b.cardNo || 0)).map((c, i) => {
+                ${[...state.mciCasualties].sort((a, b) => _cardSortDesc ? (b.cardNo || 0) - (a.cardNo || 0) : (a.cardNo || 0) - (b.cardNo || 0)).map((c, i) => {
                   const tr = MCI_TRIAGE.find(t => t.id === c.triage);
                   const displayName = state.briefingMode ? maskNameHtml(c.name) : escapeHtml(c.name || '-');
                   const displayAuthor = state.briefingMode ? maskNameHtml(c.author) : escapeHtml(c.author || '-');
@@ -7198,6 +7206,18 @@ function renderMciSituation() {
 
 // ==================== MCI 통합상황판 사상자 명단 → 행 클릭 이벤트 ====================
 function bindMciSituationEvents() {
+  // 사상자 명단 정렬 순서 토글(번호 오름차순 ↔ 내림차순) — 입력화면 좌측 목록과 같은 설정(localStorage) 공유
+  const sitSortBtn = document.getElementById('mci-sit-sort');
+  if (sitSortBtn) {
+    sitSortBtn.onclick = () => {
+      let cur = 'asc';
+      try { cur = (localStorage.getItem('mci_card_sort') === 'desc') ? 'desc' : 'asc'; } catch (e) {}
+      const next = cur === 'desc' ? 'asc' : 'desc';
+      try { localStorage.setItem('mci_card_sort', next); } catch (e) {}
+      render();
+    };
+  }
+
   // 사상자 명단 행 클릭 → 카드 상세 모달
   document.querySelectorAll('.mci-row-clickable').forEach(tr => {
     tr.onclick = () => {
