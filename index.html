@@ -2629,6 +2629,22 @@ function renderDisplayMain() {
     startedAt: incMeta.startedAt,
   };
   const totalCount = state.mciCasualties.length;
+  // 사상자 명단 정렬 — 입력/상황판과 같은 localStorage 설정 공유('mci_card_sort')
+  let _cardSortDesc = false;
+  try { _cardSortDesc = localStorage.getItem('mci_card_sort') === 'desc'; } catch (e) {}
+  const displayList = [...state.mciCasualties].sort((a, b) => _cardSortDesc ? (b.cardNo || 0) - (a.cardNo || 0) : (a.cardNo || 0) - (b.cardNo || 0));
+
+  // 표출 레이아웃 모드 — 'list'(요약+사상자 명단 2단, 기본) | 'summary'(기존: 요약만 전체폭). localStorage 저장.
+  let displayLayout = 'list';
+  try { if (localStorage.getItem('mci_display_layout') === 'summary') displayLayout = 'summary'; } catch (e) {}
+  const isList = displayLayout === 'list';
+  // 모드별 요약 카드 크기 — 요약만 모드는 초대형(기존 느낌), 명단 동반 모드는 적당히 줄여 명단 공간 확보.
+  const triPad = isList ? 'py-3.5' : 'py-6';
+  const triLabel = isList ? 'text-lg font-black tracking-wider mb-1' : 'text-xl font-black tracking-wider mb-2';
+  const triNum = isList ? 'text-5xl' : 'text-7xl';
+  const txPad = isList ? 'py-3' : 'py-5';
+  const txLabel = isList ? 'text-base' : 'text-lg';
+  const txNum = isList ? 'text-4xl mt-1' : 'text-6xl mt-1.5';
 
   // 트리아지 합계
   const triageTotals = MCI_TRIAGE.map(tr => ({
@@ -2687,7 +2703,7 @@ function renderDisplayMain() {
     <div class="h-screen bg-slate-950 text-slate-100 p-6 md:px-10 xl:px-16 2xl:px-24 select-none flex flex-col overflow-hidden">
 
       <!-- 헤더 -->
-      <header class="flex-shrink-0 flex items-center justify-between mb-6 pb-4 border-b-2 border-slate-800 gap-4">
+      <header class="flex-shrink-0 flex items-center justify-between mb-4 pb-3 border-b-2 border-slate-800 gap-4">
         <!-- 좌: 로고 + 시스템 이름 -->
         <div class="flex items-center gap-4 flex-shrink-0">
           <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-rose-600 to-pink-700 flex items-center justify-center shadow-lg shadow-pink-900/50">
@@ -2715,6 +2731,14 @@ function renderDisplayMain() {
             <div id="display-date" class="text-[11px] text-slate-500 mt-1.5 tracking-widest font-medium">----</div>
           </div>
           <div class="flex flex-col gap-1.5">
+            <!-- 표출 레이아웃 토글 — 사상자 명단 포함 / 요약만(기존) -->
+            <button id="display-layout-toggle" class="text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 bg-slate-800/70 text-slate-300 hover:bg-slate-700" title="표출 화면 전환: 사상자 명단 포함 / 요약만(기존)">
+              <i data-lucide="${isList ? 'layout-list' : 'layout-grid'}" class="w-3.5 h-3.5"></i>${isList ? '명단 포함' : '요약만'}
+            </button>
+            <!-- 마스킹(브리핑 모드) 토글 — 표출 화면에서 직접 켜고 끔 -->
+            <button id="display-mask-toggle" class="text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 ${state.briefingMode ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30' : 'bg-red-600/30 text-red-300 hover:bg-red-600/40'}" title="이름·증상 마스킹 켜기/끄기">
+              <i data-lucide="${state.briefingMode ? 'eye-off' : 'eye'}" class="w-3.5 h-3.5"></i>${state.briefingMode ? '마스킹 ON' : '실명 표시'}
+            </button>
             ${POPOUT_DISPLAY ? `
               <!-- 팝아웃 창: 로그아웃하면 입력 창 세션까지 끊기므로 [창 닫기]만 제공 -->
               <button id="display-close-popout" class="text-xs text-slate-300 hover:text-white px-3 py-1.5 rounded-lg bg-slate-800/70 hover:bg-slate-700 flex items-center gap-1" title="표출 창 닫기 (입력 창은 그대로 유지됩니다)">
@@ -2732,8 +2756,34 @@ function renderDisplayMain() {
         </div>
       </header>
 
+      <!-- 본문: 모드에 따라 [좌 요약 | 우 명단] 2단(list) 또는 [요약만 전체폭](summary) -->
+      <div class="flex-1 min-h-0 ${isList ? 'flex flex-row gap-6' : 'flex flex-col'}">
+
+      <!-- 요약(트리아지·이송·병원별) — list 모드: 좌측 스크롤 컬럼 / summary 모드: contents로 본문에 직접 흐름 -->
+      <div class="${isList ? 'w-3/5 flex-shrink-0 flex flex-col min-h-0 overflow-y-auto scrollbar-thin pr-1' : 'flex-1 min-h-0 flex flex-col overflow-y-auto scrollbar-thin'}">
+
+      <!-- 발견 위치별 — 좌측 컬럼 최상단 섹션(제목은 다른 섹션과 동일 크기). 작은 카드 한 줄. -->
+      <section class="flex-shrink-0 mb-3">
+        <h2 class="text-2xl font-bold mb-3 flex items-center gap-2">
+          <div class="w-1.5 h-7 bg-pink-500 rounded-full"></div>
+          발견 위치별
+        </h2>
+        ${floors.length > 0 ? `
+          <div class="flex items-stretch gap-2 flex-wrap">
+            ${floors.map(f => `
+              <button data-display-floor="${escapeHtml(f.name)}" class="display-card cursor-pointer px-3 py-1.5 rounded-lg flex items-baseline gap-1.5 border transition-colors ${isHotFloor(f) ? '' : 'bg-slate-900 border-slate-700 hover:bg-slate-800 hover:border-pink-500'}"${isHotFloor(f) ? ' style="background:#9d174d;border-color:#f472b6" title="환자 최다 발생 위치"' : ''}>
+                <span class="text-base font-bold ${isHotFloor(f) ? 'text-yellow-300' : 'text-slate-200'}">${escapeHtml(f.name)}</span>
+                <span class="text-2xl font-black mono leading-none ${isHotFloor(f) ? 'text-yellow-300' : 'text-slate-100'}">${f.total}</span>
+                ${f.emergency > 0 ? `<span class="text-[11px] px-1 py-0.5 rounded font-black" style="background:#dc2626;color:#ffffff;">I ${f.emergency}</span>` : ''}
+                ${f.dead > 0 ? `<span class="text-[11px] px-1 py-0.5 rounded font-black" style="background:#000000;color:#ffffff;border:1px solid #64748b;">IV ${f.dead}</span>` : ''}
+              </button>
+            `).join('')}
+          </div>
+        ` : '<div class="text-base text-slate-500">발견 위치 정보 없음</div>'}
+      </section>
+
       <!-- 트리아지 합계 (초대형, 솔리드 컬러) -->
-      <section class="flex-shrink-0 mb-5">
+      <section class="flex-shrink-0 mb-3">
         <h2 class="mb-3 flex items-baseline gap-3">
           <div class="w-1.5 h-7 bg-pink-500 rounded-full self-center"></div>
           <span class="text-2xl font-bold">트리아지 합계</span>
@@ -2748,22 +2798,6 @@ function renderDisplayMain() {
               <span class="text-xl mono leading-none">${ritCount}</span>
             </button>
           ` : ''}
-          <span class="flex-1"></span>
-          <!-- 발견 위치별 칩 — 제목줄 우측 빈 공간 활용. 층 합계 = 총원이라 바로 대조 가능.
-               긴급(I)·사망(IV)은 뱃지로 위험 강조 -->
-          ${floors.length > 0 ? `
-            <span class="self-center flex items-center gap-1.5 flex-wrap justify-end font-normal">
-              <span class="text-sm text-slate-400 mr-0.5">발견 위치별</span>
-              ${floors.map(f => `
-                <button data-display-floor="${escapeHtml(f.name)}" class="display-card cursor-pointer px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-pink-500 transition-colors flex items-baseline gap-1.5 ${isHotFloor(f) ? 'floor-chip-max' : ''}"${isHotFloor(f) ? ' title="환자 최다 발생 위치"' : ''}>
-                  <span class="text-sm font-bold">${escapeHtml(f.name)}</span>
-                  <span class="text-xl font-black mono leading-none text-slate-100">${f.total}</span>
-                  ${f.emergency > 0 ? `<span class="text-[10px] px-1 py-0.5 rounded font-black" style="background:#dc2626;color:#ffffff;">I ${f.emergency}</span>` : ''}
-                  ${f.dead > 0 ? `<span class="text-[10px] px-1 py-0.5 rounded font-black" style="background:#000000;color:#ffffff;border:1px solid #64748b;">IV ${f.dead}</span>` : ''}
-                </button>
-              `).join('')}
-            </span>
-          ` : ''}
         </h2>
         <div class="grid grid-cols-4 gap-3">
           ${triageTotals.map(tr => {
@@ -2773,11 +2807,11 @@ function renderDisplayMain() {
             // 응급(노랑)만 진한 갈색 글씨. 나머지는 흰색.
             const txt = tr.id === 'urgent' ? '#451a03' : '#ffffff';
             return `
-            <button data-display-triage="${tr.id}" class="display-card triage-card-clickable rounded-2xl px-3 py-6 text-center transition-all cursor-pointer hover:brightness-110 flex flex-col items-center justify-center"
+            <button data-display-triage="${tr.id}" class="display-card triage-card-clickable rounded-2xl px-3 ${triPad} text-center transition-all cursor-pointer hover:brightness-110 flex flex-col items-center justify-center"
               data-triage-card="${tr.id}"
               style="background: ${cardBg}; border:2px solid ${cardBorder};">
-              <div class="text-xl font-black tracking-wider mb-2" style="color:${txt};">${tr.shortName}·${tr.name}</div>
-              <div class="text-7xl font-black mono leading-none" style="color:${txt};">${tr.count}</div>
+              <div class="${triLabel}" style="color:${txt};">${tr.shortName}·${tr.name}</div>
+              <div class="${triNum} font-black mono leading-none" style="color:${txt};">${tr.count}</div>
               ${tr.pediatricCount > 0 ? `
                 <div class="text-sm font-bold mt-2 flex items-center justify-center gap-1" style="color:${txt}; opacity:0.85;">
                   <i data-lucide="baby" class="w-4 h-4"></i>소아 ${tr.pediatricCount}
@@ -2789,34 +2823,36 @@ function renderDisplayMain() {
         </div>
       </section>
 
-      <!-- 이송 상태 (반투명 톤) -->
-      <section class="flex-shrink-0 mb-5">
-        <h2 class="text-2xl font-bold mb-3 flex items-center gap-2">
+      <!-- 이송 상태 — list 모드: flex-1로 남는 높이 흡수(카드가 위아래로 늘/줄어 한 화면에 맞춤) -->
+      <section class="${isList ? 'flex-1 min-h-0' : 'flex-shrink-0'} mb-3 flex flex-col">
+        <h2 class="flex-shrink-0 text-2xl font-bold mb-3 flex items-center gap-2">
           <div class="w-1.5 h-7 bg-blue-500 rounded-full"></div>
           이송 상태
         </h2>
-        <div class="grid grid-cols-4 gap-3">
-          <button data-display-transport="pending" class="display-card rounded-2xl px-4 py-5 text-center bg-slate-900 border-2 border-amber-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
-            <div class="text-lg font-bold tracking-wider text-amber-300">미배정</div>
-            <div class="text-6xl font-black mono mt-1.5 leading-none text-amber-400">${pending.length}</div>
+        <div class="grid grid-cols-4 gap-3 ${isList ? 'flex-1 min-h-0' : ''}">
+          <button data-display-transport="pending" class="display-card rounded-2xl px-4 ${txPad} text-center bg-slate-900 flex flex-col items-center justify-center border-2 border-amber-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
+            <div class="${txLabel} font-bold tracking-wider text-amber-300">미배정</div>
+            <div class="${txNum} font-black mono leading-none text-amber-400">${pending.length}</div>
           </button>
-          <button data-display-transport="in-transit" class="display-card rounded-2xl px-4 py-5 text-center bg-slate-900 border-2 border-blue-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
-            <div class="text-lg font-bold tracking-wider text-blue-300">이송중</div>
-            <div class="text-6xl font-black mono mt-1.5 leading-none text-blue-400">${inTransit}</div>
+          <button data-display-transport="in-transit" class="display-card rounded-2xl px-4 ${txPad} text-center bg-slate-900 flex flex-col items-center justify-center border-2 border-blue-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
+            <div class="${txLabel} font-bold tracking-wider text-blue-300">이송중</div>
+            <div class="${txNum} font-black mono leading-none text-blue-400">${inTransit}</div>
           </button>
-          <button data-display-transport="arrived" class="display-card rounded-2xl px-4 py-5 text-center bg-slate-900 border-2 border-emerald-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
-            <div class="text-lg font-bold tracking-wider text-emerald-300">병원 도착</div>
-            <div class="text-6xl font-black mono mt-1.5 leading-none text-emerald-400">${arrived.length}</div>
+          <button data-display-transport="arrived" class="display-card rounded-2xl px-4 ${txPad} text-center bg-slate-900 flex flex-col items-center justify-center border-2 border-emerald-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
+            <div class="${txLabel} font-bold tracking-wider text-emerald-300">병원 도착</div>
+            <div class="${txNum} font-black mono leading-none text-emerald-400">${arrived.length}</div>
           </button>
-          <button data-display-transport="not-transported" class="display-card rounded-2xl px-4 py-5 text-center bg-slate-900 border-2 border-violet-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
-            <div class="text-lg font-bold tracking-wider text-violet-300">미이송</div>
-            <div class="text-6xl font-black mono mt-1.5 leading-none text-violet-400">${notTransported.length}</div>
+          <button data-display-transport="not-transported" class="display-card rounded-2xl px-4 ${txPad} text-center bg-slate-900 flex flex-col items-center justify-center border-2 border-violet-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
+            <div class="${txLabel} font-bold tracking-wider text-violet-300">미이송</div>
+            <div class="${txNum} font-black mono leading-none text-violet-400">${notTransported.length}</div>
           </button>
         </div>
       </section>
 
-      <!-- 병원별 이송 현황 — 남는 공간 자동으로 채움 (flex-1) -->
-      <section class="flex-1 min-h-0 mb-4 flex flex-col">
+      <!-- (발견 위치별은 헤더 직후 상단 전체폭 한 줄로 이동) -->
+
+      <!-- 병원별 이송 현황 — 모든 모드 자연 높이(요약 영역 스크롤이 공간 처리) -->
+      <section class="flex-shrink-0 mb-3 flex flex-col">
         <h2 class="flex-shrink-0 text-2xl font-bold mb-3 flex items-center gap-2">
           <div class="w-1.5 h-7 bg-cyan-500 rounded-full"></div>
           병원별 이송 현황
@@ -2855,6 +2891,56 @@ function renderDisplayMain() {
           </div>
         `}
       </section>
+
+      </div><!-- /요약 영역 -->
+
+      ${isList ? `
+      <!-- 우측: 사상자 명단 (list 모드 전용) — 가로 공간을 채워 지휘소가 전체 환자를 한눈에. 브리핑 모드 시 마스킹. -->
+      <section class="flex-1 min-h-0 flex flex-col">
+        <h2 class="flex-shrink-0 text-2xl font-bold mb-3 flex items-center gap-2">
+          <div class="w-1.5 h-7 bg-rose-500 rounded-full"></div>
+          사상자 명단
+          ${state.briefingMode
+            ? '<span class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold tracking-wider">마스킹</span>'
+            : '<span class="text-xs px-2 py-0.5 rounded bg-red-600/30 text-red-300 font-bold tracking-wider">실명 표시</span>'}
+          <span class="ml-auto text-base text-slate-400 font-normal">총 <span class="font-bold text-slate-200 mono">${totalCount}</span>명</span>
+        </h2>
+        ${displayList.length === 0 ? `
+          <div class="flex-shrink-0 bg-slate-900 border-2 border-slate-800 rounded-2xl p-10 text-center text-2xl text-slate-500">아직 등록된 사상자 카드가 없습니다</div>
+        ` : `
+          <div class="flex-1 min-h-0 overflow-y-auto rounded-2xl border-2 border-slate-800 bg-slate-900/60 divide-y divide-slate-800/70 scrollbar-thin">
+            ${displayList.map(c => {
+              const tr = MCI_TRIAGE.find(t => t.id === c.triage);
+              const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '';
+              const nm = state.briefingMode ? maskNameHtml(c.name) : escapeHtml(c.name || '-');
+              const sym = state.briefingMode ? maskSymptomHtml(c.symptom) : escapeHtml(c.symptom || '');
+              return `
+                <div class="px-4 py-2.5 flex items-center gap-3 text-lg">
+                  <span class="text-base text-slate-500 mono font-bold w-14 flex-shrink-0">${cardNo}</span>
+                  <span class="text-base py-1 rounded font-black flex-shrink-0 inline-flex items-center justify-center w-10" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
+                  ${c.isPediatric ? '<i data-lucide="baby" class="w-5 h-5 text-cyan-400 flex-shrink-0"></i>' : ''}
+                  <span class="font-bold ${c._autoNamed ? 'italic text-slate-400' : 'text-slate-100'} ${state.briefingMode ? 'mono' : ''} flex-shrink-0">${nm}</span>${ritBadge(c)}
+                  <span class="text-base text-slate-400 mono flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
+                  ${c.location ? `<span class="text-base text-pink-300 truncate max-w-[260px] flex-shrink-0"><i data-lucide="map-pin" class="w-4 h-4 inline"></i>${escapeHtml(c.location)}</span>` : ''}
+                  <span class="flex-1 min-w-0 text-base text-slate-300 truncate">${sym}</span>
+                  <div class="flex items-center gap-3 flex-shrink-0 text-base">
+                    ${c.notTransported
+                      ? '<span class="text-violet-400 font-bold">미이송</span>'
+                      : (c.hospital
+                          ? `<span class="text-emerald-300 truncate max-w-[200px]">${escapeHtml(c.hospital)}</span>`
+                          : '<span class="text-amber-400">미배정</span>')}
+                    ${c.arriveTime
+                      ? `<span class="text-emerald-400 mono">${escapeHtml(c.arriveTime)}</span>`
+                      : (c.departTime && !c.notTransported ? `<span class="text-amber-400 mono">${escapeHtml(c.departTime)}</span>` : '')}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </section>
+      ` : ''}
+      </div><!-- /본문 -->
 
       <!-- 푸터 -->
       <footer class="flex-shrink-0 text-center text-sm text-slate-600 mt-2 pt-2 border-t border-slate-800/50">
@@ -2962,7 +3048,7 @@ function renderDisplayModal() {
                 return `
                   <button data-display-patient="${c._key}" class="w-full text-left px-4 py-3 hover:bg-slate-800 transition-colors flex items-center gap-3 text-lg">
                     <span class="text-base text-slate-500 mono font-bold w-14 flex-shrink-0">${cardNo}</span>
-                    <span class="text-base px-2 py-1 rounded font-black flex-shrink-0" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
+                    <span class="text-base py-1 rounded font-black flex-shrink-0 inline-flex items-center justify-center w-10" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
                     ${c.isPediatric ? '<i data-lucide="baby" class="w-5 h-5 text-cyan-400 flex-shrink-0"></i>' : ''}
                     <span class="font-bold ${c._autoNamed ? 'italic text-slate-400' : 'text-slate-100'} flex-shrink-0">${escapeHtml(c.name || '-')}</span>${ritBadge(c)}
                     <span class="text-base text-slate-400 mono flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
@@ -3107,6 +3193,24 @@ function bindDisplayEvents() {
   // 팝아웃 창 — [창 닫기]
   const closePopout = document.getElementById('display-close-popout');
   if (closePopout) closePopout.onclick = () => window.close();
+
+  // 마스킹(브리핑 모드) 토글 — 표출 화면에서 직접 켜고 끔. 실명 전환 시 경고 확인.
+  const maskBtn = document.getElementById('display-mask-toggle');
+  if (maskBtn) maskBtn.onclick = () => {
+    if (state.briefingMode && !confirm('⚠ 실명 표시로 전환합니다.\n언론·일반인이 이 화면을 볼 수 없는지 반드시 확인하세요.\n계속하시겠습니까?')) return;
+    state.briefingMode = !state.briefingMode;
+    render();
+  };
+
+  // 표출 레이아웃 토글 — 사상자 명단 포함(list) <-> 요약만(summary, 기존). localStorage 저장.
+  const layoutBtn = document.getElementById('display-layout-toggle');
+  if (layoutBtn) layoutBtn.onclick = () => {
+    let cur = 'list';
+    try { cur = (localStorage.getItem('mci_display_layout') === 'summary') ? 'summary' : 'list'; } catch (e) {}
+    const next = cur === 'summary' ? 'list' : 'summary';
+    try { localStorage.setItem('mci_display_layout', next); } catch (e) {}
+    render();
+  };
 
   // 로그아웃 (picker · main 공통) — 팝아웃에서는 localStorage(본 창 세션)를 건드리지 않고 창만 닫음
   ['display-logout', 'display-logout-picker'].forEach(id => {
