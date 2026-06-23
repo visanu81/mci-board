@@ -2823,13 +2823,13 @@ function renderDisplayMain() {
         </div>
       </section>
 
-      <!-- 이송 상태 — list 모드: flex-1로 남는 높이 흡수(카드가 위아래로 늘/줄어 한 화면에 맞춤) -->
-      <section class="${isList ? 'flex-1 min-h-0' : 'flex-shrink-0'} mb-3 flex flex-col">
+      <!-- 이송 상태 — 자연 높이(트리아지·병원별과 균형). 과거 list 모드 flex-1 높이흡수는 카드가 과도하게 커져 제거. -->
+      <section class="flex-shrink-0 mb-3 flex flex-col">
         <h2 class="flex-shrink-0 text-2xl font-bold mb-3 flex items-center gap-2">
           <div class="w-1.5 h-7 bg-blue-500 rounded-full"></div>
           이송 상태
         </h2>
-        <div class="grid grid-cols-4 gap-3 ${isList ? 'flex-1 min-h-0' : ''}">
+        <div class="grid grid-cols-4 gap-3">
           <button data-display-transport="pending" class="display-card rounded-2xl px-4 ${txPad} text-center bg-slate-900 flex flex-col items-center justify-center border-2 border-amber-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
             <div class="${txLabel} font-bold tracking-wider text-amber-300">미배정</div>
             <div class="${txNum} font-black mono leading-none text-amber-400">${pending.length}</div>
@@ -2904,6 +2904,10 @@ function renderDisplayMain() {
             ? '<span class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold tracking-wider">마스킹</span>'
             : '<span class="text-xs px-2 py-0.5 rounded bg-red-600/30 text-red-300 font-bold tracking-wider">실명 표시</span>'}
           <span class="ml-auto text-base text-slate-400 font-normal">총 <span class="font-bold text-slate-200 mono">${totalCount}</span>명</span>
+          <!-- 번호 정렬 순서 토글 — 입력/상황판/좌측목록과 같은 설정(mci_card_sort) 공유 -->
+          <button id="display-list-sort" type="button" class="flex items-center gap-1 text-sm font-bold text-slate-300 bg-slate-800/70 border border-slate-700 rounded-lg px-2.5 py-1 hover:bg-slate-700 active:bg-slate-600 transition-colors" title="번호 정렬 순서 바꾸기 (오름차순 ↔ 내림차순)" aria-label="사상자 명단 번호 정렬 순서 전환">
+            <i data-lucide="${_cardSortDesc ? 'arrow-down-wide-narrow' : 'arrow-up-narrow-wide'}" class="w-4 h-4"></i>${_cardSortDesc ? '내림차순' : '오름차순'}
+          </button>
         </h2>
         ${displayList.length === 0 ? `
           <div class="flex-shrink-0 bg-slate-900 border-2 border-slate-800 rounded-2xl p-10 text-center text-2xl text-slate-500">아직 등록된 사상자 카드가 없습니다</div>
@@ -3209,6 +3213,16 @@ function bindDisplayEvents() {
     try { cur = (localStorage.getItem('mci_display_layout') === 'summary') ? 'summary' : 'list'; } catch (e) {}
     const next = cur === 'summary' ? 'list' : 'summary';
     try { localStorage.setItem('mci_display_layout', next); } catch (e) {}
+    render();
+  };
+
+  // 사상자 명단 정렬 순서 토글 — 입력/상황판/좌측목록과 같은 설정(mci_card_sort) 공유. 한 곳에서 정하면 모두 적용.
+  const listSortBtn = document.getElementById('display-list-sort');
+  if (listSortBtn) listSortBtn.onclick = () => {
+    let cur = 'asc';
+    try { cur = (localStorage.getItem('mci_card_sort') === 'desc') ? 'desc' : 'asc'; } catch (e) {}
+    const next = cur === 'desc' ? 'asc' : 'desc';
+    try { localStorage.setItem('mci_card_sort', next); } catch (e) {}
     render();
   };
 
