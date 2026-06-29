@@ -3081,6 +3081,7 @@ function renderDisplayModal() {
 }
 
 function renderDisplayPatientCard(c) {
+  // ★개인정보: 첨부 사진(c.cardPhoto/c.patientPhoto)은 공개 표출(TV)에 절대 렌더링하지 말 것.
   const tr = MCI_TRIAGE.find(t => t.id === c.triage);
   const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '-';
   const vital = [
@@ -4069,6 +4070,7 @@ function renderMain() {
 
       ${state.adminModal ? renderAdminModal() : ''}
       ${state.viewMciCardKey ? renderMciCardDetailModal() : ''}
+      ${state.photoEnlarge ? renderPhotoEnlarge() : ''}
       ${renderHospitalDatalist()}
     </div>
   `;
@@ -5218,6 +5220,9 @@ let mciDraft = {
   notTransported: false,                            // 미이송 (자체귀가) — true면 병원 이송 안 함
   // 메모
   notes: '',
+  // 첨부 사진 (base64 썸네일) — 동명이인·누락 대조용. 표출/공개 화면엔 표시하지 않음.
+  cardPhoto: '',     // OCR로 촬영한 중증도분류표 이미지(자동 첨부)
+  patientPhoto: '',  // 환자 사진(별도 촬영)
   _editKey: null,
 };
 
@@ -5245,6 +5250,7 @@ function resetMciDraft() {
     hospital: '', departTime: '', arriveTime: '',
     notTransported: false,
     notes: '',
+    cardPhoto: '', patientPhoto: '',
     _editKey: null,
   };
 }
@@ -5415,6 +5421,14 @@ function renderMciCasualtyForm() {
               ? `<span class="text-violet-300 font-bold">미이송 (${ntReasonLabel(c)})</span>`
               : (c.hospital ? `<span class="text-emerald-300 font-bold">${escapeHtml(c.hospital)}</span>${c.departTime ? ` · 출발 <span class="mono">${escapeHtml(c.departTime)}</span>` : ''}${c.arriveTime ? ` · 도착 <span class="mono">${escapeHtml(c.arriveTime)}</span>` : ''}` : '<span class="text-amber-400">미배정</span>'))}
             ${row('메모', c.notes ? escapeHtml(c.notes) : '')}
+            ${(!state.briefingMode && (c.cardPhoto || c.patientPhoto)) ? `
+              <div class="bg-slate-950 rounded-lg p-2.5 border border-slate-800 sm:col-span-2">
+                <div class="text-[10px] text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1"><i data-lucide="camera" class="w-3 h-3"></i>첨부 사진</div>
+                <div class="flex gap-2">
+                  ${c.cardPhoto ? `<img src="data:image/jpeg;base64,${c.cardPhoto}" data-photo-enlarge class="h-28 rounded border border-slate-700 cursor-zoom-in" alt="중증도분류표" />` : ''}
+                  ${c.patientPhoto ? `<img src="data:image/jpeg;base64,${c.patientPhoto}" data-photo-enlarge class="h-28 rounded border border-slate-700 cursor-zoom-in" alt="환자 사진" />` : ''}
+                </div>
+              </div>` : ''}
             ${row('등록', `${escapeHtml(c.author || '-')}${c.timestamp ? ` · ${new Date(c.timestamp).toLocaleString('ko-KR')}` : ''}`, 'text-slate-400')}
           </div>
           <div class="px-4 pb-3 text-[11px] text-slate-500">좌측 목록에서 이 카드를 다시 누르거나 [닫기]를 누르면 입력 화면으로 돌아갑니다.</div>
@@ -5687,6 +5701,34 @@ function renderMciCasualtyForm() {
             </div>
           `}
 
+          <!-- 사진 첨부 (동명이인·누락 대조용) — 표출/공개 화면엔 표시되지 않음 -->
+          ${state.mode !== 'general' ? `
+            <div>
+              <label class="text-[11px] text-slate-400 block mb-1.5 tracking-wider uppercase flex items-center gap-1">
+                <i data-lucide="camera" class="w-3.5 h-3.5 text-violet-400"></i>사진 첨부
+                <span class="text-[10px] text-slate-600 normal-case tracking-normal">· 표출엔 안 보임</span>
+              </label>
+              <div class="grid grid-cols-2 gap-2">
+                ${[['cardPhoto', '중증도분류표'], ['patientPhoto', '환자 사진']].map(([k, lbl]) => `
+                  <div class="bg-slate-950 rounded-lg border border-slate-800 p-2">
+                    <div class="text-[10px] text-slate-500 mb-1">${lbl}${k === 'cardPhoto' && mciOcrFlags.cardPhoto ? ' <span class="text-amber-400">(자동)</span>' : ''}</div>
+                    ${_draft[k] ? `
+                      <img src="data:image/jpeg;base64,${_draft[k]}" data-photo-enlarge class="w-full h-24 object-cover rounded mb-1 cursor-zoom-in border border-slate-700" alt="${lbl}" />
+                      <div class="flex gap-1">
+                        <button type="button" data-photo-cap="${k}" class="flex-1 text-[10px] py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200">재촬영</button>
+                        <button type="button" data-photo-del="${k}" class="flex-1 text-[10px] py-1 rounded bg-red-900/40 hover:bg-red-900/60 text-red-300">삭제</button>
+                      </div>
+                    ` : `
+                      <button type="button" data-photo-cap="${k}" class="w-full h-24 rounded border border-dashed border-slate-700 hover:bg-slate-900 text-[11px] text-slate-400 flex flex-col items-center justify-center gap-1">
+                        <i data-lucide="camera" class="w-4 h-4"></i>${lbl} 촬영
+                      </button>
+                    `}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
           <!-- 저장 -->
           <button id="mci-save-btn" class="w-full py-3 rounded-xl ${isEditing ? 'bg-amber-600 hover:bg-amber-700' : 'bg-pink-600 hover:bg-pink-700'} disabled:bg-slate-700 font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2">
             <i data-lucide="${isEditing ? 'save' : 'plus'}" class="w-4 h-4"></i>
@@ -5739,7 +5781,7 @@ function renderMciCasualtyForm() {
                   <div class="flex items-center gap-1.5 min-w-0">
                     <span class="text-[9px] mono flex-shrink-0 ${isDupNo ? 'font-black px-1 rounded' : 'text-slate-600'}"${isDupNo ? ' style="background:#dc2626;color:#ffffff;" title="카드 번호 중복 — 정리 필요"' : ''}>${cardNo}${isDupNo ? ' ⚠중복' : ''}</span>
                     <span class="text-[10px] px-1.5 py-0.5 rounded font-black flex-shrink-0" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
-                    <span class="text-sm font-medium truncate ${c._autoNamed ? 'text-slate-400 italic' : ''}">${escapeHtml(c.name || '-')}</span>${ritBadge(c)}
+                    <span class="text-sm font-medium truncate ${c._autoNamed ? 'text-slate-400 italic' : ''}">${escapeHtml(c.name || '-')}</span>${ritBadge(c)}${(c.cardPhoto || c.patientPhoto) ? '<i data-lucide="camera" class="w-3 h-3 text-violet-400 flex-shrink-0" title="사진 첨부됨"></i>' : ''}
                     <span class="text-xs text-slate-500 flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
                     ${c.isPediatric ? '<i data-lucide="baby" class="w-3 h-3 text-cyan-400 flex-shrink-0"></i>' : ''}
                     <span class="flex-1"></span>
@@ -5785,10 +5827,23 @@ function renderMciCasualtyForm() {
 // 사상자 카드 폼 → 📸 버튼 → 카메라 모달 → 캡처 → Tesseract.js → 필드 추출 → mciDraft 병합
 let _cameraStream = null;
 let _cameraCapturedBlob = null;
+let _cameraMode = 'ocr';            // 'ocr'(카드 인식) | 'photo'(사진 첨부)
+let _cameraPhotoTarget = 'patientPhoto';   // photo 모드일 때 넣을 슬롯('cardPhoto'|'patientPhoto')
 
-function openCameraModal() {
+function openCameraModal(mode = 'ocr', target = 'patientPhoto') {
   const modal = document.getElementById('camera-modal');
   if (!modal) return;
+  _cameraMode = mode;
+  _cameraPhotoTarget = target;
+  // 모드별 제목·분석버튼 라벨 (open마다 설정 → close가 몰라도 됨)
+  const titleEl = document.getElementById('camera-title');
+  if (titleEl) titleEl.textContent = (mode === 'photo')
+    ? (target === 'cardPhoto' ? '카드 사진 촬영' : '환자 사진 촬영')
+    : '사상자 카드 촬영';
+  const analyzeBtn = document.getElementById('camera-analyze');
+  if (analyzeBtn) analyzeBtn.innerHTML = (mode === 'photo')
+    ? '<i data-lucide="image" class="w-4 h-4"></i>사진 첨부'
+    : '<i data-lucide="sparkles" class="w-4 h-4"></i>분석 시작';
   modal.classList.remove('hidden');
   modal.classList.add('flex');
   showCameraLive();
@@ -5815,6 +5870,7 @@ function closeCameraModal() {
     _cameraStream = null;
   }
   _cameraCapturedBlob = null;
+  _cameraMode = 'ocr';   // 기본(OCR)으로 복귀
   const img = document.getElementById('camera-preview-img');
   if (img) img.src = '';
 }
@@ -6068,6 +6124,66 @@ function blobToBase64(blob) {
   });
 }
 
+// ==================== 사진 첨부 (동명이인·누락 대조용) ====================
+// DB 내장 base64 썸네일로 저장 → 기존 durableWrite/outbox를 타 오프라인에서도 보존.
+// 용량 압박(RTDB·localStorage outbox·전 클라이언트 다운로드) 때문에 작게 유지하고 캡을 둔다.
+// 캡 초과 시 화질·크기를 줄여 재시도, 끝내 초과면 null(첨부 생략).
+async function makeThumbBase64(blob, maxDim, quality, capBytes) {
+  let q = quality, dim = maxDim;
+  for (let i = 0; i < 4; i++) {
+    const small = await downscaleImageBlob(blob, dim, q);
+    const b64 = await blobToBase64(small);
+    if (b64.length <= capBytes) return b64;   // base64 문자 수 ≈ 바이트 수
+    q -= 0.12;
+    if (q < 0.4) { dim = Math.round(dim * 0.8); q = quality; }
+  }
+  return null;
+}
+
+// 슬롯별 권장 크기/캡 — cardPhoto(글자 판독) 약간 크게, patientPhoto(식별) 더 작게
+function _photoSpec(target) {
+  return target === 'cardPhoto' ? { dim: 640, cap: 70000 } : { dim: 480, cap: 55000 };
+}
+
+// blob을 썸네일로 만들어 현재 draft의 슬롯에 넣음. opts.flag=true면 OCR 자동첨부 노란표시.
+// render는 호출부 책임. 캡 초과/오프라인 용량부족 시 첨부 생략(임상 카드 데이터는 항상 우선).
+async function commitPhotoToDraft(blob, target, opts = {}) {
+  const { dim, cap } = _photoSpec(target);
+  let t = null;
+  try { t = await makeThumbBase64(blob, dim, 0.6, cap); }
+  catch (e) { console.warn('[photo] 썸네일 생성 실패', e); }
+  if (!t) { window.__mciToast?.('사진 용량이 커서 첨부하지 못했습니다 (카드 정보는 저장됩니다)', 'warn'); return false; }
+  // 오프라인 outbox 용량 압박 시 사진은 건너뜀(임상 데이터 보호 — _outboxEvictForSpace는 오프라인에서 공간 확보 불가)
+  if (!navigator.onLine) {
+    try {
+      const sz = (localStorage.getItem(OUTBOX_KEY) || '').length;
+      if (sz > 3000000) { window.__mciToast?.('오프라인 저장공간 부족 — 사진은 건너뜁니다 (카드 정보는 저장됨)', 'warn'); return false; }
+    } catch (e) {}
+  }
+  currentCasualtyDraft()[target] = t;
+  if (opts.flag) mciOcrFlags[target] = true; else delete mciOcrFlags[target];
+  return true;
+}
+
+async function attachPhotoFromBlob(blob, target) {
+  await commitPhotoToDraft(blob, target);
+  render();
+}
+
+// getUserMedia 불가 기기 폴백 — 파일 선택(촬영/갤러리)
+function pickPhotoFile(target) {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment';
+  inp.onchange = () => { const f = inp.files && inp.files[0]; if (f) attachPhotoFromBlob(f, target); };
+  inp.click();
+}
+
+// 사진 슬롯 촬영/재촬영 진입 — 카메라 가능하면 모달(photo 모드), 아니면 파일 선택
+function openPhotoCapture(target) {
+  if (navigator.mediaDevices?.getUserMedia) openCameraModal('photo', target);
+  else pickPhotoFile(target);
+}
+
 async function runClaudeOcr(blob) {
   const user = auth.currentUser;
   if (!user) throw new Error('인증되지 않음 — 새로고침 후 다시 시도');
@@ -6145,6 +6261,16 @@ async function analyzeCapturedImage() {
     return;
   }
 
+  // 사진 첨부 모드 — OCR 없이 썸네일만 만들어 슬롯에 저장
+  if (_cameraMode === 'photo') {
+    const blob = _cameraCapturedBlob, target = _cameraPhotoTarget;
+    showCameraAnalyzing('사진 처리 중...');
+    await commitPhotoToDraft(blob, target);
+    closeCameraModal();
+    render();
+    return;
+  }
+
   let flags = null;
 
   // 1차: Claude AI 분석 (온라인일 때) — 손글씨·체크표시까지 판독
@@ -6197,6 +6323,9 @@ async function analyzeCapturedImage() {
   if (state.mciInputMode === 'simple' && _fullOnlyKeys.some(k => flags[k])) {
     state.mciInputMode = 'full';
   }
+  // OCR에 쓴 카드 이미지를 카드 사진으로도 보관 (기존엔 폐기) — 첨부 실패는 무시(OCR 결과는 살림)
+  try { await commitPhotoToDraft(_cameraCapturedBlob, 'cardPhoto', { flag: true }); }
+  catch (e) { console.warn('[photo] cardPhoto 보관 실패', e); }
   closeCameraModal();
   render();
   setTimeout(() => alert(`${filledCount}개 필드가 자동 입력되었습니다. 노란색으로 강조된 부분을 꼭 확인해주세요.`), 100);
@@ -6218,6 +6347,19 @@ function initCameraModal() {
     if (e.target === modal) closeCameraModal();
   });
   // ESC 처리는 initGlobalEscHandler()에서 통합 관리
+
+  // ── 사진 첨부 이벤트 (문서 레벨 위임 — 모든 화면 공통, 1회만 등록) ──
+  document.addEventListener('click', (e) => {
+    const enl = e.target.closest('[data-photo-enlarge]');
+    if (enl) { state.photoEnlarge = enl.getAttribute('src'); render(); return; }
+    if (e.target.closest('#photo-enlarge-close') || e.target.id === 'photo-enlarge-bg') {
+      state.photoEnlarge = null; render(); return;
+    }
+    const cap = e.target.closest('[data-photo-cap]');
+    if (cap) { openPhotoCapture(cap.getAttribute('data-photo-cap')); return; }
+    const del = e.target.closest('[data-photo-del]');
+    if (del) { const k = del.getAttribute('data-photo-del'); currentCasualtyDraft()[k] = ''; delete mciOcrFlags[k]; render(); return; }
+  });
 }
 
 // ==================== 탭 스와이프 전환 (터치) ====================
@@ -6285,6 +6427,8 @@ function initSwipeTabNav() {
 function initGlobalEscHandler() {
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
+    // 0) 사진 확대 오버레이 (최상단)
+    if (state.photoEnlarge) { state.photoEnlarge = null; render(); return; }
     // 1) 카메라 OCR 모달
     const cam = document.getElementById('camera-modal');
     if (cam && !cam.classList.contains('hidden')) { closeCameraModal(); return; }
@@ -7292,7 +7436,7 @@ function renderMciSituation() {
                         <span class="text-xs px-2 py-0.5 rounded font-black" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
                         ${c.isPediatric ? '<i data-lucide="baby" class="w-3.5 h-3.5 text-cyan-400 inline ml-1"></i>' : ''}
                       </td>
-                      <td class="px-2.5 py-2.5 font-bold ${state.briefingMode ? 'mono text-slate-200' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''}">${displayName} ${ritBadge(c)}</td>
+                      <td class="px-2.5 py-2.5 font-bold ${state.briefingMode ? 'mono text-slate-200' : 'text-slate-100'} ${c._autoNamed ? 'italic text-slate-400' : ''}">${displayName} ${ritBadge(c)}${(c.cardPhoto || c.patientPhoto) ? ' <i data-lucide="camera" class="w-3 h-3 text-violet-400 inline" title="사진 첨부됨"></i>' : ''}</td>
                       <td class="px-2.5 py-2.5 text-center text-slate-300 mono font-medium">${escapeHtml(c.age || '-')}/${escapeHtml(c.gender || '-')}</td>
                       <td class="px-2.5 py-2.5 text-slate-200 max-w-[160px] truncate" title="${escapeHtml(c.location || '')}">${escapeHtml(c.location || '-')}</td>
                       <td class="px-2.5 py-2.5 text-center">
@@ -7448,6 +7592,17 @@ function bindMciSituationEvents() {
 }
 
 // ==================== MCI 사상자 카드 상세 모달 ====================
+// 사진 확대 오버레이 — 썸네일 클릭 시 전체화면. 닫기·ESC는 전역 위임(initCameraModal)/ESC 핸들러.
+function renderPhotoEnlarge() {
+  return `
+    <div id="photo-enlarge-bg" class="fixed inset-0 z-[210] bg-black/90 flex items-center justify-center p-4">
+      <img src="${state.photoEnlarge}" class="max-w-full max-h-full rounded-lg shadow-2xl" alt="확대 보기" />
+      <button id="photo-enlarge-close" type="button" class="absolute top-4 right-4 text-white/80 hover:text-white p-2 bg-black/50 rounded-full" aria-label="닫기">
+        <i data-lucide="x" class="w-7 h-7"></i>
+      </button>
+    </div>`;
+}
+
 function renderMciCardDetailModal() {
   const c = state.mciCasualties.find(x => x._key === state.viewMciCardKey);
   if (!c) {
@@ -7464,6 +7619,9 @@ function renderMciCardDetailModal() {
   const displayName    = state.briefingMode ? maskNameHtml(c.name)        : escapeHtml(c.name || '-');
   const displayAuthor  = state.briefingMode ? maskNameHtml(c.author)      : escapeHtml(c.author || '-');
   const displaySymptom = state.briefingMode ? maskSymptomHtml(c.symptom)  : escapeHtml(c.symptom || '');
+
+  // 첨부 사진은 민감정보 — 표출 역할/마스킹 모드에선 숨김 (공개 표출엔 절대 노출 금지)
+  const showPhotos = !isDisplay() && !state.briefingMode && (c.cardPhoto || c.patientPhoto);
 
   const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '-';
 
@@ -7626,6 +7784,17 @@ function renderMciCardDetailModal() {
             </section>
           ` : ''}
 
+          <!-- 첨부 사진 (권한자·비마스킹 시에만 · 공개 표출엔 표시 금지) -->
+          ${showPhotos ? `
+            <section class="bg-slate-950 rounded-xl p-3 border border-slate-800">
+              <div class="text-[10px] tracking-widest text-slate-500 uppercase mb-2 flex items-center gap-1"><i data-lucide="camera" class="w-3 h-3"></i>첨부 사진</div>
+              <div class="grid grid-cols-2 gap-3">
+                ${c.cardPhoto ? `<div><div class="text-[10px] text-slate-500 mb-1">중증도분류표</div><img src="data:image/jpeg;base64,${c.cardPhoto}" data-photo-enlarge class="w-full max-h-56 object-contain rounded border border-slate-700 cursor-zoom-in bg-black/30" alt="중증도분류표" /></div>` : ''}
+                ${c.patientPhoto ? `<div><div class="text-[10px] text-slate-500 mb-1">환자 사진</div><img src="data:image/jpeg;base64,${c.patientPhoto}" data-photo-enlarge class="w-full max-h-56 object-contain rounded border border-slate-700 cursor-zoom-in bg-black/30" alt="환자 사진" /></div>` : ''}
+              </div>
+            </section>
+          ` : ''}
+
           <!-- 등록자 · 시간 -->
           <div class="text-[10px] text-slate-500 flex flex-wrap gap-x-3 gap-y-1 pt-2 border-t border-slate-800">
             <span>등록자: <span class="${state.briefingMode ? 'mono text-slate-400' : 'text-slate-300'}">${displayAuthor}</span></span>
@@ -7695,6 +7864,8 @@ function bindMciCardDetailModalEvents() {
         notTransported: !!c.notTransported,
         notTransportedReason: c.notTransportedReason || (c.notTransported ? '자체귀가' : ''),
         notes: c.notes || '',
+        cardPhoto: c.cardPhoto || '',        // 수정 시 기존 사진 보존 (없으면 set/update가 사진을 지움)
+        patientPhoto: c.patientPhoto || '',
         _editKey: c._key,
       };
       state.viewMciCardKey = null;
