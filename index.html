@@ -5421,7 +5421,7 @@ function renderMciCasualtyForm() {
               ? `<span class="text-violet-300 font-bold">미이송 (${ntReasonLabel(c)})</span>`
               : (c.hospital ? `<span class="text-emerald-300 font-bold">${escapeHtml(c.hospital)}</span>${c.departTime ? ` · 출발 <span class="mono">${escapeHtml(c.departTime)}</span>` : ''}${c.arriveTime ? ` · 도착 <span class="mono">${escapeHtml(c.arriveTime)}</span>` : ''}` : '<span class="text-amber-400">미배정</span>'))}
             ${row('메모', c.notes ? escapeHtml(c.notes) : '')}
-            ${(!state.briefingMode && (c.cardPhoto || c.patientPhoto)) ? `
+            ${(c.cardPhoto || c.patientPhoto) ? `
               <div class="bg-slate-950 rounded-lg p-2.5 border border-slate-800 sm:col-span-2">
                 <div class="text-[10px] text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1"><i data-lucide="camera" class="w-3 h-3"></i>첨부 사진</div>
                 <div class="flex gap-2">
@@ -6817,6 +6817,8 @@ function bindMciCasualtyEvents() {
       notTransported: !!_draft.notTransported,
       notTransportedReason: _draft.notTransported ? (_draft.notTransportedReason || '자체귀가') : null,
       notes: (_draft.notes || '').trim(),
+      cardPhoto: _draft.cardPhoto || '',        // 첨부 사진(base64 썸네일) — 빠지면 저장 안 돼 사진이 안 뜸
+      patientPhoto: _draft.patientPhoto || '',
     }, state.user.teamId, state.user.name, _draft._editKey);
 
     if (ok) {
@@ -7620,8 +7622,9 @@ function renderMciCardDetailModal() {
   const displayAuthor  = state.briefingMode ? maskNameHtml(c.author)      : escapeHtml(c.author || '-');
   const displaySymptom = state.briefingMode ? maskSymptomHtml(c.symptom)  : escapeHtml(c.symptom || '');
 
-  // 첨부 사진은 민감정보 — 표출 역할/마스킹 모드에선 숨김 (공개 표출엔 절대 노출 금지)
-  const showPhotos = !isDisplay() && !state.briefingMode && (c.cardPhoto || c.patientPhoto);
+  // 첨부 사진: 표출(display) 역할엔 절대 노출 금지. 운영자/본부 상세 열람은 마스킹 모드와 무관하게 허용
+  // (표출 화면 renderDisplay*엔 사진을 아예 렌더하지 않음. 상세 모달은 운영자의 명시적 드릴다운).
+  const showPhotos = !isDisplay() && (c.cardPhoto || c.patientPhoto);
 
   const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '-';
 
