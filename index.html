@@ -65,36 +65,44 @@
   }
 
   /* ── 스크롤 화살표(.glow-arrows) ──
-     페이드만으로는 "더 있다"는 게 잘 안 보여서, 스크롤 가능한 방향에
-     ↑ ↓ 화살표를 띄우고 살짝 움직이게(펄스) 함.
+     업무공유시스템 스타일: 둥근 버튼 안에 흰 화살표 + 바깥으로 빛번짐(글로우).
+     (가는 선 화살표는 TV에서 잘 안 보인다는 피드백을 받아 원형 배지로 교체)
      화살표는 스크롤 영역 '바깥' 테두리 박스에 그려서 페이드에 같이 흐려지지 않음.
+     색은 코발트(#3E7BFA) — 트리아지 4색(적·황·녹·흑)과 겹치지 않아 오인 위험 없음.
      arrow-top / arrow-bottom 클래스는 JS(applyScrollGlow)가 붙였다 뗌. */
   .glow-arrows { position: relative; }
   .glow-arrows::before, .glow-arrows::after {
-    content: ''; position: absolute; left: 50%; margin-left: -9px;
-    width: 15px; height: 15px;
-    border-right: 3px solid #94a3b8; border-bottom: 3px solid #94a3b8;
-    border-radius: 2px;
-    filter: drop-shadow(0 0 6px rgba(148,163,184,.55));
-    opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 5;
+    content: ''; position: absolute; left: 50%; margin-left: -21px;
+    width: 42px; height: 42px; border-radius: 9999px;
+    background-color: #3E7BFA;
+    background-repeat: no-repeat; background-position: center; background-size: 24px 24px;
+    opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 5;
   }
-  .glow-arrows::before { top: 9px;    transform: rotate(-135deg); }  /* 위쪽 화살표 */
-  .glow-arrows::after  { bottom: 11px; transform: rotate(45deg);  }  /* 아래쪽 화살표 */
-  .glow-arrows.arrow-top::before    { opacity: .9; animation: glowArrowUp   1.6s ease-in-out infinite; }
-  .glow-arrows.arrow-bottom::after  { opacity: .9; animation: glowArrowDown 1.6s ease-in-out infinite; }
+  /* 흰 화살표(V자)는 SVG를 그대로 심음 — 외부 파일·아이콘 폰트에 의존하지 않아 오프라인에서도 표시 */
+  .glow-arrows::before {
+    top: 10px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='18 15 12 9 6 15'/%3E%3C/svg%3E");
+  }
+  .glow-arrows::after {
+    bottom: 10px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  }
+  .glow-arrows.arrow-top::before   { opacity: 1; animation: glowArrowUp   1.8s ease-in-out infinite; }
+  .glow-arrows.arrow-bottom::after { opacity: 1; animation: glowArrowDown 1.8s ease-in-out infinite; }
+  /* 위아래로 살짝 떠다니며 빛번짐이 커졌다 작아짐 — 멀리서도 눈에 들어오게.
+     ※ opacity를 키프레임 안에 직접 넣음 — 전환(transition)에 기대지 않아
+        다시 그려질 때 간혹 투명하게 남는 문제를 원천 차단 */
   @keyframes glowArrowDown {
-    0%, 100% { transform: rotate(45deg)   translate(0, 0);     opacity: .5; }
-    50%      { transform: rotate(45deg)   translate(3px, 3px); opacity: 1; }
+    0%, 100% { opacity: .85; transform: translateY(0);
+               box-shadow: 0 0 0 5px rgba(62,123,250,.16), 0 0 14px 3px rgba(62,123,250,.45), 0 3px 10px rgba(0,0,0,.45); }
+    50%      { opacity: 1;   transform: translateY(5px);
+               box-shadow: 0 0 0 9px rgba(62,123,250,.10), 0 0 26px 8px rgba(62,123,250,.75), 0 3px 10px rgba(0,0,0,.45); }
   }
   @keyframes glowArrowUp {
-    0%, 100% { transform: rotate(-135deg) translate(0, 0);     opacity: .5; }
-    50%      { transform: rotate(-135deg) translate(3px, 3px); opacity: 1; }
-  }
-  /* 외부(밝은) 모드 — 흰 배경에서도 보이게 진한 색으로 */
-  body.outdoor-mode .glow-arrows::before,
-  body.outdoor-mode .glow-arrows::after {
-    border-right-color: #475569; border-bottom-color: #475569;
-    filter: drop-shadow(0 0 6px rgba(71,85,105,.35));
+    0%, 100% { opacity: .85; transform: translateY(0);
+               box-shadow: 0 0 0 5px rgba(62,123,250,.16), 0 0 14px 3px rgba(62,123,250,.45), 0 3px 10px rgba(0,0,0,.45); }
+    50%      { opacity: 1;   transform: translateY(-5px);
+               box-shadow: 0 0 0 9px rgba(62,123,250,.10), 0 0 26px 8px rgba(62,123,250,.75), 0 3px 10px rgba(0,0,0,.45); }
   }
 
   /* ============================================================
