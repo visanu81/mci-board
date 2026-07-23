@@ -40,6 +40,31 @@
   .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
 
   /* ============================================================
+     스크롤 글로우 (.scroll-glow)
+     스크롤 막대를 아예 숨기고, "더 볼 내용이 있는 쪽" 가장자리만
+     은은하게 흐려지게(페이드) 처리 — 상황실 TV처럼 멀리서 보는 화면에서
+     스크롤바가 지저분하게 걸리는 문제를 없앰.
+     · glow-top    : 위로 더 있음  → 윗변 페이드
+     · glow-bottom : 아래로 더 있음 → 아랫변 페이드
+     두 클래스는 JS(applyScrollGlow)가 스크롤 위치에 따라 실시간으로 붙였다 뗌.
+     배경색을 쓰지 않고 마스크로 처리하므로 다크/외부(밝은) 모드 모두 그대로 동작.
+     ============================================================ */
+  .scroll-glow { scrollbar-width: none; -ms-overflow-style: none; }
+  .scroll-glow::-webkit-scrollbar { width: 0; height: 0; }
+  .scroll-glow.glow-top {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 32px);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 32px);
+  }
+  .scroll-glow.glow-bottom {
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent 100%);
+            mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent 100%);
+  }
+  .scroll-glow.glow-top.glow-bottom {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%);
+  }
+
+  /* ============================================================
      가독성 향상 (전역 일괄 보정)
      1) 다크 모드: 어두운 배경에서 대비가 부족한 회색 글씨를 한 단계씩 밝게
         (외부 모드는 자체 라이트 팔레트가 !important로 적용되므로 영향 없음)
@@ -2831,7 +2856,9 @@ function renderDisplayMain() {
         ${displayList.length === 0 ? `
           <div class="flex-shrink-0 bg-slate-900 border-2 border-slate-800 rounded-2xl p-10 text-center text-2xl text-slate-500">아직 등록된 사상자 카드가 없습니다</div>
         ` : `
-          <div class="flex-1 min-h-0 overflow-y-auto rounded-2xl border-2 border-slate-800 bg-slate-900/60 divide-y divide-slate-800/70 scrollbar-thin">
+          <!-- 바깥: 테두리·배경(고정) / 안쪽: 실제 스크롤 영역(scroll-glow — 스크롤바 대신 가장자리 페이드) -->
+          <div class="flex-1 min-h-0 rounded-2xl border-2 border-slate-800 bg-slate-900/60 overflow-hidden">
+          <div class="h-full overflow-y-auto scroll-glow divide-y divide-slate-800/70">
             ${displayList.map(c => {
               const tr = MCI_TRIAGE.find(t => t.id === c.triage);
               const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '';
@@ -2859,6 +2886,7 @@ function renderDisplayMain() {
                 </div>
               `;
             }).join('')}
+          </div>
           </div>
         `}`;
 
@@ -2961,7 +2989,7 @@ function renderDisplayMain() {
       <div class="flex-1 min-h-0 ${isList ? 'flex flex-row gap-6' : 'flex flex-col'}">
 
       <!-- 요약(트리아지·이송·병원별) — list 모드: 좌측 스크롤 컬럼 / summary 모드: contents로 본문에 직접 흐름 -->
-      <div class="${isList ? summaryColClass + ' flex flex-col min-h-0 overflow-y-auto scrollbar-thin pr-1' : 'flex-1 min-h-0 flex flex-col overflow-y-auto scrollbar-thin'}">
+      <div class="${isList ? summaryColClass + ' flex flex-col min-h-0 overflow-y-auto scroll-glow pr-1' : 'flex-1 min-h-0 flex flex-col overflow-y-auto scroll-glow'}">
 
       <!-- 발견 위치별 — 좌측 컬럼 최상단 섹션(제목은 다른 섹션과 동일 크기). 작은 카드 한 줄. -->
       <section class="flex-shrink-0 mb-3" data-tv-panel="loc" style="order:${ordLoc};${show.loc ? '' : 'display:none'}">
@@ -3347,7 +3375,32 @@ function renderDisplayPatientCard(c) {
 }
 
 // 표출 모드 이벤트 바인딩 — picker / main / modal
+/* ── 스크롤 글로우 적용 ──
+   .scroll-glow 영역마다 "위/아래로 더 볼 내용이 있는지"를 확인해 가장자리 페이드를 켜고 끔.
+   스크롤할 때(스크롤 이벤트)와 창 크기가 바뀔 때(ResizeObserver) 자동 갱신.
+   ※ Tailwind CDN이 클래스를 뒤늦게 적용하며 높이가 변할 수 있어 한 번 더 지연 갱신. */
+function applyScrollGlow(root) {
+  (root || document).querySelectorAll('.scroll-glow').forEach(el => {
+    const update = () => {
+      const more = el.scrollHeight - el.clientHeight;
+      const canScroll = more > 4;                                   // 넘치는 내용이 없으면 페이드 없음
+      el.classList.toggle('glow-top',    canScroll && el.scrollTop > 4);
+      el.classList.toggle('glow-bottom', canScroll && el.scrollTop < more - 4);
+    };
+    if (!el._scrollGlowBound) {
+      el._scrollGlowBound = true;
+      el.addEventListener('scroll', update, { passive: true });
+      if (window.ResizeObserver) new ResizeObserver(update).observe(el);
+    }
+    update();
+    setTimeout(update, 300);
+  });
+}
+
 function bindDisplayEvents() {
+  // 스크롤바 대신 가장자리 글로우로 "더 있음"을 표시
+  applyScrollGlow();
+
   // 팝아웃 창 — [창 닫기]
   const closePopout = document.getElementById('display-close-popout');
   if (closePopout) closePopout.onclick = () => window.close();
