@@ -607,6 +607,89 @@
   .display-hospital-grid::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
   .display-hospital-grid::-webkit-scrollbar-thumb:hover { background: #64748b; }
 </style>
+
+<!-- ============================================================================
+     리디자인 레이어 v2 — UI 인터랙션 색 통일 (코발트)
+     원칙: 인터랙션(주 액션 버튼·입력 포커스·주 탭)은 코발트로 통일.
+           red/pink는 모드 정체성·긴급·경고 전용으로 보존.
+     방식: 순수 CSS 오버라이드. 마크업/JS/ID/이벤트는 일절 변경 없음.
+       · 액션 버튼 = `.bg-red-600.hover:bg-red-700` 조합만 타깃
+         → 경고 배너(bg-red-600 단독)·삭제(bg-red-700)·편집(amber)·비활성(slate)은 자동 제외
+       · 트리아지 색은 JS 인라인 hex라 영향 없음
+     ============================================================================ -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style id="redesign-cobalt">
+  :root {
+    --cx-brand: #3E7BFA;
+    --cx-brand-hi: #5C92FF;
+    --cx-ring: rgba(62,123,250,.30);
+  }
+  body.outdoor-mode {
+    --cx-brand: #1F5FE0;
+    --cx-brand-hi: #1A52C6;
+    --cx-ring: rgba(31,95,224,.20);
+  }
+
+  /* ── 주 액션 버튼: 저장·진입·인증·추가·새 재난 등 ──
+     일반재난 모드=red, MCI 모드=pink 두 조합 모두 코발트로 통일.
+     (편집중 amber·비활성 slate·경고 배너·삭제·핑크 배지/토글/카메라는 조합이 달라 자동 제외) */
+  .bg-red-600.hover\:bg-red-700:not(:disabled),
+  .bg-pink-600.hover\:bg-pink-700:not(:disabled) {
+    background-color: var(--cx-brand) !important;
+  }
+  .bg-red-600.hover\:bg-red-700:not(:disabled):hover,
+  .bg-pink-600.hover\:bg-pink-700:not(:disabled):hover {
+    background-color: var(--cx-brand-hi) !important;
+  }
+
+  /* ── 입력 포커스: 전 폼 공통 코발트 링 ── */
+  body input:focus,
+  body textarea:focus,
+  body select:focus {
+    border-color: var(--cx-brand) !important;
+    box-shadow: 0 0 0 3px var(--cx-ring) !important;
+    outline: none !important;
+  }
+
+  /* ── 주 네비게이션 탭 밑줄 (상황판/사상자카드 등) ── */
+  .border-b-2.border-red-500 {
+    border-color: var(--cx-brand) !important;
+  }
+
+  /* ============================================================
+     표면·타이포 스킨 (다크 전용) — 목업의 계층형 팔레트로 리매핑.
+     outdoor(라이트) 모드는 body.outdoor-mode 규칙이 더 구체적이라 그대로 우선.
+     ============================================================ */
+  body:not(.outdoor-mode) { background:#0A0E15 !important; }
+  body:not(.outdoor-mode) .bg-slate-950:not(.floor-chip-max) { background-color:#0A0E15 !important; }
+  body:not(.outdoor-mode) .bg-slate-900 { background-color:#141B26 !important; }
+  body:not(.outdoor-mode) .bg-slate-800 { background-color:#1D2632 !important; }
+  body:not(.outdoor-mode) .bg-slate-700 { background-color:#27323F !important; }
+  body:not(.outdoor-mode) [class*="bg-slate-950/"] { background-color:rgba(10,14,21,.72) !important; }
+  body:not(.outdoor-mode) [class*="bg-slate-900/"] { background-color:rgba(20,27,38,.62) !important; }
+
+  body:not(.outdoor-mode) .border-slate-950 { border-color:#0A0E15 !important; }
+  body:not(.outdoor-mode) .border-slate-900 { border-color:#1D2632 !important; }
+  body:not(.outdoor-mode) .border-slate-800 { border-color:#2A3441 !important; }
+  body:not(.outdoor-mode) .border-slate-700 { border-color:#37424F !important; }
+  body:not(.outdoor-mode) .divide-slate-900 > * + * { border-color:#1D2632 !important; }
+  body:not(.outdoor-mode) .divide-slate-800 > * + * { border-color:#2A3441 !important; }
+
+  body:not(.outdoor-mode) .text-slate-100 { color:#F1F5FA !important; }
+  body:not(.outdoor-mode) .text-slate-200 { color:#DCE3EC !important; }
+  body:not(.outdoor-mode) .text-slate-300 { color:#C2CCD8 !important; }
+  body:not(.outdoor-mode) .text-slate-400 { color:#A6B2C1 !important; }
+  body:not(.outdoor-mode) .text-slate-500 { color:#8A96A4 !important; }
+  body:not(.outdoor-mode) .text-slate-600 { color:#6A7684 !important; }
+
+  /* 숫자 — JetBrains Mono 등폭 (목업의 수치 표기) */
+  .mono {
+    font-family:'JetBrains Mono', ui-monospace, monospace !important;
+    font-variant-numeric: tabular-nums;
+    letter-spacing:-.01em;
+  }
+</style>
 </head>
 <body>
 
@@ -875,6 +958,13 @@ const HOSPITAL_PRESETS = [
 
 // 현재 재난방 입력값(state.casualties + state.mciCasualties)에서 병원명 수집 + 프리셋 병합
 // → datalist 옵션으로 사용됨 (이미 한 번이라도 정확히 입력되면 다음 사용자는 자동완성으로 선택 가능)
+// 표출 내장 프리셋 — 패널 표시/순서/레이아웃 조합. 설정 팝오버와 핸들러에서 공용.
+const TV_BUILTIN_PRESETS = [
+  { id:'b1', name:'초기 대응', cfg:{ panels:{ loc:true,  transport:true,  hosp:false, patients:true  }, order:['loc','transport','patients','hosp'], layout:'right' } },
+  { id:'b2', name:'이송 집중', cfg:{ panels:{ loc:false, transport:true,  hosp:true,  patients:true  }, order:['transport','hosp','patients','loc'], layout:'right' } },
+  { id:'b3', name:'전체 · 가로', cfg:{ panels:{ loc:true,  transport:true,  hosp:true,  patients:true  }, order:['loc','transport','hosp','patients'], layout:'bottom' } },
+];
+
 function getHospitalSuggestions() {
   const set = new Set();
   HOSPITAL_PRESETS.forEach(h => set.add(h));
@@ -2380,6 +2470,10 @@ function renderUserSetup() {
               <input id="name-input" type="text" placeholder="예: 불현1급차" value="${state.tempName || ''}"
                 class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2.5 text-base focus:outline-none focus:border-red-500" />
             </div>
+            <div class="flex items-start gap-2 mt-2 px-3 py-2.5 rounded-lg" style="background:rgba(62,123,250,.09);border:1px solid rgba(62,123,250,.24)">
+              <i data-lucide="info" class="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style="color:#3E7BFA"></i>
+              <p class="text-[11px] leading-relaxed text-slate-400">호출명은 <b class="text-slate-200 font-bold">미상 환자 추적</b>의 기준이 됩니다. 신원 확인 전 등록한 환자에 담당자 호출명이 함께 남아, 현장·병원 인계 시 <b class="text-slate-200 font-bold">누가 어디서 등록했는지</b> 바로 확인돼요.</p>
+            </div>
           </div>
           <button id="enter-btn" class="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:bg-slate-800 disabled:text-slate-600 font-bold text-base tracking-wide transition-all flex items-center justify-center gap-2">
             <i data-lucide="log-in" class="w-5 h-5"></i>상황판 진입
@@ -2634,10 +2728,33 @@ function renderDisplayMain() {
   try { _cardSortDesc = localStorage.getItem('mci_card_sort') === 'desc'; } catch (e) {}
   const displayList = [...state.mciCasualties].sort((a, b) => _cardSortDesc ? (b.cardNo || 0) - (a.cardNo || 0) : (a.cardNo || 0) - (b.cardNo || 0));
 
-  // 표출 레이아웃 모드 — 'list'(요약+사상자 명단 2단, 기본) | 'summary'(기존: 요약만 전체폭). localStorage 저장.
-  let displayLayout = 'list';
-  try { if (localStorage.getItem('mci_display_layout') === 'summary') displayLayout = 'summary'; } catch (e) {}
-  const isList = displayLayout === 'list';
+  // ── 표출 항목 구성 (패널 표시/순서/레이아웃) — localStorage 저장 + 구버전 mci_display_layout 마이그레이션 ──
+  if (!state.tvConfig) {
+    let cfg = null;
+    try { const raw = localStorage.getItem('mci_tv_config_v1'); if (raw) cfg = JSON.parse(raw); } catch (e) {}
+    if (!cfg) {
+      let old = 'list';
+      try { if (localStorage.getItem('mci_display_layout') === 'summary') old = 'summary'; } catch (e) {}
+      cfg = (old === 'summary')
+        ? { panels:{ loc:true, transport:true, hosp:true, patients:false }, order:['loc','transport','hosp','patients'], layout:'bottom' }
+        : { panels:{ loc:true, transport:true, hosp:true, patients:true  }, order:['loc','transport','hosp','patients'], layout:'right' };
+    }
+    cfg.panels = Object.assign({ loc:true, transport:true, hosp:true, patients:true }, cfg.panels || {});
+    cfg.order  = (Array.isArray(cfg.order) && cfg.order.length === 4) ? cfg.order : ['loc','transport','hosp','patients'];
+    cfg.layout = cfg.layout === 'bottom' ? 'bottom' : 'right';
+    state.tvConfig = cfg;
+  }
+  if (!state.tvPresets) {
+    let cp = [];
+    try { const raw = localStorage.getItem('mci_tv_presets_v1'); if (raw) cp = JSON.parse(raw) || []; } catch (e) {}
+    state.tvPresets = cp;
+  }
+  const tvCfg = state.tvConfig;
+  const isList = tvCfg.layout === 'right';          // right=우측 패널(2단, 명단 우측) | bottom=하단 패널(단일 컬럼 스택)
+  const show = tvCfg.panels;
+  const ordOf = (k) => { const i = tvCfg.order.indexOf(k); return i < 0 ? 9 : i; };
+  const ordLoc = ordOf('loc'), ordTransport = ordOf('transport'), ordHosp = ordOf('hosp'), ordPatients = ordOf('patients');
+  const summaryColClass = isList ? (show.patients ? 'w-3/5 flex-shrink-0' : 'w-full') : 'flex-1';
   // 모드별 요약 카드 크기 — 요약만 모드는 초대형(기존 느낌), 명단 동반 모드는 적당히 줄여 명단 공간 확보.
   const triPad = isList ? 'py-3.5' : 'py-6';
   const triLabel = isList ? 'text-lg font-black tracking-wider mb-1' : 'text-xl font-black tracking-wider mb-2';
@@ -2698,6 +2815,88 @@ function renderDisplayMain() {
   const _maxFloorTotal = Math.max(0, ...floors.filter(f => f.name !== '미분류').map(f => f.total));
   const isHotFloor = (f) => f.name !== '미분류' && _maxFloorTotal > 0 && f.total === _maxFloorTotal;
 
+  // ── 사상자 명단 내부(우측·하단 레이아웃 공용) ──
+  const rosterInner = `
+        <h2 class="flex-shrink-0 text-2xl font-bold mb-3 flex items-center gap-2">
+          <div class="w-1.5 h-7 bg-rose-500 rounded-full"></div>
+          사상자 명단
+          ${state.briefingMode
+            ? '<span class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold tracking-wider">마스킹</span>'
+            : '<span class="text-xs px-2 py-0.5 rounded bg-red-600/30 text-red-300 font-bold tracking-wider">실명 표시</span>'}
+          <span class="ml-auto text-base text-slate-400 font-normal">총 <span class="font-bold text-slate-200 mono">${totalCount}</span>명</span>
+          <button id="display-list-sort" type="button" class="flex items-center gap-1 text-sm font-bold text-slate-300 bg-slate-800/70 border border-slate-700 rounded-lg px-2.5 py-1 hover:bg-slate-700 active:bg-slate-600 transition-colors" title="번호 정렬 순서 바꾸기 (오름차순 ↔ 내림차순)" aria-label="사상자 명단 번호 정렬 순서 전환">
+            <i data-lucide="${_cardSortDesc ? 'arrow-down-wide-narrow' : 'arrow-up-narrow-wide'}" class="w-4 h-4"></i>${_cardSortDesc ? '내림차순' : '오름차순'}
+          </button>
+        </h2>
+        ${displayList.length === 0 ? `
+          <div class="flex-shrink-0 bg-slate-900 border-2 border-slate-800 rounded-2xl p-10 text-center text-2xl text-slate-500">아직 등록된 사상자 카드가 없습니다</div>
+        ` : `
+          <div class="flex-1 min-h-0 overflow-y-auto rounded-2xl border-2 border-slate-800 bg-slate-900/60 divide-y divide-slate-800/70 scrollbar-thin">
+            ${displayList.map(c => {
+              const tr = MCI_TRIAGE.find(t => t.id === c.triage);
+              const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '';
+              const nm = state.briefingMode ? maskNameHtml(c.name) : escapeHtml(c.name || '-');
+              const sym = state.briefingMode ? maskSymptomHtml(c.symptom) : escapeHtml(c.symptom || '');
+              return `
+                <div class="px-4 py-2.5 flex items-center gap-3 text-lg">
+                  <span class="text-base text-slate-500 mono font-bold w-14 flex-shrink-0">${cardNo}</span>
+                  <span class="text-base py-1 rounded font-black flex-shrink-0 inline-flex items-center justify-center w-10" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
+                  ${c.isPediatric ? '<i data-lucide="baby" class="w-5 h-5 text-cyan-400 flex-shrink-0"></i>' : ''}
+                  <span class="font-bold ${c._autoNamed ? 'italic text-slate-400' : 'text-slate-100'} ${state.briefingMode ? 'mono' : ''} flex-shrink-0">${nm}</span>${ritBadge(c)}
+                  <span class="text-base text-slate-400 mono flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
+                  ${c.location ? `<span class="text-base text-pink-300 truncate max-w-[260px] flex-shrink-0"><i data-lucide="map-pin" class="w-4 h-4 inline"></i>${escapeHtml(c.location)}</span>` : ''}
+                  <span class="flex-1 min-w-0 text-base text-slate-300 truncate">${sym}</span>
+                  <div class="flex items-center gap-3 flex-shrink-0 text-base">
+                    ${c.notTransported
+                      ? '<span class="text-violet-400 font-bold">미이송</span>'
+                      : (c.hospital
+                          ? `<span class="text-emerald-300 truncate max-w-[200px]">${escapeHtml(c.hospital)}</span>`
+                          : '<span class="text-amber-400">미배정</span>')}
+                    ${c.arriveTime
+                      ? `<span class="text-emerald-400 mono">${escapeHtml(c.arriveTime)}</span>`
+                      : (c.departTime && !c.notTransported ? `<span class="text-amber-400 mono">${escapeHtml(c.departTime)}</span>` : '')}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}`;
+
+  // ── 표출 항목 구성 팝오버 ──
+  const PANEL_META = { loc:{label:'발견 위치별',icon:'map-pin'}, transport:{label:'이송 상태',icon:'ambulance'}, hosp:{label:'병원별 이송',icon:'building-2'}, patients:{label:'사상자 명단',icon:'clipboard-list'} };
+  const _segStyle = (on) => on ? ' style="background:#3E7BFA"' : '';
+  const tvSettingsPanel = !state.tvSettingsOpen ? '' : `
+    <div id="tv-config-backdrop" class="fixed inset-0 z-40"></div>
+    <div class="fixed top-28 right-6 md:right-10 xl:right-16 2xl:right-24 z-50 w-80 max-w-[calc(100vw-3rem)] bg-slate-900 border-2 border-slate-700 rounded-2xl shadow-2xl p-4 text-slate-200">
+      <div class="flex items-center gap-2 mb-1"><i data-lucide="sliders-horizontal" class="w-4 h-4 text-blue-400"></i><span class="text-sm font-black">표출 항목 구성</span></div>
+      <p class="text-[11px] text-slate-500 mb-3">항목을 켜고 <b class="text-slate-300">드래그로 순서</b>를 바꾸세요</p>
+      <div class="mb-3 pb-3 border-b border-slate-800">
+        <div class="flex items-center justify-between mb-2"><span class="text-[11px] font-bold text-slate-400">프리셋</span>
+          <button id="tv-preset-save" class="text-[11px] font-bold text-blue-300 border border-slate-700 rounded-md px-2 py-0.5 hover:bg-slate-800">+ 현재 구성 저장</button></div>
+        <div class="flex flex-wrap gap-1.5">
+          ${TV_BUILTIN_PRESETS.map(p => `<button data-tv-preset-builtin="${p.id}" class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-blue-300 hover:bg-slate-700">${escapeHtml(p.name)}</button>`).join('')}
+          ${(state.tvPresets||[]).map((p,i) => `<span class="inline-flex items-center text-[11px] font-bold rounded-lg bg-slate-800 border border-slate-700 text-slate-200 overflow-hidden"><button data-tv-preset-custom="${i}" class="px-2.5 py-1 hover:bg-slate-700">${escapeHtml(p.name)}</button><button data-tv-preset-del="${i}" class="px-1.5 py-1 text-slate-500 hover:text-red-400 hover:bg-slate-700 border-l border-slate-700" title="삭제">×</button></span>`).join('')}
+        </div>
+        ${state.tvSaving ? `<div class="flex gap-1.5 mt-2"><input id="tv-preset-name" placeholder="구성 이름" class="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs focus:outline-none" /><button id="tv-preset-confirm" class="px-2.5 py-1 rounded-lg text-white text-xs font-bold" style="background:#3E7BFA">저장</button><button id="tv-preset-cancel" class="px-2 py-1 rounded-lg bg-slate-700 text-slate-300 text-xs font-bold">취소</button></div>` : ''}
+      </div>
+      <div class="flex items-center gap-2 mb-3">
+        <span class="text-[11px] font-bold text-slate-400 flex-shrink-0">레이아웃</span>
+        <div class="flex flex-1 p-0.5 rounded-lg bg-slate-800 border border-slate-700">
+          <button data-tv-layout="right" class="flex-1 text-[11px] font-bold py-1 rounded-md ${tvCfg.layout==='right'?'text-white':'text-slate-400'}"${_segStyle(tvCfg.layout==='right')}>우측 패널</button>
+          <button data-tv-layout="bottom" class="flex-1 text-[11px] font-bold py-1 rounded-md ${tvCfg.layout==='bottom'?'text-white':'text-slate-400'}"${_segStyle(tvCfg.layout==='bottom')}>하단 패널</button>
+        </div>
+      </div>
+      <div id="tv-panel-list">
+        ${tvCfg.order.map(k => { const m = PANEL_META[k]; const on = !!show[k]; return `
+          <div class="tv-panel-row flex items-center gap-2 py-2 border-t border-slate-800" draggable="true" data-tv-key="${k}">
+            <i data-lucide="grip-vertical" class="w-4 h-4 text-slate-600 cursor-grab flex-shrink-0"></i>
+            <i data-lucide="${m.icon}" class="w-4 h-4 text-slate-400 flex-shrink-0"></i>
+            <span class="text-sm font-bold ${on?'text-slate-100':'text-slate-500'}">${m.label}</span>
+            <button data-tv-toggle="${k}" class="ml-auto w-10 h-6 rounded-full flex items-center px-0.5 transition-all ${on?'justify-end':'justify-start bg-slate-700'}"${on?' style="background:#3E7BFA"':''} aria-label="${m.label} 표시 토글"><span class="w-5 h-5 rounded-full bg-white block shadow"></span></button>
+          </div>`; }).join('')}
+      </div>
+    </div>`;
+
   return `
     <!-- 좌우 여백: TV(와이드)일수록 넓게 — 콘텐츠가 화면 가장자리에 붙지 않도록 -->
     <div class="h-screen bg-slate-950 text-slate-100 p-6 md:px-10 xl:px-16 2xl:px-24 select-none flex flex-col overflow-hidden">
@@ -2731,9 +2930,9 @@ function renderDisplayMain() {
             <div id="display-date" class="text-[11px] text-slate-500 mt-1.5 tracking-widest font-medium">----</div>
           </div>
           <div class="flex flex-col gap-1.5">
-            <!-- 표출 레이아웃 토글 — 사상자 명단 포함 / 요약만(기존) -->
-            <button id="display-layout-toggle" class="text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 bg-slate-800/70 text-slate-300 hover:bg-slate-700" title="표출 화면 전환: 사상자 명단 포함 / 요약만(기존)">
-              <i data-lucide="${isList ? 'layout-list' : 'layout-grid'}" class="w-3.5 h-3.5"></i>${isList ? '명단 포함' : '요약만'}
+            <!-- 표출 항목 구성 — 패널 표시·순서·레이아웃·프리셋 -->
+            <button id="display-tv-config" class="text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 ${state.tvSettingsOpen ? 'bg-slate-700 text-white' : 'bg-slate-800/70 text-slate-300 hover:bg-slate-700'}" title="표출 항목 구성 — 패널 표시·순서·레이아웃·프리셋">
+              <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>화면 구성
             </button>
             <!-- 마스킹(브리핑 모드) 토글 — 표출 화면에서 직접 켜고 끔 -->
             <button id="display-mask-toggle" class="text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 ${state.briefingMode ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30' : 'bg-red-600/30 text-red-300 hover:bg-red-600/40'}" title="이름·증상 마스킹 켜기/끄기">
@@ -2756,14 +2955,16 @@ function renderDisplayMain() {
         </div>
       </header>
 
+      ${tvSettingsPanel}
+
       <!-- 본문: 모드에 따라 [좌 요약 | 우 명단] 2단(list) 또는 [요약만 전체폭](summary) -->
       <div class="flex-1 min-h-0 ${isList ? 'flex flex-row gap-6' : 'flex flex-col'}">
 
       <!-- 요약(트리아지·이송·병원별) — list 모드: 좌측 스크롤 컬럼 / summary 모드: contents로 본문에 직접 흐름 -->
-      <div class="${isList ? 'w-3/5 flex-shrink-0 flex flex-col min-h-0 overflow-y-auto scrollbar-thin pr-1' : 'flex-1 min-h-0 flex flex-col overflow-y-auto scrollbar-thin'}">
+      <div class="${isList ? summaryColClass + ' flex flex-col min-h-0 overflow-y-auto scrollbar-thin pr-1' : 'flex-1 min-h-0 flex flex-col overflow-y-auto scrollbar-thin'}">
 
       <!-- 발견 위치별 — 좌측 컬럼 최상단 섹션(제목은 다른 섹션과 동일 크기). 작은 카드 한 줄. -->
-      <section class="flex-shrink-0 mb-3">
+      <section class="flex-shrink-0 mb-3" data-tv-panel="loc" style="order:${ordLoc};${show.loc ? '' : 'display:none'}">
         <h2 class="text-2xl font-bold mb-3 flex items-center gap-2">
           <div class="w-1.5 h-7 bg-pink-500 rounded-full"></div>
           발견 위치별
@@ -2782,8 +2983,8 @@ function renderDisplayMain() {
         ` : '<div class="text-base text-slate-500">발견 위치 정보 없음</div>'}
       </section>
 
-      <!-- 트리아지 합계 (초대형, 솔리드 컬러) -->
-      <section class="flex-shrink-0 mb-3">
+      <!-- 트리아지 합계 (초대형, 솔리드 컬러) — 고정 히어로(항상 표시·최상단) -->
+      <section class="flex-shrink-0 mb-3" style="order:-1">
         <h2 class="mb-3 flex items-baseline gap-3">
           <div class="w-1.5 h-7 bg-pink-500 rounded-full self-center"></div>
           <span class="text-2xl font-bold">트리아지 합계</span>
@@ -2824,7 +3025,7 @@ function renderDisplayMain() {
       </section>
 
       <!-- 이송 상태 — 자연 높이(트리아지·병원별과 균형). 과거 list 모드 flex-1 높이흡수는 카드가 과도하게 커져 제거. -->
-      <section class="flex-shrink-0 mb-3 flex flex-col">
+      <section class="flex-shrink-0 mb-3 flex flex-col" data-tv-panel="transport" style="order:${ordTransport};${show.transport ? '' : 'display:none'}">
         <h2 class="flex-shrink-0 text-2xl font-bold mb-3 flex items-center gap-2">
           <div class="w-1.5 h-7 bg-blue-500 rounded-full"></div>
           이송 상태
@@ -2852,7 +3053,7 @@ function renderDisplayMain() {
       <!-- (발견 위치별은 헤더 직후 상단 전체폭 한 줄로 이동) -->
 
       <!-- 병원별 이송 현황 — 모든 모드 자연 높이(요약 영역 스크롤이 공간 처리) -->
-      <section class="flex-shrink-0 mb-3 flex flex-col">
+      <section class="flex-shrink-0 mb-3 flex flex-col" data-tv-panel="hosp" style="order:${ordHosp};${show.hosp ? '' : 'display:none'}">
         <h2 class="flex-shrink-0 text-2xl font-bold mb-3 flex items-center gap-2">
           <div class="w-1.5 h-7 bg-cyan-500 rounded-full"></div>
           병원별 이송 현황
@@ -2892,58 +3093,10 @@ function renderDisplayMain() {
         `}
       </section>
 
+      ${!isList && show.patients ? `<section class="flex flex-col mb-3" style="order:${ordPatients};height:48vh" data-tv-panel="patients">${rosterInner}</section>` : ''}
       </div><!-- /요약 영역 -->
 
-      ${isList ? `
-      <!-- 우측: 사상자 명단 (list 모드 전용) — 가로 공간을 채워 지휘소가 전체 환자를 한눈에. 브리핑 모드 시 마스킹. -->
-      <section class="flex-1 min-h-0 flex flex-col">
-        <h2 class="flex-shrink-0 text-2xl font-bold mb-3 flex items-center gap-2">
-          <div class="w-1.5 h-7 bg-rose-500 rounded-full"></div>
-          사상자 명단
-          ${state.briefingMode
-            ? '<span class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold tracking-wider">마스킹</span>'
-            : '<span class="text-xs px-2 py-0.5 rounded bg-red-600/30 text-red-300 font-bold tracking-wider">실명 표시</span>'}
-          <span class="ml-auto text-base text-slate-400 font-normal">총 <span class="font-bold text-slate-200 mono">${totalCount}</span>명</span>
-          <!-- 번호 정렬 순서 토글 — 입력/상황판/좌측목록과 같은 설정(mci_card_sort) 공유 -->
-          <button id="display-list-sort" type="button" class="flex items-center gap-1 text-sm font-bold text-slate-300 bg-slate-800/70 border border-slate-700 rounded-lg px-2.5 py-1 hover:bg-slate-700 active:bg-slate-600 transition-colors" title="번호 정렬 순서 바꾸기 (오름차순 ↔ 내림차순)" aria-label="사상자 명단 번호 정렬 순서 전환">
-            <i data-lucide="${_cardSortDesc ? 'arrow-down-wide-narrow' : 'arrow-up-narrow-wide'}" class="w-4 h-4"></i>${_cardSortDesc ? '내림차순' : '오름차순'}
-          </button>
-        </h2>
-        ${displayList.length === 0 ? `
-          <div class="flex-shrink-0 bg-slate-900 border-2 border-slate-800 rounded-2xl p-10 text-center text-2xl text-slate-500">아직 등록된 사상자 카드가 없습니다</div>
-        ` : `
-          <div class="flex-1 min-h-0 overflow-y-auto rounded-2xl border-2 border-slate-800 bg-slate-900/60 divide-y divide-slate-800/70 scrollbar-thin">
-            ${displayList.map(c => {
-              const tr = MCI_TRIAGE.find(t => t.id === c.triage);
-              const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '';
-              const nm = state.briefingMode ? maskNameHtml(c.name) : escapeHtml(c.name || '-');
-              const sym = state.briefingMode ? maskSymptomHtml(c.symptom) : escapeHtml(c.symptom || '');
-              return `
-                <div class="px-4 py-2.5 flex items-center gap-3 text-lg">
-                  <span class="text-base text-slate-500 mono font-bold w-14 flex-shrink-0">${cardNo}</span>
-                  <span class="text-base py-1 rounded font-black flex-shrink-0 inline-flex items-center justify-center w-10" style="${triageBadgeStyle(tr?.id)}">${tr?.shortName || '?'}</span>
-                  ${c.isPediatric ? '<i data-lucide="baby" class="w-5 h-5 text-cyan-400 flex-shrink-0"></i>' : ''}
-                  <span class="font-bold ${c._autoNamed ? 'italic text-slate-400' : 'text-slate-100'} ${state.briefingMode ? 'mono' : ''} flex-shrink-0">${nm}</span>${ritBadge(c)}
-                  <span class="text-base text-slate-400 mono flex-shrink-0">${escapeHtml(c.age || '?')}/${escapeHtml(c.gender || '?')}</span>
-                  ${c.location ? `<span class="text-base text-pink-300 truncate max-w-[260px] flex-shrink-0"><i data-lucide="map-pin" class="w-4 h-4 inline"></i>${escapeHtml(c.location)}</span>` : ''}
-                  <span class="flex-1 min-w-0 text-base text-slate-300 truncate">${sym}</span>
-                  <div class="flex items-center gap-3 flex-shrink-0 text-base">
-                    ${c.notTransported
-                      ? '<span class="text-violet-400 font-bold">미이송</span>'
-                      : (c.hospital
-                          ? `<span class="text-emerald-300 truncate max-w-[200px]">${escapeHtml(c.hospital)}</span>`
-                          : '<span class="text-amber-400">미배정</span>')}
-                    ${c.arriveTime
-                      ? `<span class="text-emerald-400 mono">${escapeHtml(c.arriveTime)}</span>`
-                      : (c.departTime && !c.notTransported ? `<span class="text-amber-400 mono">${escapeHtml(c.departTime)}</span>` : '')}
-                  </div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        `}
-      </section>
-      ` : ''}
+      ${isList && show.patients ? `<section class="flex-1 min-h-0 flex flex-col" data-tv-panel="patients">${rosterInner}</section>` : ''}
       </div><!-- /본문 -->
 
       <!-- 푸터 -->
@@ -3207,15 +3360,75 @@ function bindDisplayEvents() {
     render();
   };
 
-  // 표출 레이아웃 토글 — 사상자 명단 포함(list) <-> 요약만(summary, 기존). localStorage 저장.
-  const layoutBtn = document.getElementById('display-layout-toggle');
-  if (layoutBtn) layoutBtn.onclick = () => {
-    let cur = 'list';
-    try { cur = (localStorage.getItem('mci_display_layout') === 'summary') ? 'summary' : 'list'; } catch (e) {}
-    const next = cur === 'summary' ? 'list' : 'summary';
-    try { localStorage.setItem('mci_display_layout', next); } catch (e) {}
-    render();
+  // 표출 항목 구성 (gear) — 패널 표시/순서/레이아웃/프리셋. 설정은 localStorage에 저장(구버전 mci_display_layout 대체).
+  const persistTvCfg = () => { try { localStorage.setItem('mci_tv_config_v1', JSON.stringify(state.tvConfig)); } catch (e) {} };
+  const persistTvPresets = () => { try { localStorage.setItem('mci_tv_presets_v1', JSON.stringify(state.tvPresets || [])); } catch (e) {} };
+
+  const cfgBtn = document.getElementById('display-tv-config');
+  if (cfgBtn) cfgBtn.onclick = (e) => { e.stopPropagation(); state.tvSettingsOpen = !state.tvSettingsOpen; state.tvSaving = false; render(); };
+  const cfgBackdrop = document.getElementById('tv-config-backdrop');
+  if (cfgBackdrop) cfgBackdrop.onclick = () => { state.tvSettingsOpen = false; state.tvSaving = false; render(); };
+
+  // 레이아웃 세그먼트 (우측/하단)
+  document.querySelectorAll('[data-tv-layout]').forEach(b => b.onclick = () => {
+    state.tvConfig.layout = b.dataset.tvLayout === 'bottom' ? 'bottom' : 'right';
+    persistTvCfg(); render();
+  });
+  // 패널 on/off
+  document.querySelectorAll('[data-tv-toggle]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    const k = b.dataset.tvToggle;
+    state.tvConfig.panels[k] = !state.tvConfig.panels[k];
+    persistTvCfg(); render();
+  });
+  // 프리셋 적용 (내장)
+  document.querySelectorAll('[data-tv-preset-builtin]').forEach(b => b.onclick = () => {
+    const p = TV_BUILTIN_PRESETS.find(x => x.id === b.dataset.tvPresetBuiltin);
+    if (p) { state.tvConfig = JSON.parse(JSON.stringify(p.cfg)); persistTvCfg(); render(); }
+  });
+  // 프리셋 적용 (커스텀) / 삭제
+  document.querySelectorAll('[data-tv-preset-custom]').forEach(b => b.onclick = () => {
+    const p = (state.tvPresets || [])[+b.dataset.tvPresetCustom];
+    if (p) { state.tvConfig = JSON.parse(JSON.stringify(p.cfg)); persistTvCfg(); render(); }
+  });
+  document.querySelectorAll('[data-tv-preset-del]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    (state.tvPresets || []).splice(+b.dataset.tvPresetDel, 1); persistTvPresets(); render();
+  });
+  // 프리셋 저장 흐름
+  const pSave = document.getElementById('tv-preset-save');
+  if (pSave) pSave.onclick = () => { state.tvSaving = true; render(); setTimeout(() => { const i = document.getElementById('tv-preset-name'); if (i) i.focus(); }, 0); };
+  const pCancel = document.getElementById('tv-preset-cancel');
+  if (pCancel) pCancel.onclick = () => { state.tvSaving = false; render(); };
+  const pConfirm = document.getElementById('tv-preset-confirm');
+  const doSavePreset = () => {
+    const i = document.getElementById('tv-preset-name');
+    const nm = (i && i.value.trim()) || '';
+    if (!nm) { if (i) i.focus(); return; }
+    state.tvPresets = state.tvPresets || [];
+    state.tvPresets.push({ name: nm, cfg: JSON.parse(JSON.stringify(state.tvConfig)) });
+    state.tvSaving = false; persistTvPresets(); render();
   };
+  if (pConfirm) pConfirm.onclick = doSavePreset;
+  const pName = document.getElementById('tv-preset-name');
+  if (pName) pName.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); doSavePreset(); } else if (e.key === 'Escape') { state.tvSaving = false; render(); } };
+  // 드래그 순서 변경
+  let _tvDrag = null;
+  document.querySelectorAll('.tv-panel-row').forEach(row => {
+    row.ondragstart = () => { _tvDrag = row.dataset.tvKey; row.style.opacity = '0.4'; };
+    row.ondragend   = () => { row.style.opacity = ''; };
+    row.ondragover  = (e) => e.preventDefault();
+    row.ondrop = (e) => {
+      e.preventDefault();
+      const from = _tvDrag, to = row.dataset.tvKey;
+      if (!from || from === to) return;
+      const ord = state.tvConfig.order.slice();
+      const fi = ord.indexOf(from), ti = ord.indexOf(to);
+      if (fi < 0 || ti < 0) return;
+      ord.splice(fi, 1); ord.splice(ti, 0, from);
+      state.tvConfig.order = ord; persistTvCfg(); render();
+    };
+  });
 
   // 사상자 명단 정렬 순서 토글 — 입력/상황판/좌측목록과 같은 설정(mci_card_sort) 공유. 한 곳에서 정하면 모두 적용.
   const listSortBtn = document.getElementById('display-list-sort');
@@ -6999,17 +7212,19 @@ function renderMciSituation() {
           ${triageTotals.map(tr => {
             const isExpanded = state.expandedTriage === tr.id;
             const isDead = tr.id === 'dead';                       // 사망=검정(솔리드)+흰 글씨+회색 테두리
-            const _bg = isDead ? '#000000' : `${tr.bg}50`;
-            const _fr = isDead ? '#64748b' : tr.color;
-            const _tx = isDead ? '#ffffff' : tr.color;
+            // 솔리드 단색 카드(표출·리디자인 목업과 동일): 풀채도 배경 + 흰 글씨(응급만 진한 갈색) + 색 글로우
+            const _bg = isDead ? '#0B0F16' : tr.color;
+            const _fr = isDead ? '#3A4657' : tr.bg;
+            const _tx = tr.id === 'urgent' ? '#451a03' : '#ffffff';
+            const _glow = isDead ? '0 14px 32px -18px #000' : `0 14px 30px -14px ${tr.color}`;
             return `
-            <button data-triage-card="${tr.id}" class="triage-card-clickable rounded-xl px-2 py-4 text-center transition-all cursor-pointer hover:brightness-125 flex flex-col items-center justify-center"
-              style="background:${_bg}; border:1.5px solid ${_fr}; ${isExpanded ? `outline:2px solid ${_fr}; outline-offset:2px;` : ''}"
+            <button data-triage-card="${tr.id}" class="triage-card-clickable rounded-xl px-2 py-4 text-center transition-all cursor-pointer hover:brightness-110 flex flex-col items-center justify-center"
+              style="background:${_bg}; border:1.5px solid ${_fr}; box-shadow:${_glow}; ${isExpanded ? `outline:2px solid ${_fr}; outline-offset:2px;` : ''}"
               title="${isExpanded ? '접기' : tr.name + ' 환자 목록 펼치기'}">
               <div class="text-xs sm:text-sm tracking-wider font-extrabold" style="color:${_tx}">${tr.shortName}·${tr.name}</div>
               <div class="text-4xl sm:text-5xl font-black mono mt-1 leading-none" style="color:${_tx}">${tr.count}</div>
               ${tr.pediatricCount > 0 ? `
-                <div class="text-[11px] font-bold text-cyan-300 mt-1.5 flex items-center justify-center gap-0.5">
+                <div class="text-[11px] font-bold mt-1.5 flex items-center justify-center gap-0.5" style="color:${_tx};opacity:.85">
                   <i data-lucide="baby" class="w-3 h-3"></i>${tr.pediatricCount}
                 </div>
               ` : ''}
