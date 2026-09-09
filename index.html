@@ -6770,31 +6770,71 @@ function initSwipeTabNav() {
   }, { passive: true });
 }
 
-// ==================== ESC 키 — 모달 통합 처리 ====================
-// 모든 모달의 ESC 닫기를 한 곳에서 처리. ESC 한 번에 "맨 위" 모달 하나만 닫는다.
-// 우선순위 = z-index 순: 카메라(z-200) > 도움말(z-200) > 상태 기반 모달(z-50)
-// (상태 기반 z-50 모달들은 화면 특성상 동시에 열리지 않음)
+// ==================== 오버레이 통합 닫기 (ESC · 뒤로가기 공용) ====================
+// 열려 있는 "가장 위" 오버레이 하나만 닫는다. 닫았으면 true.
+// 우선순위 = z-index 순: 사진확대 > 카메라(z-200) > 도움말(z-200) > 표출설정 > 상태 기반 모달(z-50)
+// ESC 키와 하드웨어/브라우저 뒤로가기 버튼이 이 함수를 공유한다 — 둘의 동작이 어긋나지 않게.
+function closeTopmostOverlay() {
+  if (state.photoEnlarge) { state.photoEnlarge = null; render(); return true; }
+  const cam = document.getElementById('camera-modal');
+  if (cam && !cam.classList.contains('hidden')) { closeCameraModal(); return true; }
+  const help = document.getElementById('help-modal');
+  if (help && !help.classList.contains('hidden')) { help.classList.add('hidden'); help.classList.remove('flex'); return true; }
+  if (state.tvSettingsOpen) { state.tvSettingsOpen = false; state.tvSaving = false; render(); return true; }
+  if (state.displayModal) { state.displayModal = null; render(); return true; }
+  if (state.viewMciCardKey) { state.viewMciCardKey = null; render(); return true; }
+  if (state.adminModal) { state.adminModal = false; render(); return true; }
+  return false;
+}
+
+// ESC 한 번에 "맨 위" 모달 하나만 닫는다.
 function initGlobalEscHandler() {
   document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    // 0) 사진 확대 오버레이 (최상단)
-    if (state.photoEnlarge) { state.photoEnlarge = null; render(); return; }
-    // 1) 카메라 OCR 모달
-    const cam = document.getElementById('camera-modal');
-    if (cam && !cam.classList.contains('hidden')) { closeCameraModal(); return; }
-    // 2) 도움말 모달
-    const help = document.getElementById('help-modal');
-    if (help && !help.classList.contains('hidden')) {
-      help.classList.add('hidden');
-      help.classList.remove('flex');
-      return;
+    if (e.key === 'Escape') closeTopmostOverlay();
+  });
+}
+
+// ==================== 뒤로가기(하드웨어·브라우저) 가드 ====================
+// 문제: 이 앱은 화면 이동을 URL/히스토리 없이 state로만 처리한다. 그래서 휴대폰 뒤로 버튼이나
+//       브라우저 뒤로가기를 누르면 사이트를 통째로 벗어나 세션(관서·직책·재난방)이 날아간다 — 현장에서 치명적.
+// 해결: 히스토리에 '가드' 항목을 심어 뒤로가기를 가로채고, 계층적으로 처리한다.
+//   1) 열린 모달/오버레이가 있으면 그것만 닫는다(ESC와 동일).
+//   2) 재난방 안이면 로비로 나간다(관서 세션은 유지 — 앱을 벗어나지 않음).
+//   3) 최상위(로비·본부·표출·관리자·진입)에서는 '한 번 더' 눌러야 실제 종료.
+//      → 실수로 한 번 누른 것으로는 절대 닫히지 않는다.
+// ※ 표출 팝아웃 창(POPOUT_DISPLAY)은 사용자가 창을 직접 닫으므로 가드하지 않는다.
+let _backExitArmed = false;
+let _backExitTimer = null;
+
+// 뒤로가기 처리. 실제로 앱을 종료(이전 페이지로 이탈)하려면 true 반환.
+function handleBackNavigation() {
+  if (closeTopmostOverlay()) { _backExitArmed = false; return false; }
+  if (state.view2 === 'incident') { _backExitArmed = false; leaveIncident(); return false; }
+  // 최상위 — 첫 뒤로가기는 안내만, 2.5초 안에 재차 누르면 종료 허용
+  if (!_backExitArmed) {
+    _backExitArmed = true;
+    if (window.__mciToast) window.__mciToast('뒤로가기를 한 번 더 누르면 종료됩니다', 'warn');
+    clearTimeout(_backExitTimer);
+    _backExitTimer = setTimeout(() => { _backExitArmed = false; }, 2500);
+    return false;
+  }
+  clearTimeout(_backExitTimer);
+  _backExitArmed = false;
+  return true;   // 종료 허용 — 가드를 다시 심지 않는다
+}
+
+function initBackGuard() {
+  if (POPOUT_DISPLAY) return;
+  try { history.pushState({ mciGuard: true }, ''); } catch (e) { return; }
+  window.addEventListener('popstate', () => {
+    const exiting = handleBackNavigation();
+    if (exiting) {
+      // 최상위에서 재차 뒤로가기 → 실제 이전 페이지로 나간다
+      setTimeout(() => { try { history.back(); } catch (e) {} }, 0);
+    } else {
+      // 페이지 이탈 방지: 소비된 가드 항목을 다시 심는다
+      try { history.pushState({ mciGuard: true }, ''); } catch (e) {}
     }
-    // 3) 표출 모드 드릴다운 (환자 목록/카드 상세)
-    if (state.displayModal) { state.displayModal = null; render(); return; }
-    // 4) 사상자 카드 상세 모달
-    if (state.viewMciCardKey) { state.viewMciCardKey = null; render(); return; }
-    // 5) 관리(다운로드/백업) 모달
-    if (state.adminModal) { state.adminModal = false; render(); return; }
   });
 }
 
@@ -8728,6 +8768,7 @@ async function boot() {
   initSwipeTabNav();
   initKoreanIme();
   initScrollGlowWatcher();
+  initBackGuard();
   // 익명 인증 대기 — Firebase Rules가 auth!=null 요구하므로 인증 후 데이터 구독.
   // 오프라인이거나 5초 안에 응답 없으면 일단 진행 (캐시 화면 표시).
   await authReady;
