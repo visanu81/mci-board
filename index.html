@@ -870,8 +870,8 @@
         <button data-help-tab="faq" class="help-tab-btn px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent transition-colors">❓ 자주 묻는 질문</button>
       </nav>
       <!-- 본문 (탭별 콘텐츠 — JS에서 동적 표시) -->
-      <div class="flex-1 min-h-0 relative glow-arrows glow-arrows-sm">
-      <main id="help-content" class="h-full overflow-y-auto scroll-glow p-5 text-sm leading-relaxed">
+      <div class="flex-1 min-h-0 flex flex-col relative glow-arrows glow-arrows-sm">
+      <main id="help-content" class="flex-1 min-h-0 overflow-y-auto scroll-glow p-5 text-sm leading-relaxed">
         <!-- JS가 채움 -->
       </main>
       </div>
@@ -2907,8 +2907,8 @@ function renderDisplayMain() {
           <div class="flex-shrink-0 bg-slate-900 border-2 border-slate-800 rounded-2xl p-10 text-center text-2xl text-slate-500">아직 등록된 사상자 카드가 없습니다</div>
         ` : `
           <!-- 바깥: 테두리·배경(고정) / 안쪽: 실제 스크롤 영역(scroll-glow — 스크롤바 대신 가장자리 페이드) -->
-          <div class="flex-1 min-h-0 relative rounded-2xl border-2 border-slate-800 bg-slate-900/60 overflow-hidden glow-arrows">
-          <div class="h-full overflow-y-auto scroll-glow divide-y divide-slate-800/70">
+          <div class="flex-1 min-h-0 flex flex-col relative rounded-2xl border-2 border-slate-800 bg-slate-900/60 overflow-hidden glow-arrows">
+          <div class="flex-1 min-h-0 overflow-y-auto scroll-glow divide-y divide-slate-800/70">
             ${displayList.map(c => {
               const tr = MCI_TRIAGE.find(t => t.id === c.triage);
               const cardNo = c.cardNo ? `#${String(c.cardNo).padStart(3, '0')}` : '';
@@ -3272,8 +3272,8 @@ function renderDisplayModal() {
             <i data-lucide="x" class="w-7 h-7"></i>
           </button>
         </div>
-        <div class="flex-1 min-h-0 relative glow-arrows">
-        <div class="h-full overflow-y-auto scroll-glow p-4">
+        <div class="flex-1 min-h-0 flex flex-col relative glow-arrows">
+        <div class="flex-1 min-h-0 overflow-y-auto scroll-glow p-4">
           ${patients.length === 0 ? `
             <div class="text-center text-2xl text-slate-500 py-20">해당하는 환자가 없습니다</div>
           ` : `
@@ -3338,8 +3338,8 @@ function renderDisplayPatientCard(c) {
             <i data-lucide="x" class="w-7 h-7"></i>
           </button>
         </div>
-        <div class="flex-1 min-h-0 relative glow-arrows">
-        <div class="h-full overflow-y-auto scroll-glow p-6 space-y-4 text-base">
+        <div class="flex-1 min-h-0 flex flex-col relative glow-arrows">
+        <div class="flex-1 min-h-0 overflow-y-auto scroll-glow p-6 space-y-4 text-base">
           <!-- 기본 정보 -->
           <div class="grid grid-cols-3 gap-4">
             <div class="bg-slate-950 rounded-xl p-4 border border-slate-800">
@@ -4451,8 +4451,8 @@ function renderAdminModal() {
         </div>
 
         <!-- 본문 -->
-        <div class="flex-1 min-h-0 relative glow-arrows glow-arrows-sm">
-        <div class="h-full overflow-y-auto scroll-glow p-4">
+        <div class="flex-1 min-h-0 flex flex-col relative glow-arrows glow-arrows-sm">
+        <div class="flex-1 min-h-0 overflow-y-auto scroll-glow p-4">
           ${state.adminTab === 'export' ? renderExportPanel() : ''}
           ${state.adminTab === 'archives' ? renderArchivesPanel() : ''}
           ${state.adminTab === 'reset' ? renderResetPanel() : ''}
@@ -8012,8 +8012,8 @@ function renderMciCardDetailModal() {
         </div>
 
         <!-- 본문 (스크롤) -->
-        <div class="flex-1 min-h-0 relative glow-arrows glow-arrows-sm">
-        <div class="h-full overflow-y-auto scroll-glow p-4 space-y-3">
+        <div class="flex-1 min-h-0 flex flex-col relative glow-arrows glow-arrows-sm">
+        <div class="flex-1 min-h-0 overflow-y-auto scroll-glow p-4 space-y-3">
 
           <!-- 기본 정보 -->
           <section class="bg-slate-950 rounded-xl p-3 border border-slate-800">
