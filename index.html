@@ -1449,7 +1449,7 @@ function outboxCleanup() {
   if (changed) { try { _outboxSave(o); } catch { /* 기존 기록 유지, 배지로 알림 */ } }
 }
 
-// 단일 통로 — 모든 사상자 쓰기는 이 함수를 거친다.
+// 현장 입력은 기기 보관 후 저장 당시 계정으로 전송한다.
 async function durableWrite({ kind, method, path, incidentId, payload }) {
   if (POPOUT_DISPLAY) return { ok: false, queued: false };
   if (!path) return { ok: false, queued: false };   // incPath null 방어(재난방 미선택)
@@ -1481,6 +1481,10 @@ async function _outboxSendOne(opId) {
       outboxMark(opId, {status:'failed',lastError:'이전 로그인 또는 다른 환경의 기록입니다. 자동 전송하지 않습니다.'});
       return false;
     }
+    // Earlier unsent edits on this record must finish before a newer edit.
+    const earlier = Object.values(_outboxLoad(true).ops).some(x =>
+      x.opId !== opId && x.path === op.path && x.seq < op.seq && x.status !== 'sent');
+    if (earlier) return false;
     outboxMark(opId, { status: 'sending' });
   } catch { updateOutboxBadge(); return false; }
   try {
@@ -1726,76 +1730,40 @@ function rebindIncidentRealtime() {
   }, handleSyncError('MCI 사상자')));
 }
 
+async function saveFieldRecord(formKey, path, payload, method = 'set') {
+  setSaveStatus(formKey, { saving: true });
+  try {
+    const result = await durableWrite({kind: formKey, method, path,
+      incidentId: state.currentIncidentId, payload});
+    if (!result.ok && !result.queued) throw Error(result.error || '기기에 저장하지 못했습니다. 입력 내용을 유지합니다.');
+    setSaveStatus(formKey, {saving: false, savedAt: new Date(), queued: !!result.queued});
+    setTimeout(() => clearSaveStatus(formKey), 2500);
+    return true;
+  } catch (error) {
+    setSaveStatus(formKey, {saving: false, error: error.message});
+    return false;
+  }
+}
 async function saveIncident(data) {
   if (!assertCanWrite('사고개요 저장')) return false;
-  const formKey = 'incident';
-  setSaveStatus(formKey, { saving: true });
-  try {
-    await set(ref(db, incPath('incident')), { ...data, _at: Date.now() });
-    setSaveStatus(formKey, { saving: false, savedAt: new Date() });
-    setTimeout(() => clearSaveStatus(formKey), 2500);
-    return true;
-  } catch (e) {
-    setSaveStatus(formKey, { saving: false, error: e.message });
-    return false;
-  }
+  return saveFieldRecord('incident', incPath('incident'), {...data, _at: Date.now()});
 }
-
 async function saveDamage(teamId, data, author) {
   if (!assertCanWrite('피해 저장')) return false;
-  const formKey = 'damage';
-  setSaveStatus(formKey, { saving: true });
-  try {
-    await set(ref(db, incPath(`damages/${teamId}`)), { ...data, _author: author, _at: Date.now() });
-    setSaveStatus(formKey, { saving: false, savedAt: new Date() });
-    setTimeout(() => clearSaveStatus(formKey), 2500);
-    return true;
-  } catch (e) {
-    setSaveStatus(formKey, { saving: false, error: e.message });
-    return false;
-  }
+  return saveFieldRecord('damage', incPath('damages/'+teamId), {...data, _author: author, _at: Date.now()});
 }
-
 async function saveMobil(teamId, agencies, vehicles, author) {
   if (!assertCanWrite('동원 저장')) return false;
-  const formKey = 'mobil';
-  setSaveStatus(formKey, { saving: true });
-  try {
-    await set(ref(db, incPath(`mobilizations/${teamId}`)), { agencies, vehicles, _author: author, _at: Date.now() });
-    setSaveStatus(formKey, { saving: false, savedAt: new Date() });
-    setTimeout(() => clearSaveStatus(formKey), 2500);
-    return true;
-  } catch (e) {
-    setSaveStatus(formKey, { saving: false, error: e.message });
-    return false;
-  }
+  return saveFieldRecord('mobil', incPath('mobilizations/'+teamId), {agencies, vehicles, _author: author, _at: Date.now()});
 }
-
 async function addAction(content, teamId, author) {
   if (!assertCanWrite('조치사항 저장')) return false;
-  const formKey = 'action';
-  setSaveStatus(formKey, { saving: true });
-  try {
-    const newRef = push(ref(db, incPath('actions')));
-    await set(newRef, {
-      timestamp: Date.now(),
-      content,
-      teamId,
-      author,
-    });
-    setSaveStatus(formKey, { saving: false, savedAt: new Date() });
-    setTimeout(() => clearSaveStatus(formKey), 2500);
-    return true;
-  } catch (e) {
-    setSaveStatus(formKey, { saving: false, error: e.message });
-    return false;
-  }
+  const key = push(ref(db, incPath('actions'))).key;
+  return saveFieldRecord('action', incPath('actions/'+key), {timestamp: Date.now(), content, teamId, author});
 }
-
 async function deleteAction(key) {
   if (!assertCanWrite('조치사항 삭제')) return false;
-  try { await remove(ref(db, incPath(`actions/${key}`))); return true; }
-  catch (e) { alert('삭제 실패: ' + e.message); return false; }
+  return saveFieldRecord('action', incPath('actions/'+key), undefined, 'remove');
 }
 
 async function saveCasualty(data, teamId, author, editKey, basePayload) {

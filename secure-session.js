@@ -11,7 +11,7 @@ export function isActiveGrant(grant,now=Date.now()) {
   return !!grant && grant.active===true && grant.environment==='test' && Number.isFinite(grant.expiresAt) && grant.expiresAt>now && ['normal','observer','display','admin','hq'].includes(grant.role) && /^[a-z0-9_-]{1,50}$/.test(grant.agencyId || '');
 }
 export function mayReplay(op,identity,projectId) {
-  return !!identity && isActiveGrant(identity) && ['normal','admin'].includes(identity.role) && op?.securityContext?.projectId===projectId && op.securityContext.uid===identity.uid && op.securityContext.agencyId===identity.agencyId && typeof op.path==='string' && /^mci2\/incidents\/[^/]+\/(casualties|mciCasualties)\/[^/]+$/.test(op.path);
+  return !!identity && isActiveGrant(identity) && ['normal','admin'].includes(identity.role) && op?.securityContext?.projectId===projectId && op.securityContext.uid===identity.uid && op.securityContext.agencyId===identity.agencyId && typeof op.path==='string' && /^mci2\/incidents\/[A-Za-z0-9_-]+\/(incident|(casualties|mciCasualties|damages|mobilizations|actions)\/[A-Za-z0-9_-]+)$/.test(op.path);
 }
 export function createSessionController({auth,db,sdk,onChange,fetcher=fetch,setTimer=setTimeout,clearTimer=clearTimeout}) {
   let epoch=0,unsubscribeGrant=null,unsubscribeAuth=null,timer=null,identity=null;
@@ -57,5 +57,5 @@ export async function sendBoundOperation(op,{currentIdentity,currentUser,project
   url.searchParams.set('auth',token);
   const method={set:'PUT',update:'PATCH',remove:'DELETE'}[op.method];if(!method)throw Error('unsupported operation');
   const r=await fetcher(url,{method,headers:{'Content-Type':'application/json'},body:op.method==='remove'?undefined:JSON.stringify(op.payload),signal:AbortSignal.timeout(12000)});
-  if(!r.ok)throw Error(r.status===401 || r.status===403?'permission_denied':'카드 전송 실패 ('+r.status+')');
+  if(!r.ok)throw Error(r.status===401 || r.status===403?'permission_denied':'기록 전송 실패 ('+r.status+')');
 }

@@ -120,3 +120,10 @@ test('HQ has cross-agency read-only access without archive or code administratio
  await assertFails(get(at('hq-reader','mci2/archives')));
  await assertFails(get(at('hq-reader','serverCodes')));
 });
+
+for(const field of ['incident','damages/medical','mobilizations/medical','actions/offline']) {
+ test(field+': member can replay own agency field record',()=>assertSucceeds(set(at('alice','mci2/incidents/a/'+field),{fixture:'offline'})));
+ test(field+': foreign agency replay denied',()=>assertFails(set(at('bob','mci2/incidents/a/'+field),{fixture:'blocked'})));
+ test(field+': read-only replay denied',()=>assertFails(set(at('reader','mci2/incidents/a/'+field),{fixture:'blocked'})));
+ test(field+': closed incident replay denied',()=>assertFails(set(at('alice','mci2/incidents/closed/'+field),{fixture:'blocked'})));
+}

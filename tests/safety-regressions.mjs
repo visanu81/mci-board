@@ -30,11 +30,12 @@ export async function runSafetyTests(html) {
       return options.online === false ? new Promise(() => {}) : Promise.resolve();
     };
     const core = between('const OUTBOX_KEY =', '// 미전송 배지(');
-    const saves = between('async function saveCasualty(', '// ==================== 데이터 내보내기');
+    const saves = between('async function saveFieldRecord(', '// ==================== 데이터 내보내기');
     const patch = html.includes('function changedCardFields(')
       ? between('function changedCardFields(', 'function currentCasualtyDraft(') : '';
     const source = 'const DB_ROOT = ' + JSON.stringify(options.dbRoot ?? 'mci2') + ';\n' + core + '\n' + saves + '\n' + patch + `
       return {
+        saveIncident, saveDamage, saveMobil, addAction, deleteAction,
         saveCasualty, saveMciCasualty, deleteCasualty, deleteMciCasualty,
         outboxCleanup, replayOutbox, outboxEnqueue,
         changedCardFields: typeof changedCardFields === 'function' ? changedCardFields : null
@@ -50,6 +51,38 @@ export async function runSafetyTests(html) {
       (key, value) => { statuses[key] = value; }, () => {}, () => 0, false, Promise.resolve(), () => {}, {uid:'fixture-uid',agencyId:'a',active:true,environment:'test',role:'normal',expiresAt:Date.now()+3600000}, {projectId:'mci2-fixture'}, mayReplay, {currentUser:{uid:'fixture-uid'}}, op => remoteWrite(op.method)(op.path,op.payload));
     return { ...api, raw: () => raw, writes, statuses, notices, storageKeys };
   }
+  for (const [label, save, status] of [
+    ['incident', x=>x.saveIncident({title:'fixture'}), 'incident'],
+    ['damage', x=>x.saveDamage('medical',{dead:0},'tester'), 'damage'],
+    ['mobilization', x=>x.saveMobil('medical',{}, {},'tester'), 'mobil'],
+    ['action', x=>x.addAction('fixture','medical','tester'), 'action'],
+    ['action deletion', x=>x.deleteAction('fixture'), 'action']
+  ]) {
+    await test(label+' survives disconnect with a bound durable record', async()=>{
+      const x=harness({online:false});
+      assert(await save(x), 'not accepted into durable storage');
+      const entries=Object.values(JSON.parse(x.raw()).ops);
+      assert(entries.length===1 && entries[0].securityContext.uid==='fixture-uid','missing bound operation');
+      assert(x.statuses[status].queued===true, 'queued state not shown');
+      assert(x.writes.length===0, 'sent while offline');
+    });
+    await test(label+' preserves input when storage fails', async()=>{
+      const x=harness({quota:true});
+      assert(await save(x)===false,'incorrect success');
+      assert(x.writes.length===0,'sent before durable storage');
+    });
+  }
+  await test('an earlier failed save blocks newer writes to the same record',async()=>{
+    const x=harness();
+    const operation={kind:'incident',method:'set',path:'mci2/incidents/test/incident',payload:{title:'older'}};
+    const id=x.outboxEnqueue(operation);
+    const queue=JSON.parse(x.raw());queue.ops[id].status='failed';
+    const y=harness({raw:JSON.stringify(queue)});
+    assert(await y.saveIncident({title:'newer'}), 'newer edit was not retained');
+    assert(y.writes.length===0,'newer edit overtook failed edit');
+    await y.replayOutbox({manual:true});
+    equal(y.writes.map(w=>w.value.title),['older','newer'],'retry order reversed');
+  });
   const card = () => ({ cardNo: 1, name: 'TEST', triage: 'urgent', hospital: '', notes: '' });
   await test('MCI save rejects quota failure before any network write', async () => {
     const x = harness({ quota: true });

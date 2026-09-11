@@ -39,3 +39,16 @@ test('identity change during token refresh prevents network send',async()=>{
  await assert.rejects(sendBoundOperation({...op(),method:'remove'},{currentIdentity:()=>current,currentUser:()=>({uid:current.uid,getIdToken:async()=>{current={...identity(),uid:'two'};return 'old-token';}}),projectId:'mci2-test',databaseURL:cfg.firebase.databaseURL},async()=>{sent=true;return new Response('{}');}));
  assert.equal(sent,false);
 });
+
+for (const suffix of ['incident','damages/medical','mobilizations/medical','actions/log']) {
+  test('field write '+suffix+' is bound to the original session',async()=>{
+    const operation={...op(),path:'mci2/incidents/one/'+suffix,method:'set',payload:{fixture:true}};
+    assert.equal(mayReplay(operation,identity(),'mci2-test'),true);
+    let current=identity(),sent=false;
+    await assert.rejects(sendBoundOperation(operation,{currentIdentity:()=>current,currentUser:()=>({uid:current.uid,getIdToken:async()=>{current={...identity(),uid:'two'};return 'old-token';}}),projectId:'mci2-test',databaseURL:cfg.firebase.databaseURL},async()=>{sent=true;return new Response('{}');}));
+    assert.equal(sent,false);
+  });
+}
+for (const path of ['mci2/incidents/one','mci2/archives/one','mci2/incidents/one/actions/../incident','mci2/incidents/one/actions/key?auth=x','mci2/incidents/one/actions/key/child']) {
+  test('field queue rejects unsafe or administrative path '+path,()=>assert.equal(mayReplay({...op(),path},identity(),'mci2-test'),false));
+}
