@@ -4,7 +4,7 @@ export function validateTestConfig(value) {
   if(!c || !/^mci2-[a-z0-9-]+$/.test(c.projectId || '') || c.projectId==='disester-f3669')throw Error('테스트 Firebase 설정이 필요합니다.');
   const url=new URL(c.databaseURL);
   if(url.protocol!=='https:' || url.username || url.password || url.pathname!=='/' || url.search || url.hash || !(url.hostname===c.projectId+'-default-rtdb.firebaseio.com' || url.hostname.startsWith(c.projectId+'-default-rtdb.') && url.hostname.endsWith('.firebasedatabase.app')))throw Error('테스트 데이터베이스 설정이 올바르지 않습니다.');
-  if(typeof c.apiKey!=='string' || !c.apiKey || c.authDomain!==c.projectId+'.firebaseapp.com')throw Error('테스트 인증 설정이 올바르지 않습니다.');
+  if(typeof c.apiKey!=='string' || !c.apiKey || (c.authDomain!==c.projectId+'.firebaseapp.com' && !(c.projectId==='mci2-secure-visanu81' && c.authDomain==='mci2--visanu81.firebaseapp.com')))throw Error('테스트 인증 설정이 올바르지 않습니다.');
   return Object.freeze({...c});
 }
 export function isActiveGrant(grant,now=Date.now()) {

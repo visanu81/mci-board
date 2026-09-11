@@ -6,7 +6,7 @@
 
 서버 로그인 모듈을 Worker에, 서버 승인 세션을 실제 진입 화면에 연결했다. 이 브랜치는 아직 배포하지 않았다. 운영 mci와 현재 mci2는 이전 배포 상태를 유지한다.
 
-별도 Firebase 프로젝트 `mci2-secure-visanu81` 생성 요청은 자동 승인 검토가 거절했다. 사유는 지속되는 외부 리소스와 잠재 비용에 대한 명시적 승인이 필요하다는 것이다. 프로젝트·DB·서비스 계정·키·새 진입 코드는 생성하지 않았다. 재시도 전 사용자 승인이 필요하다. 유료 요금제 전환이나 결제 연결은 제안 범위에 포함하지 않는다.
+사용자의 새 프로젝트 생성 승인에 따라 `mci2-secure-visanu81`(MCI2 Secure Test)을 생성했다. 웹 앱과 싱가포르(asia-southeast1) Realtime Database를 만들고, `firebase.secure.json`으로 테스트 규칙을 배포했다. 서버에서 다시 읽은 규칙이 로컬 파일과 일치한다. Firebase Authentication을 초기화하고 이메일·익명 가입을 비활성화했다. 과금 연결은 비활성 상태(billingEnabled=false)다. 서비스 계정·키·새 진입 코드는 아직 생성하지 않았으며 Worker 보안 버전도 미배포다.
 
 `security/database.test.rules.json`은 별도 테스트 프로젝트용이다. 기존 운영 프로젝트 disester-f3669에 적용하면 운영 접근을 차단하므로 적용하면 안 된다.
 
@@ -27,15 +27,15 @@
 - `npm run test:rules`: Database Emulator 4.11.2, 62/62 통과(규칙 변경 없음).
 - `npm run test:auth`: 서버 코드 확인/토큰 발급, 17/17 통과(모듈 변경 없음).
 - `npm run test:safety`: 실제 HTML 저장 함수 회귀 검사, 19/19 통과.
-- `npm run test:session`: 브라우저 세션/재전송 및 Worker 인증·OCR 검사, 30/30 통과. 실제 생성한 일회성 RSA 키로 토큰 서명을 검증하고 외부 응답을 모의 구현한다.
+- `npm run test:session`: 브라우저 세션/재전송 및 Worker 인증·OCR 검사, 32/32 통과. 실제 생성한 일회성 RSA 키로 토큰 서명을 검증하고 외부 응답을 모의 구현한다.
 - 로컬 브라우저: 잘못된 코드 거부 → 정상 코드 로그인 → 관서 로비 → 재난 합류 → 구급팀장 선택 → 카드 메모 저장 → 사진·작성자 유지 확인. 권한 회수 후 로그인 화면과 카드 입력 복구 버튼 확인. REST 토큰 고정 전송 후에도 실제 화면 저장 결과 확인.
 - Workers dry-run 통과: AUTH_RATE_LIMIT(120회/60초), ASSETS, 27.23KiB Worker 번들. 실제 배포는 안 했다.
 - 모든 시험은 가상 데이터로 실행했다. 실제 환자 데이터 조회·복사는 하지 않았다.
 
-## 승인 후 구성할 리소스
+## 구성한 리소스와 남은 서버 설정
 
-제안 프로젝트 ID: `mci2-secure-visanu81`, 표시 이름 `MCI2 Secure Test`.
-기존 Firebase 프로젝트와 별개로 테스트 DB와 웹 앱을 구성한다. 요금제 업그레이드·결제 연결·운영 데이터 복사는 하지 않는다.
+생성한 프로젝트 ID: `mci2-secure-visanu81`, 표시 이름 `MCI2 Secure Test`.
+기존 Firebase 프로젝트와 별개로 테스트 DB와 웹 앱을 구성했다. Firebase가 실제 발급한 인증 도메인은 `mci2--visanu81.firebaseapp.com`이며 해당 프로젝트에만 허용한다. 공개 웹 설정은 `security/firebase-web-config.json`과 Worker vars에 반영했다. 요금제 업그레이드·결제 연결·운영 데이터 복사는 하지 않는다.
 
 Worker Secret: FIREBASE_SERVICE_ACCOUNT(테스트 전용), MCI_CODE_PEPPER, MCI_LOGIN_RECORDS.
 공개 설정: FIREBASE_PROJECT_ID, FIREBASE_DATABASE_URL, FIREBASE_WEB_CONFIG, PUBLIC_ORIGIN.
