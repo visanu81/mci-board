@@ -1,3 +1,5 @@
+import {OCR_PROMPT, ocrImageBlocks} from './security/ocr-prompt.mjs';
+import {normalizeOcrCandidates} from './ocr-core.js';
 import { handleAccessManagement } from './security/access-management.mjs';
 import { handleAgencyLogin } from './security/agency-login.mjs';
 import { validateTestConfig, isActiveGrant } from './secure-session.js';
@@ -63,37 +65,6 @@ const OCR_SCHEMA = {
   },
 };
 
-const OCR_PROMPT = `이 사진은 한국 소방의 다수사상자(MCI) 현장에서 쓰는 종이 「중증도분류표」(트리아지 카드)입니다. 카드에 실제 기재·표시된 정보만 JSON으로 추출하세요. 없거나 불확실하면 null — 절대 추측하지 마세요.
-
-★ 주의: 카드에 "맥박"과 "의식" 글자가 두 군데 있습니다. (가) 상단 격자의 맥박·의식(정상/비정상)은 트리아지 판정용. (나) 중하단 "생체징후" 표의 맥박[숫자]·의식[A/V/P/U]은 실제 측정값. → pulse·consciousness 필드는 반드시 (나) 생체징후 표에서만 가져오세요.
-
-[카드 양식 — 위에서 아래 순서]
-1) 상단 4칸 격자: ①보행여부(가능/불가능) ②호흡(정상/비정상) ③맥박(정상/비정상) ④의식(정상/비정상). 각 칸에서 선택된 단어 위에 V(체크) 또는 O(동그라미) 표시가 있음. ★V와 O는 모두 "선택됨"으로 동일하게 해석.
-2) 분류자 / 분류시간 / 이름 ___ 나이 ___세 성별(남·여 중 표시) / 발견장소 ___
-3) 인체도 + "주요 손상별 및 처치" 손글씨 → symptom (예: "후두부 열상", "우측 다리골절").
-4) "생체징후" 표 (여기 손글씨 숫자를 끝까지 판독): 1행 [혈압 (수축기)/(이완기)  호흡 (숫자)], 2행 [맥박 (숫자)  의식 (A·V·P·U 중 동그라미)]. 예) "혈압 130/90"→bpSys "130", bpDia "90" / "맥박 89"→pulse "89" / "의식 (A)"→consciousness "A". 슬래시(/)가 흐려도 두 숫자로 꼭 분리.
-5) 구급차 119/119 / 이송의료기관 ___ (hospital) / 이송(출발)시간 __:__ (departTime).
-6) 맨 아래 색띠(사망=검정, 긴급=빨강, 응급=노랑, 비응급=녹색)와 우상단 색점 = 최종 분류 표시.
-
-[triage 판정 — 매우 중요]
-- 맨 아래 큰 색띠(검정·빨강·노랑·녹색)와 우상단 색점은 모두 "인쇄된 범례"일 뿐입니다. 빨간 칸이 보인다고 emergency가 아닙니다.
-- 손으로 한 칸만 동그라미·체크·색칠·절취한 "표시"가 있을 때만 그 색으로: 검정→"dead", 빨강→"emergency", 노랑→"urgent", 녹색→"nonurgent".
-- 손 표시가 없으면 반드시 상단 격자로 판정:
-   - 보행 "가능" → "nonurgent" (★보행 가능이면 절대 emergency·urgent 아님)
-   - 보행 "불가능" + (호흡·맥박·의식 중 하나라도 "비정상") → "emergency"
-   - 보행 "불가능" + 호흡·맥박·의식 모두 "정상" → "urgent"
-   - 호흡 없음/사망 명시 → "dead"
-
-[필드 규칙]
-- age: 숫자만("42"). "40대"면 "40". gender: "남" 또는 "여". isPediatric: 14세 이하 확인 시 true.
-- consciousness: 생체징후의 A/V/P/U 중 표시된 글자. GCS만 있으면 14~15→"A", 9~13→"V", 4~8→"P", 3→"U".
-- rr·pulse·bpSys·bpDia·spo2·temp·age 는 숫자 문자열만. 혈압 "130/90"이면 bpSys "130", bpDia "90".
-- symptom: "주요 손상별 및 처치" 손글씨 그대로. mechanism: 명확한 손상기전 단어가 있으면(낙상·교통사고·추락·둔상·관통상·연소가스·화상·중독·익수·감전·폭발·압좌·동상) 그 값, 없으면 null.
-- hospital: 이송의료기관명. departTime: 이송(출발)시간 "HH:MM".
-- 개인정보(주민번호·전화·주소)는 추출하지 말 것.
-
-[예시] 상단 격자에서 보행"가능"·호흡"정상"·맥박"정상"·의식"정상"에 표시, 이름 김천수, 나이 42, 성별 남, 발견장소 2층 탈의실, 주요손상 "우측 다리골절", 혈압 130/90, 호흡 24, 맥박 89, 의식 A, 이송의료기관 의정부성모병원, 이송시간 15:12 인 카드의 정답:
-{"triage":"nonurgent","name":"김천수","age":"42","gender":"남","isPediatric":false,"location":"2층 탈의실","symptom":"우측 다리골절","consciousness":"A","rr":"24","pulse":"89","bpSys":"130","bpDia":"90","spo2":null,"temp":null,"mechanism":null,"hospital":"의정부성모병원","departTime":"15:12","notes":null}`;
 
 export default {
   async fetch(request, env) {
@@ -174,6 +145,9 @@ async function handleOcr(request, env) {
     return jsonResponse({ error: '지원하지 않는 이미지 형식입니다' }, 400);
   }
 
+  let imageBlocks;
+  try { imageBlocks=ocrImageBlocks(body,MAX_IMAGE_BASE64_CHARS); } catch(error) { return jsonResponse({error:error.message},400); }
+
   // 4) Claude Vision 호출 — 구조화 출력(json_schema)으로 형식 보장
   const anthropicRes = await fetch(ANTHROPIC_URL, {
     method: 'POST',
@@ -190,7 +164,7 @@ async function handleOcr(request, env) {
         {
           role: 'user',
           content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } },
+            ...imageBlocks,
             { type: 'text', text: OCR_PROMPT },
           ],
         },
@@ -201,9 +175,7 @@ async function handleOcr(request, env) {
 
   if (!anthropicRes.ok) {
     // 상세 오류는 서버 로그로만 — 클라이언트에는 일반화된 메시지
-    let detail = '';
-    try { detail = JSON.stringify(await anthropicRes.json()); } catch {}
-    console.error('[OCR] Anthropic 오류', anthropicRes.status, detail);
+    console.error('[OCR] Anthropic 오류', anthropicRes.status);
     if (anthropicRes.status === 401) return jsonResponse({ error: 'AI 분석 설정 오류 (관리자: API 키 확인 필요)' }, 502);
     if (anthropicRes.status === 429) return jsonResponse({ error: 'AI 분석 사용량 한도 초과. 잠시 후 다시 시도해주세요.' }, 502);
     if (anthropicRes.status === 529) return jsonResponse({ error: 'AI 서버가 혼잡합니다. 잠시 후 다시 시도해주세요.' }, 502);
@@ -224,7 +196,8 @@ async function handleOcr(request, env) {
   }
 
   return jsonResponse({
-    fields,
+    fields: normalizeOcrCandidates(fields),
+    engine: 'claude',
     model: result.model,
     usage: result.usage ? { input: result.usage.input_tokens, output: result.usage.output_tokens } : null,
   });

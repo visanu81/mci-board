@@ -6,7 +6,7 @@
    ============================================================================= */
 
 // 캐시 이름 — 코드 수정 시 버전을 올려서 사용자 디바이스의 옛 캐시를 무효화
-const CACHE_VERSION = 'v108-display-incident';
+const CACHE_VERSION = 'v109-ocr-review';
 const CACHE_NAME    = `mci2-${CACHE_VERSION}`;
 
 // 사전 캐시 대상 (앱 셸)
@@ -15,6 +15,7 @@ const APP_SHELL = [
   './index.html',
   './secure-session.js',
   './display-session.js',
+  './ocr-core.js',
   './manifest.json',
   './icon.svg',
   './icon-maskable.svg',

@@ -699,6 +699,21 @@
 .workspace-patients{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
 .workspace-patient{padding:16px;border:1px solid #334155;border-radius:14px;background:#111c2e;overflow-wrap:anywhere}
 .field-summary{padding-bottom:0}
+#camera-crop-wrap{position:relative;max-width:100%;line-height:0}
+#camera-preview-img{display:block;max-width:100%;max-height:calc(100dvh - 370px);object-fit:contain}
+#camera-crop-outline{position:absolute;inset:0;border:3px solid #60a5fa;box-shadow:0 0 0 100vmax #0008;pointer-events:none}
+#camera-preview{overflow:hidden}
+.ocr-crop-controls{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:13px}
+.ocr-crop-controls label{display:flex;align-items:center;gap:6px;min-width:0}.ocr-crop-controls input{min-width:0;width:100%;height:32px}
+.ocr-review-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}.ocr-review-grid img{max-width:100%;max-height:60vh;object-fit:contain}
+.ocr-review-row{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;border-bottom:1px solid #334155;padding:10px 0}.ocr-review-row input[type=checkbox]{width:24px;height:24px;margin-top:12px}
+.ocr-review-row input:not([type=checkbox]),.ocr-review-row select{background:#0f172a;border:1px solid #64748b;border-radius:6px;padding:8px;color:#f1f5f9;font-size:16px;width:100%;min-width:0;min-height:44px}
+.ocr-review-row label{font-size:14px}.ocr-review-row small{display:block;color:#cbd5e1}
+#camera-message{z-index:5}#camera-modal button{min-height:44px}#camera-modal>div:last-of-type{max-height:46vh;overflow:auto}
+body.outdoor-mode #camera-modal .bg-slate-950{background:#020617!important;color:#f1f5f9!important}
+body.outdoor-mode #camera-modal .bg-slate-800,body.outdoor-mode #camera-modal .bg-slate-700{background:#1e293b!important;color:#f1f5f9!important}
+#camera-engine,#camera-original-link{color:#93c5fd!important}
+@media(max-width:700px){.ocr-review-grid{grid-template-columns:1fr}.ocr-review-grid img{max-height:30vh}.ocr-review-grid>div:first-child{position:sticky;top:-16px;background:#020617;z-index:1}}
 .display-incident-info{flex-shrink:0;margin-bottom:16px;padding:12px 16px;border:1px solid #475569;border-radius:12px;background:#111c2e;max-height:24vh;overflow:auto;font-size:clamp(16px,1.05vw,22px);line-height:1.5}
 .display-incident-facts{display:grid;grid-template-columns:minmax(180px,1fr) minmax(0,2fr) minmax(0,1fr);gap:8px 20px}
 .display-incident-facts>div{min-width:0;overflow-wrap:anywhere}
@@ -891,8 +906,15 @@ body.outdoor-mode .mci-save-dock{background:#fff;border-color:#94a3b8}
     </div>
 
     <!-- ② 캡처 미리보기 -->
-    <div id="camera-preview" class="absolute inset-0 hidden flex items-center justify-center">
-      <img id="camera-preview-img" alt="캡처 이미지" class="max-w-full max-h-full" />
+    <div id="camera-preview" class="absolute inset-0 hidden flex items-center justify-center overflow-auto">
+      <div id="camera-crop-wrap"><img id="camera-preview-img" alt="캡처 이미지" /><div id="camera-crop-outline"></div></div>
+    </div>
+
+    <div id="camera-review" class="absolute inset-0 hidden overflow-auto bg-slate-950 p-4 text-slate-100">
+      <p id="camera-engine" class="text-blue-300 font-bold mb-2"></p>
+      <p class="text-sm mb-3">원본을 확인하고 반영할 항목을 체크하세요. 기존 입력값은 유지됩니다. 중증도·의식·숫자는 반드시 대조하세요.</p>
+      <div class="ocr-review-grid"><div><img id="camera-review-img" alt="인식에 사용한 카드 원본" /><a id="camera-original-link" target="_blank" rel="noopener" class="text-blue-300 underline">원본 크게 보기</a></div><div id="camera-review-fields"></div></div>
+      <label class="flex items-center gap-2 mt-3"><input id="camera-attach-card" type="checkbox" checked />카드 사진도 첨부</label>
     </div>
 
     <!-- ③ 분석 중 오버레이 -->
@@ -910,9 +932,15 @@ body.outdoor-mode .mci-save-dock{background:#fff;border-color:#94a3b8}
   <div class="px-4 py-4 bg-slate-950 border-t border-slate-800 flex-shrink-0">
     <!-- 라이브 화면 버튼 -->
     <div id="camera-live-actions" class="flex items-center justify-center gap-4">
+      <button id="camera-file" class="px-4 py-3 rounded-lg bg-slate-800 text-white">사진 선택</button>
       <button id="camera-capture" class="w-16 h-16 rounded-full bg-pink-600 hover:bg-pink-500 border-4 border-white shadow-2xl flex items-center justify-center" title="촬영" aria-label="촬영">
         <i data-lucide="camera" class="w-7 h-7 text-white"></i>
       </button>
+    </div>
+    <div id="camera-crop-controls" class="hidden text-white mb-3">
+      <p class="text-sm mb-2">카드를 똑바로 촬영하고 반사광·흐림을 확인하세요. 테두리 밖 여백을 줄일 수 있습니다.</p>
+      <div class="ocr-crop-controls"><label>위 여백 <input data-crop="top" type="range" min="0" max="45" value="0" /></label><label>아래 여백 <input data-crop="bottom" type="range" min="0" max="45" value="0" /></label><label>왼쪽 여백 <input data-crop="left" type="range" min="0" max="45" value="0" /></label><label>오른쪽 여백 <input data-crop="right" type="range" min="0" max="45" value="0" /></label></div>
+      <div class="flex gap-2 items-center mt-2"><button id="camera-rotate" class="bg-slate-800 px-3 py-2 rounded">90° 회전</button><label class="text-sm flex items-center gap-2"><input id="camera-detail" type="checkbox" checked />작은 글씨 확대 분석 (사진 3장 분석)</label></div>
     </div>
     <!-- 미리보기 화면 버튼 -->
     <div id="camera-preview-actions" class="hidden items-center justify-between gap-3">
@@ -922,7 +950,10 @@ body.outdoor-mode .mci-save-dock{background:#fff;border-color:#94a3b8}
       <button id="camera-analyze" class="flex-1 py-3 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-sm font-bold flex items-center justify-center gap-2">
         <i data-lucide="sparkles" class="w-4 h-4"></i>분석 시작
       </button>
+      <button id="camera-local" class="hidden flex-1 py-3 rounded-lg bg-slate-700 text-white text-sm">일반 문자 인식</button>
     </div>
+    <div id="camera-review-actions" class="hidden gap-3"><button id="camera-review-back" class="flex-1 py-3 rounded-lg bg-slate-800 text-white">사진으로 돌아가기</button><button id="camera-apply" class="flex-1 py-3 rounded-lg bg-blue-600 text-white font-bold">선택 항목 반영</button></div>
+    <input id="camera-file-input" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" />
   </div>
 
   <canvas id="camera-canvas" class="hidden"></canvas>
@@ -1011,6 +1042,7 @@ import {
   getAuth, initializeAuth, inMemoryPersistence, signInWithCustomToken, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
+import {OCR_LABELS,normalizeOcrCandidates,extractLocalOcrCandidates,selectedOcrPatch,ocrContextMatches} from './ocr-core.js';
 import {connectDisplayParent,connectDisplayChild} from './display-session.js';
 import { validateTestConfig, isActiveGrant, mayReplay, sendBoundOperation, createSessionController } from './secure-session.js';
 
@@ -1035,6 +1067,7 @@ function onSecureIdentity(identity) {
   secureIdentity = identity;
   if(changed)state.firebaseConnected=null;
   if (!changed) return;
+  closeCameraModal();
   stopSecureSubscriptions();
   if (previous && !identity && !POPOUT_DISPLAY) {
     secureDraftBackup = JSON.parse(JSON.stringify({ projectId: firebaseConfig.projectId, uid: previous.uid, incidentId: state.currentIncidentId, mciDraft, csDraft, transportDraft:state.transportDraft }));
@@ -6209,10 +6242,35 @@ let _cameraStream = null;
 let _cameraCapturedBlob = null;
 let _cameraMode = 'ocr';            // 'ocr'(카드 인식) | 'photo'(사진 첨부)
 let _cameraPhotoTarget = 'patientPhoto';   // photo 모드일 때 넣을 슬롯('cardPhoto'|'patientPhoto')
+let _cameraEpoch=0, _cameraContext=null, _cameraDraft=null, _cameraBusy=false, _cameraReview=null, _cameraAbort=null;
+let _cameraPreviewUrl='', _cameraReviewUrl='';
+const cameraContext=()=>({uid:secureIdentity?.uid,incidentId:state.currentIncidentId,mode:state.mode,editKey:currentCasualtyDraft()._editKey || null,epoch:_cameraEpoch});
+const cameraContextValid=()=>isActiveGrant(secureIdentity)&&ocrContextMatches(_cameraContext,cameraContext())&&_cameraDraft===currentCasualtyDraft();
+function setCameraBusy(busy){_cameraBusy=busy;['camera-analyze','camera-local','camera-rotate','camera-retake','camera-apply'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=busy;});}
+function setCameraBlob(blob){
+  _cameraCapturedBlob=blob;_cameraReview=null;
+  if(_cameraPreviewUrl)URL.revokeObjectURL(_cameraPreviewUrl);
+  _cameraPreviewUrl=URL.createObjectURL(blob);document.getElementById('camera-preview-img').src=_cameraPreviewUrl;
+  document.getElementById('camera-local').classList.add('hidden');
+  document.querySelectorAll('[data-crop]').forEach(el=>el.value='0');updateCameraCrop();showCameraPreview();
+}
+function updateCameraCrop(){const values={};document.querySelectorAll('[data-crop]').forEach(el=>values[el.dataset.crop]=Number(el.value));document.getElementById('camera-crop-outline').style.inset=`${values.top}% ${values.right}% ${values.bottom}% ${values.left}%`;}
+async function transformCameraBlob(blob,{rotate=false,crop=null}={}){
+  const bitmap=await createImageBitmap(blob);
+  try{
+    const x=crop?Math.round(bitmap.width*crop.left/100):0,y=crop?Math.round(bitmap.height*crop.top/100):0;
+    const w=crop?Math.max(1,Math.round(bitmap.width*(100-crop.left-crop.right)/100)):bitmap.width,h=crop?Math.max(1,Math.round(bitmap.height*(100-crop.top-crop.bottom)/100)):bitmap.height;
+    const canvas=document.createElement('canvas');canvas.width=rotate?h:w;canvas.height=rotate?w:h;
+    const ctx=canvas.getContext('2d');if(rotate){ctx.translate(canvas.width,0);ctx.rotate(Math.PI/2);}ctx.drawImage(bitmap,x,y,w,h,0,0,w,h);
+    return await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('사진 변환 실패')),'image/jpeg',.94));
+  }finally{bitmap.close();}
+}
 
 function openCameraModal(mode = 'ocr', target = 'patientPhoto') {
   const modal = document.getElementById('camera-modal');
   if (!modal) return;
+  closeCameraModal();
+  _cameraContext=cameraContext();_cameraDraft=currentCasualtyDraft();
   _cameraMode = mode;
   _cameraPhotoTarget = target;
   // 모드별 제목·분석버튼 라벨 (open마다 설정 → close가 몰라도 됨)
@@ -6230,18 +6288,25 @@ function openCameraModal(mode = 'ocr', target = 'patientPhoto') {
   if (window.lucide) window.lucide.createIcons();
 
   // 후면 카메라 우선
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+  if(!navigator.mediaDevices?.getUserMedia){showCameraMessage('카메라를 사용할 수 없습니다. 사진 선택으로 불러오세요.');return;}
+  const epoch=_cameraEpoch;
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' },width:{ideal:1920},height:{ideal:1080} }, audio: false })
     .then(stream => {
+      if(epoch!==_cameraEpoch){stream.getTracks().forEach(t=>t.stop());return;}
       _cameraStream = stream;
       const video = document.getElementById('camera-video');
       if (video) { video.srcObject = stream; }
     })
     .catch(err => {
-      showCameraMessage('카메라 접근이 거부되었습니다. 브라우저 권한을 확인해주세요. (' + (err.name || err.message) + ')');
+      if(epoch===_cameraEpoch)showCameraMessage('카메라를 사용할 수 없습니다. 사진 선택으로 불러오거나 카메라 권한을 확인하세요.');
     });
 }
 
 function closeCameraModal() {
+  _cameraEpoch++;_cameraAbort?.abort();_cameraAbort=null;_cameraReview=null;_cameraContext=null;_cameraDraft=null;setCameraBusy(false);
+  for(const url of [_cameraPreviewUrl,_cameraReviewUrl])if(url)URL.revokeObjectURL(url);
+  _cameraPreviewUrl='';_cameraReviewUrl='';
+  document.getElementById('camera-review-fields').innerHTML='';document.getElementById('camera-review-img').removeAttribute('src');document.getElementById('camera-original-link').removeAttribute('href');
   const modal = document.getElementById('camera-modal');
   if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
   // 카메라 스트림 해제
@@ -6256,6 +6321,8 @@ function closeCameraModal() {
 }
 
 function showCameraLive() {
+  ['camera-review','camera-review-actions','camera-crop-controls','camera-local'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
+  document.getElementById('camera-review-actions').classList.remove('flex');
   document.getElementById('camera-live')?.classList.remove('hidden');
   document.getElementById('camera-preview')?.classList.add('hidden');
   document.getElementById('camera-analyzing')?.classList.add('hidden');
@@ -6266,6 +6333,8 @@ function showCameraLive() {
 }
 
 function showCameraPreview() {
+  document.getElementById('camera-review').classList.add('hidden');document.getElementById('camera-review-actions').classList.add('hidden');document.getElementById('camera-review-actions').classList.remove('flex');
+  document.getElementById('camera-crop-controls').classList.toggle('hidden',_cameraMode!=='ocr');document.getElementById('camera-crop-outline').classList.toggle('hidden',_cameraMode!=='ocr');
   document.getElementById('camera-live')?.classList.add('hidden');
   document.getElementById('camera-preview')?.classList.remove('hidden');
   document.getElementById('camera-analyzing')?.classList.add('hidden');
@@ -6293,6 +6362,8 @@ function captureCameraFrame() {
   const video = document.getElementById('camera-video');
   const canvas = document.getElementById('camera-canvas');
   if (!video || !canvas) return;
+  if(!video.videoWidth){showCameraMessage('카메라 영상이 준비되지 않았습니다. 사진 선택을 이용할 수 있습니다.');return;}
+  const epoch=_cameraEpoch;
   const w = video.videoWidth || 1280;
   const h = video.videoHeight || 720;
   canvas.width = w;
@@ -6300,10 +6371,7 @@ function captureCameraFrame() {
   const ctx = canvas.getContext('2d');
   ctx.drawImage(video, 0, 0, w, h);
   canvas.toBlob(blob => {
-    _cameraCapturedBlob = blob;
-    const img = document.getElementById('camera-preview-img');
-    if (img) img.src = URL.createObjectURL(blob);
-    showCameraPreview();
+    if(epoch===_cameraEpoch && blob)setCameraBlob(blob);
   }, 'image/jpeg', 0.92);
 }
 
@@ -6330,153 +6398,12 @@ async function runOcr(blob) {
 
 // OCR 결과 텍스트에서 필드 추출 → mciDraft 부분 업데이트
 // 표준 카드 양식 (활력징후·환자정보) 지원
-function extractFieldsFromOcr(text) {
-  const flags = {};
-  const draft = mciDraft;
-  const norm = text.replace(/\s+/g, ' ').replace(/[•●◆■]/g, '');
-
-  // 1) 트리아지: I/II/III/IV 또는 긴급/응급/비응급/사망
-  const triageMap = {
-    'I': 'emergency', '긴급': 'emergency',
-    'II': 'urgent', '응급': 'urgent',
-    'III': 'nonurgent', '비응급': 'nonurgent', '경증': 'nonurgent',
-    'IV': 'dead', '사망': 'dead',
-  };
-  let triageMatch = null;
-  for (const key of ['긴급','응급','비응급','경증','사망']) {
-    if (norm.includes(key)) { triageMatch = triageMap[key]; break; }
-  }
-  if (!triageMatch) {
-    const m = /(?:^|[^A-Z])(IV|III|II|I)(?:[^A-Z]|$)/.exec(norm);
-    if (m) triageMatch = triageMap[m[1]];
-  }
-
-  // 2) 이름 (한글 2-4자) — "이름" 라벨 다음. 표 형식 (이름|성별|나이) 도 처리
-  const nameM = /이름[:\s|]*([가-힣]{2,4})/.exec(norm);
-  if (nameM && !draft.name) {
-    draft.name = nameM[1];
-    flags.name = true;
-  }
-
-  // 3) 연령 (40세, 8세, 40대, "나이/연령" 라벨, 표 형식 "나이|27")
-  const ageM = /(?:연령|나이)[:\s|]*([0-9]{1,3})\s*(세|대)?/.exec(norm)
-            || /([0-9]{1,3})\s*(세|대)/.exec(norm);
-  if (ageM && !draft.age) {
-    draft.age = ageM[1] + (ageM[2] || '세');
-    flags.age = true;
-  }
-
-  // 4) 성별
-  const genderM = /성별[:\s|]*([남여])/.exec(norm) || /\b([남여])\s*(자|성)?\b/.exec(norm);
-  if (genderM && !draft.gender) {
-    draft.gender = genderM[1];
-    flags.gender = true;
-  }
-
-  // 5) 발견장소
-  const locM = /(?:발견장소|장소)[:\s|]*([^\n]{2,40})/.exec(text);
-  if (locM && !draft.location) {
-    draft.location = locM[1].trim().slice(0, 200);
-    flags.location = true;
-  }
-
-  // 6) 주증상 — "증상", "주증상" + 진단명까지 통합
-  let symptomText = '';
-  const symM = /(?:주증상|증상)[:\s|]*([^\n]{2,80})/.exec(text);
-  if (symM) symptomText = symM[1].trim();
-  const dxM = /진단[명]?[:\s|]*([^\n]{2,40})/.exec(text);
-  if (dxM) {
-    // 진단명을 증상 앞에 통합 (예: "손가락 열상 — 손가락통증, 부종, 출혈")
-    const dx = dxM[1].trim();
-    symptomText = symptomText ? `${dx} — ${symptomText}` : dx;
-  }
-  if (symptomText && !draft.symptom) {
-    draft.symptom = symptomText.slice(0, 200);
-    flags.symptom = true;
-  }
-
-  // 7) 생체징후 — BP는 슬래시 양옆 공백 허용
-  const rrM    = /(?:호흡|RR)[:\s|]*(\d{1,2})/.exec(norm);
-  const pulseM = /(?:맥박|HR|P\b)[:\s|]*(\d{2,3})/.exec(norm);
-  const bpM    = /(?:혈압|BP)[:\s|]*(\d{2,3})\s*\/\s*(\d{2,3})/.exec(norm);
-  const spo2M  = /SpO[2₂]?[:\s|]*(\d{2,3})/.exec(norm);
-  // 체온 — 소수점 1자리 (예: 35.6, 36.5, 37.2). 일반 범위 30.0~45.0 만 허용
-  const tempM  = /(?:체온|BT|T(?:emp)?)[:\s|]*(\d{2}(?:\.\d)?)/i.exec(norm);
-  if (rrM && !draft.rr)         { draft.rr = rrM[1]; flags.rr = true; }
-  if (pulseM && !draft.pulse)   { draft.pulse = pulseM[1]; flags.pulse = true; }
-  if (bpM && !draft.bpSys)      { draft.bpSys = bpM[1]; draft.bpDia = bpM[2]; flags.bpSys = true; flags.bpDia = true; }
-  if (spo2M && !draft.spo2)     { draft.spo2 = spo2M[1]; flags.spo2 = true; }
-  if (tempM && !draft.temp) {
-    const t = parseFloat(tempM[1]);
-    if (t >= 30 && t <= 45) { draft.temp = tempM[1]; flags.temp = true; }
-  }
-
-  // 8) GCS → AVPU 자동 매핑
-  // 15 = A(Alert), 13-14 = V(Verbal), 9-12 = P(Pain), 3-8 = U(Unresponsive)
-  const gcsM = /GCS[\s\S]{0,30}?(\d{1,2})\s*(?:점|점수)?(?:\s|$)/.exec(norm)
-            || /(?:총|합|=)\s*([3-9]|1[0-5])(?:점)?\s*(?:GCS|점)/.exec(norm);
-  if (gcsM && !draft.consciousness) {
-    const gcs = parseInt(gcsM[1], 10);
-    if (gcs >= 3 && gcs <= 15) {
-      let avpu = 'A';
-      if (gcs >= 13) avpu = 'A';
-      else if (gcs >= 9) avpu = 'V';
-      else if (gcs >= 6) avpu = 'P';
-      else avpu = 'U';
-      draft.consciousness = avpu;
-      flags.consciousness = true;
-    }
-  }
-
-  // 9) 환자평가 (START 분류법) → 트리아지 자동 추정
-  // 걸음·호흡·맥박촉지·반응 4항목의 O/X 패턴 분석
-  // 트리아지가 이미 위에서 인식된 경우는 덮어쓰지 않음
-  if (!triageMatch) {
-    const evalCheck = (label) => {
-      const re = new RegExp(label + '[\\s\\S]{0,15}?([Oo0OoㅇOＯxX×ＸX])(?:\\s|$|,|\\n)', 'i');
-      const m = re.exec(norm);
-      if (!m) return null;
-      const v = m[1];
-      // O/o/0/ㅇ → true (양성), X/× → false (음성)
-      if (/[Oo0ㅇＯO]/.test(v)) return true;
-      if (/[xX×Ｘ]/.test(v))   return false;
-      return null;
-    };
-    const walks   = evalCheck('걸음');
-    const breath  = evalCheck('호흡');
-    const pulseOk = evalCheck('맥박촉지') ?? evalCheck('맥박');
-    const respond = evalCheck('반응');
-    // START 알고리즘 단순화:
-    // - 걸음 O → III 비응급
-    // - 호흡 X (확실히 X) → IV 사망 (기도 확보 후 그래도 X면)
-    // - 호흡 O + 맥박 O + 반응 O → II 응급
-    // - 그 외 (호흡/맥박/반응 중 하나라도 X) → I 긴급
-    if (walks === true) {
-      triageMatch = 'nonurgent';
-    } else if (breath === false) {
-      triageMatch = 'dead';
-    } else if (breath === true && pulseOk === true && respond === true) {
-      triageMatch = 'urgent';
-    } else if (breath === true || pulseOk === true || respond === true) {
-      triageMatch = 'emergency';
-    }
-  }
-
-  if (triageMatch && !draft.triage) {
-    draft.triage = triageMatch;
-    flags.triage = true;
-  }
-
-  return flags;
-}
-
 // ==================== Claude AI 카드 분석 (서버 중계) ====================
 // 사진을 /api/ocr(Cloudflare Worker)로 보내면 서버가 Claude Vision으로 분석.
 // 손글씨·체크표시·동그라미까지 판독되어 Tesseract보다 인식률이 크게 높음.
-// 오프라인이거나 서버/키 미설정 등으로 실패하면 기존 Tesseract OCR로 자동 폴백.
+// 실패 원인을 표시하고 사용자가 일반 문자 인식을 선택하면 Tesseract를 사용한다.
 
-// 이미지 축소(긴 변 1568px) + JPEG 재압축 — Anthropic Vision이 내부적으로 ~1568로 다운스케일하므로
-// 이보다 키워도 이득 없고 전송 용량만 커져 호출 실패 위험(2048 시도 후 1568로 복구). 품질 0.85.
+// 현재 Sonnet 입력의 전송 크기 제한. 작은 글씨는 축소 전 원본의 부분 확대본도 함께 보낸다.
 function downscaleImageBlob(blob, maxDim = 1568, quality = 0.85) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
@@ -6570,11 +6497,22 @@ async function runClaudeOcr(blob) {
   const idToken = await user.getIdToken();
   const resized = await downscaleImageBlob(blob);
   const b64 = await blobToBase64(resized);
-  const res = await fetch('/api/ocr', {
+  const details=[];
+  if(document.getElementById('camera-detail').checked){
+    for(const crop of [{top:0,bottom:40,left:0,right:0},{top:40,bottom:0,left:0,right:0}])details.push(await blobToBase64(await downscaleImageBlob(await transformCameraBlob(blob,{crop}))));
+  }
+  if(!cameraContextValid())throw Error('재난 또는 로그인 정보가 변경되었습니다. 다시 촬영하세요.');
+  _cameraAbort=new AbortController();
+  const timeout=setTimeout(()=>_cameraAbort?.abort(),65000);
+  let res;
+  try {
+  res = await fetch('/api/ocr', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
-    body: JSON.stringify({ image: b64, mediaType: 'image/jpeg' }),
+    body: JSON.stringify({ image: b64, details, mediaType: 'image/jpeg' }),
+    signal:_cameraAbort.signal,
   });
+  } finally {clearTimeout(timeout);}
   if (!res.ok) {
     let msg = 'AI 분석 서버 오류 (' + res.status + ')';
     try { const e = await res.json(); if (e && e.error) msg = e.error; } catch {}
@@ -6584,131 +6522,73 @@ async function runClaudeOcr(blob) {
   if (!data || typeof data.fields !== 'object' || data.fields === null) {
     throw new Error('AI 응답 형식 오류');
   }
-  return data.fields;
+  return {fields:normalizeOcrCandidates(data.fields),engine:'Claude AI',model:data.model || ''};
 }
 
 // Claude 추출 결과 → mciDraft 반영. 빈 필드만 채움(사용자가 이미 적은 값은 보존),
 // 채운 필드는 flags로 표시되어 노란색 강조(저장 전 확인 유도).
-function applyClaudeOcrFields(f) {
-  const flags = {};
-  const draft = mciDraft;
-  const fillStr = (k, v) => {
-    if (v == null) return;
-    const s = String(v).trim();
-    if (s && !draft[k]) { draft[k] = s; flags[k] = true; }
-  };
-  const fillNum = (k, v) => {
-    if (v == null) return;
-    const s = String(v).trim();
-    if (s && Number.isFinite(Number(s)) && !draft[k]) { draft[k] = s; flags[k] = true; }
-  };
-
-  if (['emergency', 'urgent', 'nonurgent', 'dead'].includes(f.triage) && !draft.triage) {
-    draft.triage = f.triage; flags.triage = true;
-  }
-  fillStr('name', f.name);
-  fillNum('age', f.age);
-  if ((f.gender === '남' || f.gender === '여') && !draft.gender) {
-    draft.gender = f.gender; flags.gender = true;
-  }
-  if (f.isPediatric === true && !draft.isPediatric) {
-    draft.isPediatric = true; flags.isPediatric = true;
-  }
-  fillStr('location', f.location);
-  fillStr('symptom', f.symptom);
-  if (['A', 'V', 'P', 'U'].includes(f.consciousness) && !draft.consciousness) {
-    draft.consciousness = f.consciousness; flags.consciousness = true;
-  }
-  fillNum('rr', f.rr);
-  fillNum('pulse', f.pulse);
-  fillNum('bpSys', f.bpSys);
-  fillNum('bpDia', f.bpDia);
-  fillNum('spo2', f.spo2);
-  fillNum('temp', f.temp);
-  if (typeof f.mechanism === 'string' && MECHANISM.includes(f.mechanism)) {
-    if (!Array.isArray(draft.mechanism)) draft.mechanism = mechList(draft.mechanism);
-    if (!draft.mechanism.includes(f.mechanism)) { draft.mechanism.push(f.mechanism); flags.mechanism = true; }
-  }
-  fillStr('hospital', f.hospital);
-  fillStr('departTime', f.departTime);
-  fillStr('notes', f.notes);
-  return flags;
+function renderOcrReview(result,blob) {
+  _cameraReview={...result,blob};
+  if(_cameraReviewUrl)URL.revokeObjectURL(_cameraReviewUrl);
+  _cameraReviewUrl=URL.createObjectURL(blob);document.getElementById('camera-review-img').src=_cameraReviewUrl;document.getElementById('camera-original-link').href=_cameraReviewUrl;
+  document.getElementById('camera-engine').textContent=`인식 방식: ${result.engine}${result.model?' · '+result.model:''} · 확인 전에는 입력되지 않습니다.`;
+  const enumOptions={triage:[['emergency','긴급'],['urgent','응급'],['nonurgent','비응급'],['dead','사망']],gender:[['남','남'],['여','여']],consciousness:['A','V','P','U'].map(v=>[v,v]),isPediatric:[['true','소아 표시 있음'],['false','소아 아님 표시']]};
+  document.getElementById('camera-review-fields').innerHTML=Object.entries(OCR_LABELS).map(([key,label])=>{
+    const value=result.fields[key]??'',old=_cameraDraft[key];
+    const occupied=old!==undefined&&old!==null&&old!==''&&old!==false&&!(Array.isArray(old)&&old.length===0);
+    const options=enumOptions[key];
+    const control=options?`<select data-ocr-value="${key}" id="ocr-value-${key}" ${occupied?'disabled':''}><option value="">판독 불가 / 미기재</option>${options.map(([id,name])=>`<option value="${id}" ${String(value)===id?'selected':''}>${name}</option>`).join('')}</select>`:`<input data-ocr-value="${key}" id="ocr-value-${key}" value="${escapeHtml(String(value))}" maxlength="1000" placeholder="판독 불가 / 미기재" ${occupied?'disabled':''} />`;
+    return `<div class="ocr-review-row"><input type="checkbox" data-ocr-select="${key}" aria-label="${label} 확인 후 반영" ${occupied?'disabled':''} /><div><label for="ocr-value-${key}">${label}</label>${control}${occupied?'<small>기존 입력값 유지</small>':'<small>원본 대조 후 체크</small>'}</div></div>`;
+  }).join('');
+  ['camera-live','camera-preview','camera-analyzing','camera-preview-actions','camera-crop-controls','camera-live-actions'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  document.getElementById('camera-review').classList.remove('hidden');document.getElementById('camera-review-actions').classList.remove('hidden');document.getElementById('camera-review-actions').classList.add('flex');hideCameraMessage();
 }
-
-async function analyzeCapturedImage() {
-  if (!_cameraCapturedBlob) {
-    showCameraMessage('캡처된 이미지가 없습니다');
-    return;
-  }
-
-  // 사진 첨부 모드 — OCR 없이 썸네일만 만들어 슬롯에 저장
-  if (_cameraMode === 'photo') {
-    const blob = _cameraCapturedBlob, target = _cameraPhotoTarget;
-    showCameraAnalyzing('사진 처리 중...');
-    await commitPhotoToDraft(blob, target);
-    closeCameraModal();
-    render();
-    return;
-  }
-
-  let flags = null;
-
-  // 1차: Claude AI 분석 (온라인일 때) — 손글씨·체크표시까지 판독
-  if (navigator.onLine) {
-    showCameraAnalyzing('AI 분석 중... (보통 5~15초)');
-    try {
-      const fields = await runClaudeOcr(_cameraCapturedBlob);
-      flags = applyClaudeOcrFields(fields);
-    } catch (err) {
-      console.error('[OCR] AI 분석 실패 — 로컬 문자인식으로 전환:', err);
-      flags = null;
+async function analyzeCapturedImage(local=false) {
+  if(_cameraBusy || !_cameraCapturedBlob)return;
+  if(!cameraContextValid()){showCameraMessage('재난 또는 로그인 정보가 변경되었습니다. 닫고 다시 촬영하세요.');return;}
+  const epoch=_cameraEpoch;setCameraBusy(true);
+  try{
+    if(_cameraMode==='photo'){
+      const spec=_photoSpec(_cameraPhotoTarget),thumb=await makeThumbBase64(_cameraCapturedBlob,spec.dim,.8,spec.cap);
+      if(epoch!==_cameraEpoch || !cameraContextValid())return;
+      if(!thumb)throw Error('사진 용량이 큽니다. 다시 촬영하세요.');
+      _cameraDraft[_cameraPhotoTarget]=thumb;closeCameraModal();render();return;
     }
-  }
-
-  // 2차: 로컬 Tesseract 폴백 (오프라인이거나 AI 분석 실패 시)
-  if (flags === null) {
-    showCameraAnalyzing('로컬 문자인식 중... (한국어 모델 로딩)');
-    try {
-      const text = await runOcr(_cameraCapturedBlob);
-      flags = extractFieldsFromOcr(text);
-    } catch (err) {
-      console.error('[OCR] 분석 실패:', err);
-      showCameraMessage('분석 실패: ' + (err.message || err));
-      showCameraLive();
-      return;
-    }
-  }
-
-  const filledCount = Object.keys(flags).length;
-  if (filledCount === 0) {
-    showCameraAnalyzing('인식된 정보가 없습니다');
-    setTimeout(() => {
-      showCameraMessage('카드에서 필드를 인식하지 못했습니다. 더 선명하게 다시 촬영해주세요.');
-      showCameraLive();
-      // 카메라 라이브 재개
-      if (_cameraStream) {
-        const video = document.getElementById('camera-video');
-        if (video && !video.srcObject) video.srcObject = _cameraStream;
-      } else {
-        openCameraModal();
-      }
-    }, 1200);
-    return;
-  }
-
-  // 성공: mciDraft 갱신, OCR 플래그 병합, 모달 닫고 폼 다시 그림
-  Object.assign(mciOcrFlags, flags);
-  // 간이 모드인데 생체징후 등 풀 카드 항목이 채워졌으면 풀 카드로 전환 (노란 강조가 보이도록)
-  const _fullOnlyKeys = ['rr','pulse','bpSys','bpDia','spo2','temp','consciousness','mechanism','hospital','notes'];
-  if (state.mciInputMode === 'simple' && _fullOnlyKeys.some(k => flags[k])) {
-    state.mciInputMode = 'full';
-  }
-  // OCR에 쓴 카드 이미지를 카드 사진으로도 보관 (기존엔 폐기) — 첨부 실패는 무시(OCR 결과는 살림)
-  try { await commitPhotoToDraft(_cameraCapturedBlob, 'cardPhoto', { flag: true }); }
-  catch (e) { console.warn('[photo] cardPhoto 보관 실패', e); }
-  closeCameraModal();
-  render();
-  setTimeout(() => alert(`${filledCount}개 필드가 자동 입력되었습니다. 노란색으로 강조된 부분을 꼭 확인해주세요.`), 100);
+    const crop={};document.querySelectorAll('[data-crop]').forEach(el=>crop[el.dataset.crop]=Number(el.value));
+    const blob=await transformCameraBlob(_cameraCapturedBlob,{crop});
+    if(epoch!==_cameraEpoch || !cameraContextValid())return;
+    showCameraAnalyzing(local?'일반 문자 인식 중 — 체크표시·중증도는 직접 확인하세요.':'Claude AI 분석 중 — 전체 카드와 확대본을 확인합니다.');
+    const result=local?{fields:extractLocalOcrCandidates(await runOcr(blob)),engine:'일반 문자 인식 (Tesseract)'}:await runClaudeOcr(blob);
+    if(epoch!==_cameraEpoch || !cameraContextValid())return;
+    renderOcrReview(result,blob);
+  }catch(error){
+    if(epoch!==_cameraEpoch)return;
+    showCameraPreview();
+    document.getElementById('camera-local').classList.remove('hidden');
+    showCameraMessage((local?'일반 문자 인식 실패: ':'AI 분석 실패: ')+(error.name==='AbortError'?'시간 초과 또는 취소되었습니다.':error.message)+' 재시도하거나 일반 문자 인식을 선택할 수 있습니다.');
+  }finally{if(epoch===_cameraEpoch)setCameraBusy(false);}
+}
+async function applyOcrReview(){
+  if(_cameraBusy || !_cameraReview)return;
+  if(!cameraContextValid()){showCameraMessage('재난 또는 로그인 정보가 변경되어 반영하지 않았습니다. 다시 촬영하세요.');return;}
+  const fields={},selected=[...document.querySelectorAll('[data-ocr-select]:checked')].map(el=>el.dataset.ocrSelect);
+  document.querySelectorAll('[data-ocr-value]').forEach(el=>{fields[el.dataset.ocrValue]=el.dataset.ocrValue==='isPediatric'?(el.value===''?null:el.value==='true'):el.value;});
+  const normalized=normalizeOcrCandidates(fields);
+  const invalid=selected.filter(k=>!Object.hasOwn(normalized,k)||(k==='mechanism'&&!MECHANISM.includes(normalized[k])));
+  if(invalid.length){showCameraMessage('선택한 항목을 다시 확인하세요: '+invalid.map(k=>OCR_LABELS[k]).join(', '));return;}
+  if(!selected.length){showCameraMessage('원본을 확인한 항목을 한 개 이상 체크하세요.');return;}
+  const epoch=_cameraEpoch;setCameraBusy(true);
+  try{
+    let thumb=null;
+    if(document.getElementById('camera-attach-card').checked){const spec=_photoSpec('cardPhoto');thumb=await makeThumbBase64(_cameraReview.blob,spec.dim,.8,spec.cap);if(!thumb)throw Error('카드 사진을 줄이지 못했습니다. 사진 첨부를 해제하고 반영할 수 있습니다.');}
+    if(epoch!==_cameraEpoch || !cameraContextValid())return;
+    const patch=selectedOcrPatch(fields,selected,_cameraDraft);
+    for(const [key,value] of Object.entries(patch)){_cameraDraft[key]=key==='mechanism'?[value]:value;mciOcrFlags[key]=true;}
+    if(thumb&&!_cameraDraft.cardPhoto){_cameraDraft.cardPhoto=thumb;mciOcrFlags.cardPhoto=true;}
+    if(['rr','pulse','bpSys','bpDia','spo2','temp','consciousness','mechanism','hospital','notes'].some(k=>Object.hasOwn(patch,k)))state.mciInputMode='full';
+    closeCameraModal();render();window.__mciToast?.(`${Object.keys(patch).length}개 항목을 입력했습니다. 카드 저장 버튼으로 저장하세요.`,'info');
+  }catch(error){if(epoch===_cameraEpoch)showCameraMessage(error.message);}
+  finally{if(epoch===_cameraEpoch)setCameraBusy(false);}
 }
 
 // 카메라 모달의 영구 이벤트 (닫기·캡처·재촬영·분석) — boot()에서 1회만 호출
@@ -6721,7 +6601,21 @@ function initCameraModal() {
     _cameraCapturedBlob = null;
     showCameraLive();
   });
-  document.getElementById('camera-analyze')?.addEventListener('click', analyzeCapturedImage);
+  document.getElementById('camera-analyze')?.addEventListener('click', ()=>analyzeCapturedImage(false));
+  document.getElementById('camera-local')?.addEventListener('click', ()=>analyzeCapturedImage(true));
+  document.getElementById('camera-file')?.addEventListener('click',()=>document.getElementById('camera-file-input').click());
+  document.getElementById('camera-file-input')?.addEventListener('change',event=>{
+    const file=event.target.files?.[0];event.target.value='';if(!file)return;
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>20000000){showCameraMessage('20MB 이하 JPG·PNG·WebP 사진을 선택하세요.');return;}
+    setCameraBlob(file);
+  });
+  document.querySelectorAll('[data-crop]').forEach(el=>el.addEventListener('input',updateCameraCrop));
+  document.getElementById('camera-rotate')?.addEventListener('click',async()=>{
+    if(_cameraBusy||!_cameraCapturedBlob)return;const epoch=_cameraEpoch;setCameraBusy(true);
+    try{const blob=await transformCameraBlob(_cameraCapturedBlob,{rotate:true});if(epoch===_cameraEpoch)setCameraBlob(blob);}catch(error){if(epoch===_cameraEpoch)showCameraMessage(error.message);}finally{if(epoch===_cameraEpoch)setCameraBusy(false);}
+  });
+  document.getElementById('camera-review-back')?.addEventListener('click',showCameraPreview);
+  document.getElementById('camera-apply')?.addEventListener('click',applyOcrReview);
   // 배경 클릭 시 닫기 (모달 안 클릭은 무시)
   modal.addEventListener('click', (e) => {
     if (e.target === modal) closeCameraModal();
@@ -6956,10 +6850,6 @@ function bindMciCasualtyEvents() {
   const ocrBtn = document.getElementById('mci-ocr-btn');
   if (ocrBtn) {
     ocrBtn.onclick = () => {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        alert('이 브라우저는 카메라 기능을 지원하지 않습니다.');
-        return;
-      }
       openCameraModal();
     };
   }
@@ -8650,9 +8540,9 @@ const HELP_CONTENT = {
           📸 카메라로 카드 자동 입력은 어떻게 쓰나요?
         </summary>
         <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
-          MCI 사상자 카드 폼 우상단의 <strong>[📸 카메라로 입력]</strong> 버튼 → 후면 카메라 활성화 → 종이 카드를 프레임에 맞추고 셔터 → 분석 시작.<br>
-          AI(Claude)가 <strong>손글씨·체크표시·동그라미까지 판독</strong>하여 트리아지·이름·연령·성별·발견장소·주증상·생체징후·이송병원을 자동 추출 → 노란색으로 강조 표시. <strong>저장 전 반드시 노란 항목을 확인·수정</strong>하세요.<br>
-          <em class="text-amber-300">* 통신이 끊긴 경우 자동으로 기기 내 문자인식(인쇄체 위주)으로 전환됩니다.</em>
+          <strong>[카메라로 입력]</strong> → 촬영 또는 사진 선택 → 카드 여백 조정·90° 회전 → 분석 시작.<br>
+          원본과 인식 후보를 대조하고 <strong>확인한 항목만 체크 → 선택 항목 반영</strong>을 누르세요. 기존 입력값은 유지되며 카드 저장은 별도로 눌러야 합니다. 작은 글씨 확대 분석은 같은 카드의 전체·위·아래 사진을 함께 분석합니다.<br>
+          <em class="text-amber-300">* AI 실패 시 원인을 표시합니다. 일반 문자 인식을 선택할 수 있으며, 이 방식은 중증도·체크표시·의식을 자동 판정하지 않습니다.</em>
         </div>
       </details>
 
