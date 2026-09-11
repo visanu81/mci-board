@@ -6,7 +6,7 @@ const project='mci2-secure-visanu81',config=JSON.parse(fs.readFileSync('security
 const env={...JSON.parse(fs.readFileSync('wrangler.mci2.jsonc')).vars,...JSON.parse(fs.readFileSync('.tmp/auth-setup/worker-secrets.json')),AUTH_RATE_LIMIT:{limit:async()=>({success:true})}};
 assert.equal(env.FIREBASE_PROJECT_ID,project);assert.equal(env.MCI_CODE_STORE,'database');
 const remote=process.env.MCI_LIVE_WORKER_URL;
-if(remote && !(new URL(remote).origin===remote && new URL(remote).protocol==='https:' && /^[a-f0-9]{8}-mci2[.]visanu81[.]workers[.]dev$/.test(new URL(remote).hostname)))throw Error('Only an isolated mci2 version URL is allowed');
+if(remote && !(new URL(remote).origin===remote && new URL(remote).protocol==='https:' && /^(?:[a-f0-9]{8}-)?mci2[.]visanu81[.]workers[.]dev$/.test(new URL(remote).hostname)))throw Error('Only the isolated mci2 serving or version URL is allowed');
 const bootstrap=JSON.parse(fs.readFileSync('.tmp/auth-setup/test-entry-codes.json')).codes.find(x=>x.role==='admin').code;
 const tag='managed-'+crypto.randomUUID(),path='mci2/incidents/'+tag,users=[],uids=new Set(),createdCodes=[],apps=[];let checks=0,controller;
 function pass(label){checks++;console.log('PASS '+label);}

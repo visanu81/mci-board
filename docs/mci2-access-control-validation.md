@@ -1,3 +1,5 @@
+> 현재 상태 (2026-09-11): mci2는 2d48b3ea-71ff-433e-b4ab-9aef97f5bfdb / v102-multitab-outbox를 100% 제공한다. 독립 Firebase mci2-secure-visanu81을 사용한다. 아래 과거 항목의 “전환하지 않음”은 당시 기록이다. 실전 mci와 기존 데이터베이스는 변경하지 않았다.
+
 # mci2 서버 인증·관서 코드 관리 검증
 
 2026-09-11. 브랜치 `codex/mci2-access-control`, PR #3.
@@ -121,3 +123,24 @@ Validation: 36 source-based safety checks, 41 session/worker/config checks, 10 c
 Limitations: old tabs that do not implement these locks must be closed/reloaded before use. Web Locks coordinate the same browser origin/storage context only. Conditional card writes continue to handle cross-device conflicts. This commit is not uploaded or promoted; the existing preview remains ffec15df-459e-4160-886a-b4cdb8c7389a (v101). Serving mci2 and production mci remain unchanged.
 
 Lock semantics: https://www.w3.org/TR/web-locks/
+
+
+## 2026-09-11 실제 브라우저 검증 및 MCI2 테스트 전환
+
+`node tests/browser-outbox-server.mjs`로 localhost:8792에 재현용 화면을 연다. 이 서버는 앱 HTML에서 미전송함 코드를 읽고 실제 secure-session.js를 제공한다. 두 IAB 탭이 브라우저 기본 Web Locks/localStorage를 공유하며, Firebase REST 부분만 메모리/ETag 모형으로 대체한다. 실제 개인/환자 정보는 사용하지 않는다. 테스트 UI와 서버는 assetsignore로 배포에서 제외된다.
+
+확인 결과:
+- 두 탭에서 각각 40건 동시 보관: pending 80건, 고유 순번 80개. 두 탭에서 재전송: sent 80건, 서버 레코드/변경 모두 80건.
+- 카드 저장 응답 보류 후 전송 탭을 실제 닫음: 다른 탭이 sending 상태를 복구하고 sent로 변경. 서버 레코드 1건/변경 1회 유지.
+- 두 탭이 같은 메모의 수정 전 값을 읽고 서로 다른 수정 보관: 한 번만 반영, 다른 요청은 write_conflict로 보관. 덮어쓰기 없음.
+- 통신 실패(로컬 HTTP 503 주입) 중 40건 재전송 실패 후 페이지 새로고침: pending 40건 유지. 통신 복구 후 sent 40건, 서버 변경 40회. 실제 무선망 차단/기기 전원 차단 시험은 아니다.
+
+자동 검사: 저장 36개 + 단위 검사 115개 + Firebase 규칙 에뮬레이터 90개 = 241개 통과. Cloudflare 후보 URL에서 실제 독립 Firebase 연결 검사 29개 통과. mci2 전환 후 실제 제공 주소에서도 동일 29개 통과, 두 실행 모두 정리 오류 없음. 로그인/발급·폐기/기관 및 HQ 권한/전광판 토큰/수정 충돌/생성 및 삭제 재시도/안전 종료와 원본 보존을 포함한다.
+
+Cloudflare 버전 2d48b3ea-71ff-433e-b4ab-9aef97f5bfdb를 mci2에 100% 배포했다. 실제 주소의 index.html, sw.js, secure-session.js, display-session.js는 로컬과 정확히 일치한다. 실제 브라우저에서 관서 코드 로그인 화면을 확인했다. 운영 mci 페이지의 배포 전후 SHA-256 동일함을 확인했다.
+
+이전 MCI2 버전: 939f0bb6-e85c-4c34-8680-b9db6cad5cf2. 새 DB에 문제가 생기면 해당 버전으로 테스트 Worker만 되돌릴 수 있으나, 이전 버전은 구형 DB/로그인 방식을 사용한다. 새 DB 기록을 구형 DB에 자동 병합하지 않는다.
+
+접속 안내는 Git/배포에서 제외된 `.tmp/auth-setup/MCI2-접속안내.md`에 저장했다. 초기 관리 코드는 2026-09-18 11:17 KST 만료 예정이다. 이전 탭은 모두 닫고 새 버전으로 접속해야 한다.
+
+남은 실전 전환 조건: 실물 휴대전화의 입력·사진·통신 전환, 실제 두 창 전광판 수신 전체 흐름, 카드 외 입력 충돌 정책 및 실전 인증/데이터 이관 방침. 현재 버전은 테스트 Firebase만 허용하므로 실전 mci에 그대로 적용하지 않는다.
