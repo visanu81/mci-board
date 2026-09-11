@@ -7,7 +7,8 @@
     "test:auth": "node --test tests/agency-login.test.mjs",
     "test:session": "node --test tests/secure-session.test.mjs tests/worker-auth.test.mjs tests/provision-config.test.mjs",
     "test:management": "node --test tests/access-management.test.mjs",
-    "test:close": "node --test tests/incident-close.test.mjs"
+    "test:close": "node --test tests/incident-close.test.mjs",
+    "test:display": "node --test tests/display-session.test.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.2",

@@ -6,7 +6,7 @@
    ============================================================================= */
 
 // 캐시 이름 — 코드 수정 시 버전을 올려서 사용자 디바이스의 옛 캐시를 무효화
-const CACHE_VERSION = 'v98-safe-close';
+const CACHE_VERSION = 'v99-display-feedback';
 const CACHE_NAME    = `mci2-${CACHE_VERSION}`;
 
 // 사전 캐시 대상 (앱 셸)
@@ -14,6 +14,7 @@ const APP_SHELL = [
   './',
   './index.html',
   './secure-session.js',
+  './display-session.js',
   './manifest.json',
   './icon.svg',
   './icon-maskable.svg',

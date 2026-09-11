@@ -924,6 +924,7 @@ import {
   getAuth, initializeAuth, inMemoryPersistence, signInWithCustomToken, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
+import {connectDisplayParent,connectDisplayChild} from './display-session.js';
 import { validateTestConfig, isActiveGrant, mayReplay, sendBoundOperation, createSessionController } from './secure-session.js';
 
 // ==================== Firebase 설정 ====================
@@ -3941,11 +3942,11 @@ function renderMain() {
               <i data-lucide="monitor" class="w-3 h-3"></i>표출
             </button>
             ${!observerMode ? `
-              <button id="admin-btn" class="text-[11px] text-slate-300 px-3 py-1.5 rounded bg-slate-800/50 hover:bg-slate-700 flex items-center gap-1">
+              <button id="admin-btn" class="shrink-0 whitespace-nowrap text-[11px] text-slate-300 px-3 py-1.5 rounded bg-slate-800/50 hover:bg-slate-700 flex items-center gap-1">
                 <i data-lucide="settings" class="w-3 h-3"></i>관리
               </button>
             ` : ''}
-            <button id="logout-btn" class="text-[11px] text-slate-500 px-3 py-1.5 rounded bg-slate-800/50">
+            <button id="logout-btn" class="shrink-0 whitespace-nowrap text-[11px] text-slate-500 px-3 py-1.5 rounded bg-slate-800/50">
               ${observerMode ? '로비로' : '반 변경'}
             </button>
           </div>
@@ -4257,14 +4258,8 @@ function bindMainEvents() {
       const url=`${location.pathname}?popout=display&nonce=${encodeURIComponent(nonce)}`;
       const popup=window.open(url,'mciDisplay-'+nonce,'popup=yes,width=1600,height=900');
       if(!popup){alert('표출 창을 열려면 팝업을 허용해주세요.');return;}
-      let timer;
-      const ready=async event=>{
-        if(event.origin!==location.origin || event.source!==popup || event.data?.type!=='mci-display-ready' || event.data.nonce!==nonce)return;
-        window.removeEventListener('message',ready);clearTimeout(timer);
-        try{const result=await serverAccess('/api/auth/display',{incidentId});popup.postMessage({type:'mci-display-token',nonce,token:result.token},location.origin);}catch(e){popup.close();alert(e.message);}
-      };
-      window.addEventListener('message',ready);
-      timer=setTimeout(()=>{window.removeEventListener('message',ready);},30000);
+      connectDisplayParent({popup,nonce,issueToken:()=>serverAccess('/api/auth/display',{incidentId}),
+        onError:message=>{popup.close();window.__mciToast?.(message,'warn');}});
     };
 
   }
@@ -8416,14 +8411,9 @@ async function boot() {
   await authReady;
   secureSession?.start();
   if(POPOUT_DISPLAY && window.opener){
-    const nonce=new URLSearchParams(location.search).get('nonce');
-    const accept=async event=>{
-      if(event.origin!==location.origin || event.source!==window.opener || event.data?.type!=='mci-display-token' || event.data.nonce!==nonce)return;
-      window.removeEventListener('message',accept);
-      try{await signInWithCustomToken(auth,event.data.token);}catch{startupError='표출 인증에 실패했습니다. 입력 창에서 다시 열어주세요.';render();}
-    };
-    window.addEventListener('message',accept);
-    window.opener.postMessage({type:'mci-display-ready',nonce},location.origin);
+    connectDisplayChild({nonce:new URLSearchParams(location.search).get('nonce'),
+      signIn:token=>signInWithCustomToken(auth,token),
+      onError:message=>{startupError=message;render();}});
   }
   render();
 

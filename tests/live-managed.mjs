@@ -33,6 +33,12 @@ try{
  assert.notEqual(display.user.uid,normal.user.uid);assert.equal(normal.auth.currentUser.uid,normal.user.uid);pass('display auth leaves parent identity intact');
  assert((await read(path,display.user)).ok);assert([401,403].includes((await read(path,display.user,'PATCH',{title:'forbidden'})).status));pass('display reads assigned incident and cannot write');
  const q=new URL(config.databaseURL+'/mci2/incidents.json');q.searchParams.set('auth',await display.user.getIdToken());q.searchParams.set('orderBy',JSON.stringify('agencyId'));q.searchParams.set('equalTo',JSON.stringify(tag));assert([401,403].includes((await fetch(q)).status));pass('scoped display cannot enumerate agency incidents');
+ const peer=await login(code.code);assert.notEqual(peer.user.uid,normal.user.uid);
+ const cardPath=path+'/mciCasualties/concurrent';
+ assert((await read(cardPath,normal.user,'PUT',{createdByUid:normal.user.uid,updatedByUid:normal.user.uid,timestamp:Date.now(),name:'가상 동시입력',triage:'urgent',notes:'before'})).ok);
+ const edits=await Promise.all([read(cardPath,normal.user,'PATCH',{notes:'현장 메모',updatedByUid:normal.user.uid}),read(cardPath,peer.user,'PATCH',{hospital:'가상 병원',updatedByUid:peer.user.uid})]);assert(edits.every(r=>r.ok));
+ const merged=await (await read(cardPath,normal.user)).json();assert.equal(merged.notes,'현장 메모');assert.equal(merged.hospital,'가상 병원');pass('two independent logins preserve concurrent changes to different card fields');
+ assert((await read(cardPath,normal.user,'PATCH',{notes:'first',updatedByUid:normal.user.uid})).ok);assert((await read(cardPath,peer.user,'PATCH',{notes:'last',updatedByUid:peer.user.uid})).ok);assert.equal((await (await read(cardPath,normal.user)).json()).notes,'last');pass('same-field writes are last-write-wins (documented limitation)');
  const closing=await api('/api/admin/close',{incidentId:tag},admin.user);assert.equal(closing.status,200);pass('server closes and archives isolated incident');
  const closed=await (await read(path,admin.user)).json();assert(closed.closure && closed.closedAt);assert.equal(closed.title,'가상 재난');
  const savedArchive=await read('mci2/archives/close-'+closed.closure.id,admin.user);assert(savedArchive.ok);assert.equal((await savedArchive.json()).sourceIncidentId,tag);pass('closed original and archive both retained');
