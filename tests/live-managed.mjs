@@ -46,6 +46,10 @@ try{
  };
  await assert.rejects(sender({notes:'first'},{notes:'stale overwrite'}),e=>e.code==='write_conflict');assert.equal((await (await read(cardPath,normal.user)).json()).notes,'last');pass('guarded sender blocks same-field stale edit on real Firebase');
  await sender({notes:'last'},{notes:'approved edit'});const protectedCard=await (await read(cardPath,normal.user)).json();assert.equal(protectedCard.notes,'approved edit');assert.equal(protectedCard.hospital,'가상 병원');pass('conditional whole-card save passes rules and preserves other fields');
+ const uiSource=fs.readFileSync('index.html','utf8');
+ const transportHelper=new Function(uiSource.slice(uiSource.indexOf('function buildTransportChange('),uiSource.indexOf('function workspaceConnectionText('))+';return buildTransportChange;')();
+ const transfer=transportHelper({hospital:'가상 이송병원',departTime:'1420',arriveTime:'1445'},protectedCard);
+ await sender(transfer.expected,transfer.payload);const transferred=await (await read(cardPath,normal.user)).json();assert.equal(transferred.departTime,'14:20');assert.equal(transferred.arriveTime,'14:45');assert.equal(transferred.notes,'approved edit');assert.equal(transferred.createdByUid,protectedCard.createdByUid);pass('new transport editor payload passes real rules and preserves clinical card fields');
  const lifecyclePath=path+'/mciCasualties/lifecycle',creation={createdByUid:normal.user.uid,updatedByUid:normal.user.uid,timestamp:Date.now(),name:'가상 재전송',triage:'urgent',notes:'original'};let attempted=false;
  const lifecycleGrant=await (await read('access/'+normal.user.uid,normal.user)).json();
  const lifecycle=(method,expected)=>sendBoundOperation({path:lifecyclePath,method,payload:creation,expected,creationGuard:true,creationAttempted:attempted,securityContext:{uid:normal.user.uid,agencyId:tag,projectId:project}},{currentIdentity:()=>({...lifecycleGrant,uid:normal.user.uid}),currentUser:()=>normal.user,projectId:project,databaseURL:config.databaseURL,beforeCreate:async()=>{attempted=true;}});

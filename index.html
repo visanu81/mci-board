@@ -679,6 +679,39 @@
   .display-hospital-grid::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
   .display-hospital-grid::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
   .display-hospital-grid::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+/* Task-oriented MCI navigation */
+.workspace-header{position:sticky;top:0;z-index:30;background:#0b1220;border-bottom:1px solid #334155}
+.workspace-heading{max-width:1024px;margin:auto;padding:16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.workspace-eyebrow{font-size:11px;color:#93c5fd;font-weight:700;letter-spacing:.08em}
+.workspace-connection{font-size:12px;color:#cbd5e1;max-width:130px;text-align:right;flex-shrink:0}
+.workspace-nav{max-width:1024px;margin:auto;display:flex;background:#0f172a}
+.workspace-nav button{flex:1;min-height:56px;display:flex;align-items:center;justify-content:center;gap:8px;color:#94a3b8;font-size:14px;border-bottom:3px solid transparent}
+.workspace-nav button.is-current{color:#93c5fd;background:#172554;border-color:#60a5fa;font-weight:700}
+.workspace-page{padding:20px 16px;display:grid;gap:16px}
+.workspace-button,.workspace-primary,.workspace-actions button{min-height:44px;padding:10px 14px;border-radius:10px;font-size:14px;font-weight:600;background:#1e293b;color:#e2e8f0;border:1px solid #475569}
+.workspace-primary{background:#2563eb;color:white;border-color:#3b82f6;flex-shrink:0}
+.workspace-primary:disabled{opacity:.55}
+.workspace-actions{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.workspace-filters{display:flex;flex-wrap:wrap;gap:12px}
+.workspace-filters label{flex:1;min-width:130px;font-size:14px;color:#cbd5e1;display:grid;gap:6px}
+.workspace-filters input,.workspace-filters select{min-height:44px;width:100%;min-width:0;background:#0b1220;border:1px solid #475569;border-radius:8px;padding:10px;color:#f1f5f9;font-size:16px}
+.workspace-patients{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
+.workspace-patient{padding:16px;border:1px solid #334155;border-radius:14px;background:#111c2e;overflow-wrap:anywhere}
+.transport-editor{display:grid;gap:12px;border-color:#60a5fa}
+body.outdoor-mode .workspace-header,body.outdoor-mode .workspace-nav,body.outdoor-mode .workspace-patient{background:#fff;color:#0f172a;border-color:#94a3b8}
+body.outdoor-mode .workspace-filters input,body.outdoor-mode .workspace-filters select{background:#fff;color:#0f172a}
+body.outdoor-mode .workspace-filters label,body.outdoor-mode .workspace-connection{color:#334155}
+body.outdoor-mode .workspace-nav button.is-current{background:#dbeafe;color:#1d4ed8}
+@media(max-width:767px){
+ .workspace-heading{padding:10px 16px}.workspace-nav{position:fixed;bottom:0;left:0;right:0;padding-bottom:env(safe-area-inset-bottom);border-top:1px solid #475569;z-index:40}
+ .workspace-nav button{flex-direction:column;gap:3px;font-size:12px;min-height:60px;border-bottom:0;border-top:3px solid transparent}
+ .workspace-nav button.is-current{border-top-color:#60a5fa}.mci-workspace main{padding-bottom:150px}
+ .mci-workspace #outbox-badge{bottom:calc(76px + env(safe-area-inset-bottom))!important}
+ .mci-workspace #mci-save-fab{bottom:calc(134px + env(safe-area-inset-bottom))!important}
+ .mci-workspace #outdoor-toggle,.mci-workspace #help-btn{bottom:calc(76px + env(safe-area-inset-bottom))!important}
+}
+
 </style>
 
 <!-- ============================================================================
@@ -946,10 +979,11 @@ function onSecureIdentity(identity) {
   const previous = secureIdentity;
   const changed = previous?.uid !== identity?.uid || previous?.role !== identity?.role || previous?.agencyId !== identity?.agencyId;
   secureIdentity = identity;
+  if(changed)state.firebaseConnected=null;
   if (!changed) return;
   stopSecureSubscriptions();
   if (previous && !identity && !POPOUT_DISPLAY) {
-    secureDraftBackup = JSON.parse(JSON.stringify({ projectId: firebaseConfig.projectId, uid: previous.uid, incidentId: state.currentIncidentId, mciDraft, csDraft }));
+    secureDraftBackup = JSON.parse(JSON.stringify({ projectId: firebaseConfig.projectId, uid: previous.uid, incidentId: state.currentIncidentId, mciDraft, csDraft, transportDraft:state.transportDraft }));
     try { localStorage.setItem('mci2_secure_draft_backup', JSON.stringify(secureDraftBackup)); } catch {}
     startupError = '로그인이 종료됐습니다. 작성 중이던 카드 입력은 복구용으로 보관했습니다.';
   }
@@ -964,7 +998,7 @@ function onSecureIdentity(identity) {
   state.session = {agencyId:identity.agencyId,agency:{id:identity.agencyId,name:identity.agencyName || identity.agencyId,role:identity.role},role:identity.role};
   state.authed = true;
   if (!previous || previous.uid !== identity.uid) {
-    resetMciDraft(); resetCsDraft();
+    resetMciDraft(); resetCsDraft(); state.transportDraft=null; state.patientEditor=false;
     state.currentIncidentId = null; state.user = null;
     state.view2 = identity.role === 'admin' ? 'admin' : ['observer','hq'].includes(identity.role) ? 'observer' : identity.role === 'display' ? 'display' : 'lobby';
   }
@@ -1235,6 +1269,7 @@ let state = {
   mode: 'mci',                      // 기본 진입 모드: 다수사상자(MCI)
   view: 'dashboard',
   inputTab: 'incident',
+  firebaseConnected: null, patientEditor:false, patientSearch:'', patientFilter:'all', transportSearch:'', transportFilter:'all', transportDraft:null, transportSaving:false, transportFeedback:'',
   mciTab: 'situation',              // 기본 MCI 탭: 통합 상황판
   mciInputMode: 'simple',
   // 재난 데이터 (현재 합류한 재난방 기준)
@@ -1593,6 +1628,7 @@ window.__mciReplayOutbox = replayOutbox;   // 디버그/IIFE용 노출
 
 // 미전송 배지(우하단) — pending>0일 때만. [지금 재전송] 버튼 포함. 비차단(alert 금지).
 function updateOutboxBadge() {
+  refreshWorkspaceConnection();
   if (POPOUT_DISPLAY) return;
   let el = document.getElementById('outbox-badge');
   const n = outboxPendingCount();
@@ -1739,6 +1775,8 @@ function bindRealtime() {
   // Firebase 서버 실제 연결 상태 — 연결되면 오프라인 큐 자동 재전송(OS online보다 정확)
   if (!POPOUT_DISPLAY) {
     _globalUnsubFns.push(onValue(ref(db, '.info/connected'), (s) => {
+      state.firebaseConnected = s.val() === true;
+      refreshWorkspaceConnection();
       if (s.val() === true) replayOutbox();
       updateOutboxBadge();   // 연결 상태에 따라 배지 색 갱신
     }));
@@ -2279,6 +2317,7 @@ function render() {
 
   // 현재 view2를 body에 노출 → CSS에서 view별 처리 가능 (예: 표출 모드에서 설치 배너 숨김)
   document.body.dataset.view = state.view2 || 'auth';
+  document.body.classList.toggle('mci-workspace', state.view2 === 'incident' && state.mode === 'mci');
 
   // 미인증 → 로그인
   if (!state.session) {
@@ -2991,7 +3030,7 @@ function renderDisplayMain() {
             <div class="${txNum} font-black mono leading-none text-amber-400">${pending.length}</div>
           </button>
           <button data-display-transport="in-transit" class="display-card rounded-2xl px-4 ${txPad} text-center bg-slate-900 flex flex-col items-center justify-center border-2 border-blue-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
-            <div class="${txLabel} font-bold tracking-wider text-blue-300">이송중</div>
+            <div class="${txLabel} font-bold tracking-wider text-blue-300">배정·이송 중</div>
             <div class="${txNum} font-black mono leading-none text-blue-400">${inTransit}</div>
           </button>
           <button data-display-transport="arrived" class="display-card rounded-2xl px-4 ${txPad} text-center bg-slate-900 flex flex-col items-center justify-center border-2 border-emerald-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
@@ -3091,7 +3130,7 @@ function renderDisplayModal() {
       title = '미배정'; color = '#f59e0b';
       patients = state.mciCasualties.filter(c => !c.hospital && !c.notTransported && c.triage !== 'dead');
     } else if (m.value === 'in-transit') {
-      title = '이송중'; color = '#60a5fa';
+      title = '병원 배정·이송 중'; color = '#60a5fa';
       patients = state.mciCasualties.filter(c => c.hospital && !c.arriveTime && !c.notTransported);
     } else if (m.value === 'arrived') {
       title = '병원 도착'; color = '#34d399';
@@ -3965,6 +4004,7 @@ function joinIncident(incidentId) {
 function leaveIncident() {
   state.currentIncidentId = null;
   state.user = null;
+  state.transportDraft=null; state.transportFeedback=''; state.patientEditor=false;
   // 진입 시점의 view2로 복원
   state.view2 = state.session.role === 'admin' ? 'admin'
               : ['observer','hq'].includes(state.session.role) ? 'observer'
@@ -3980,6 +4020,103 @@ function leaveIncident() {
 
 // ==================== /V2 ====================
 
+// MCI task-oriented workspace. Transport edits update the existing patient card.
+function mciTransportStatus(card) {
+  if (card.notTransported) return 'not-transported';
+  if (card.arriveTime) return 'arrived';
+  if (card.departTime) return 'in-transit';
+  if (card.hospital) return 'assigned';
+  return 'pending';
+}
+function hasPatientDraft() { return !!mciDraft._editKey || Object.entries(mciDraft).some(([k,v])=>!k.startsWith('_') && (Array.isArray(v)?v.length>0:typeof v==='boolean'?v:!!v)); }
+const MCI_TRANSPORT_LABELS = {pending:'병원 미배정',assigned:'병원 배정 · 출발 전','in-transit':'이송 중',arrived:'병원 도착','not-transported':'미이송'};
+function buildTransportChange(draft, baseline) {
+  const data = {hospital:draft.hospital.trim(),departTime:draft.departTime.trim(),arriveTime:draft.arriveTime.trim()};
+  for (const key of ['departTime','arriveTime']) {
+    if (data[key] && !/^(?:[01]\d|2[0-3]):?[0-5]\d$/.test(data[key])) throw Error('시각은 HHMM 또는 HH:MM 형식으로 입력하세요.');
+    if (/^\d{4}$/.test(data[key])) data[key]=data[key].slice(0,2)+':'+data[key].slice(2);
+  }
+  if ((data.departTime || data.arriveTime) && !data.hospital) throw Error('출발·도착을 기록하려면 이송 병원을 입력하세요.');
+  if (data.arriveTime && !data.departTime) throw Error('도착을 기록하려면 출발 시각도 입력하세요.');
+  if (data.hospital) { data.notTransported=false; data.notTransportedReason=null; }
+  const payload=Object.fromEntries(Object.entries(data).filter(([k,v])=>JSON.stringify(v??null)!==JSON.stringify(baseline[k]??null)));
+  // All transport fields form one decision: a concurrent change must be reviewed.
+  const expected=Object.fromEntries(['hospital','departTime','arriveTime','notTransported','notTransportedReason'].map(k=>[k,baseline[k]??null]));
+  // Sender compares payload keys. Include unchanged transport fields in this scoped operation.
+  return {payload:Object.keys(payload).length?{...Object.fromEntries(Object.entries(expected)),...data}:{},expected};
+}
+function workspaceConnectionText() {
+  if (!navigator.onLine || state.firebaseConnected === false) return '연결 끊김 · 기기 보관';
+  if (!state.firebaseConnected) return '연결 확인 중';
+  const count=outboxPendingCount()+outboxFailedCount();
+  return count ? `미전송·확인 ${count}건` : '서버 연결됨';
+}
+function refreshWorkspaceConnection() {
+  document.querySelectorAll('[data-connection-status]').forEach(el=>{el.textContent=workspaceConnectionText();});
+}
+function renderMciWorkspaceHeader(team, observerMode) {
+  const incident=state.incidents.find(i=>i._key===state.currentIncidentId);
+  const tabs=observerMode?[['situation','상황판','layout-dashboard'],['more','더보기','menu']]:[['situation','상황판','layout-dashboard'],['casualty','환자 관리','users'],['transport','이송 관리','ambulance'],['more','더보기','menu']];
+  return `<header class="workspace-header"><div class="workspace-heading"><div class="min-w-0"><div class="workspace-eyebrow">MCI · 테스트 환경</div><h1 class="text-lg font-bold truncate">${escapeHtml(incident?.title || '재난 상황판')}</h1><p class="text-xs text-slate-400">${escapeHtml(team.name)} · ${escapeHtml(state.user.name)}</p></div><span class="workspace-connection" data-connection-status role="status">${workspaceConnectionText()}</span></div>
+  <nav class="workspace-nav" aria-label="MCI 주 메뉴">${tabs.map(([id,label,icon])=>`<button data-mci-tab="${id}" class="mci-tab-btn ${state.mciTab===id?'is-current':''}" ${state.mciTab===id?'aria-current="page"':''}><i data-lucide="${icon}" class="w-5 h-5"></i>${label}</button>`).join('')}</nav></header>`;
+}
+function renderMciMore(observerMode) {
+  return `<section class="workspace-page"><h2 class="text-xl font-bold">더보기</h2><p class="text-slate-400">보기 설정과 재난 관리</p><div class="workspace-actions">
+    ${!observerMode?'<button id="open-display-btn">전광판 열기</button><button id="admin-btn">내보내기 · 재난 관리</button>':''}
+    <button id="briefing-toggle">${state.briefingMode?'개인정보 가림 켜짐':'개인정보 가림 꺼짐'}</button>
+    <button data-mode="general" class="mode-btn">일반 재난 상황판으로</button>
+    <button id="logout-btn">재난 목록으로</button>
+  </div><p class="text-sm text-slate-400">야외 모드와 도움말은 화면 왼쪽 아래에서 열 수 있습니다.</p></section>`;
+}
+function renderPatientWorkspace(transport=false) {
+  if(!transport && state.patientEditor) return `<div class="workspace-page"><button id="patient-list-back" class="workspace-button">← 환자 목록</button><p class="text-sm text-slate-400 mt-2">목록으로 이동해도 작성 중인 입력은 유지됩니다.</p></div>${renderMciCasualtyForm()}`;
+  const cards=state.mciCasualties.filter(c=>!isFieldOnly(state.user.teamId)||c.author===state.user.name);
+  const filter=transport?state.transportFilter:state.patientFilter;
+  const q=(transport?state.transportSearch:state.patientSearch).trim().toLowerCase();
+  const list=cards.filter(c=>(!filter||filter==='all'||(transport?mciTransportStatus(c)===filter:c.triage===filter))&&[c.cardNo,c.name,c.location,c.hospital].some(v=>String(v??'').toLowerCase().includes(q))).sort((a,b)=>(a.cardNo||0)-(b.cardNo||0));
+  const options=transport?Object.entries(MCI_TRANSPORT_LABELS):MCI_TRIAGE.map(t=>[t.id,t.name]);
+  return `<section class="workspace-page"><div class="flex items-center justify-between gap-3"><div><h2 class="text-xl font-bold">${transport?'이송 관리':'환자 관리'}</h2><p class="text-sm text-slate-400">${transport?'기존 환자 카드의 이송 정보를 수정합니다.':`${cards.length}명 등록 · 번호나 장소로 찾으세요.`}</p></div>${!transport?`<button id="patient-register" class="workspace-primary">${hasPatientDraft()?'작성 중 입력 계속':'＋ 환자 등록'}</button>`:''}</div>
+    <div class="workspace-filters"><label>환자 검색<input id="workspace-search" value="${escapeHtml(transport?state.transportSearch:state.patientSearch)}" placeholder="번호 · 이름 · 장소 · 병원" /></label><label>${transport?'이송 상태':'중증도'}<select id="workspace-filter"><option value="all">전체</option>${options.map(([id,label])=>`<option value="${id}" ${filter===id?'selected':''}>${label}</option>`).join('')}</select></label></div>
+    ${transport&&state.transportDraft?renderTransportEditor():''}
+    <p class="text-sm text-slate-400" role="status">검색 결과 ${list.length}명</p><div class="workspace-patients">${list.map(c=>{const tr=MCI_TRIAGE.find(t=>t.id===c.triage);return `<article class="workspace-patient"><div class="flex flex-wrap items-center gap-2"><strong class="text-lg">#${String(c.cardNo||'?').padStart(3,'0')}</strong><span class="rounded px-2 py-1 text-sm font-bold" style="${triageBadgeStyle(c.triage)}">${escapeHtml(tr?.name||'미분류')}</span><span class="text-sm text-slate-300">${escapeHtml(mciTransportStatus(c)==='pending'?'병원 미배정':MCI_TRANSPORT_LABELS[mciTransportStatus(c)])}</span></div><div class="mt-2 font-medium">${escapeHtml(state.briefingMode?maskName(c.name||''):c.name||'미상')}</div><p class="text-sm text-slate-400 mt-1">${escapeHtml(c.location||'발견 장소 미입력')} · ${escapeHtml(c.hospital||'병원 미배정')}</p>${transport?`<p class="text-sm mt-2">출발 ${escapeHtml(c.departTime||'—')} · 도착 ${escapeHtml(c.arriveTime||'—')}</p>`:''}<div class="flex gap-2 mt-3"><button data-patient-detail="${escapeHtml(c._key)}" class="workspace-button">상세 보기</button>${transport&&canEditCard(state.user,c)?`<button data-transport-edit="${escapeHtml(c._key)}" class="workspace-primary">이송 정보 수정</button>`:''}</div></article>`;}).join('')||'<p class="workspace-patient text-slate-400">조건에 맞는 환자가 없습니다.</p>'}</div></section>`;
+}
+function renderTransportEditor() {
+  const d=state.transportDraft;
+  return `<section class="workspace-patient transport-editor" aria-label="이송 정보 입력"><h3 class="font-bold text-lg">#${escapeHtml(String(d.cardNo))} 이송 정보</h3><p class="text-sm text-slate-400">기존 환자 카드에 반영됩니다. 미이송 사유 변경은 카드 상세 입력을 이용하세요.</p><div class="workspace-filters">${[['hospital','이송 병원'],['departTime','출발 시각'],['arriveTime','도착 시각']].map(([key,label])=>`<label>${label}<input data-transport-field="${key}" ${state.transportSaving?'disabled':''} value="${escapeHtml(d[key])}" ${key==='hospital'?'list="hospital-suggestions" maxlength="100"':'inputmode="numeric" maxlength="5" placeholder="HH:MM"'} /></label>`).join('')}</div><p id="transport-feedback" role="status" class="text-sm text-amber-300">${escapeHtml(state.transportFeedback||'')}</p><div class="flex gap-2"><button id="transport-save" class="workspace-primary" ${state.transportSaving?'disabled':''}>${state.transportSaving?'저장 중…':'이송 정보 저장'}</button><button id="transport-cancel" class="workspace-button" ${state.transportSaving?'disabled':''}>입력 취소</button></div></section>`;
+}
+function bindPatientWorkspace() {
+  const transport=state.mciTab==='transport';
+  const search=document.getElementById('workspace-search');
+  if(search){ const applySearch=event=>{if(event?.isComposing)return;const position=search.selectionStart;state[transport?'transportSearch':'patientSearch']=search.value;render();const next=document.getElementById('workspace-search');next?.focus();next?.setSelectionRange(position,position);}; search.oninput=applySearch;search.oncompositionend=applySearch; }
+  const filter=document.getElementById('workspace-filter');
+  if(filter)filter.onchange=()=>{state[transport?'transportFilter':'patientFilter']=filter.value;render();};
+  const register=document.getElementById('patient-register');if(register)register.onclick=()=>{state.patientEditor=true;state.inspectCardKey=null;render();};
+  const back=document.getElementById('patient-list-back');if(back)back.onclick=()=>{state.patientEditor=false;render();};
+  document.querySelectorAll('[data-patient-detail]').forEach(b=>b.onclick=()=>{state.viewMciCardKey=b.dataset.patientDetail;render();});
+  document.querySelectorAll('[data-transport-edit]').forEach(b=>b.onclick=()=>{
+    if(state.transportSaving)return;
+    if(state.transportDraft && state.transportDraft.key!==b.dataset.transportEdit){window.__mciShowOutboxStatus?.('작성 중인 이송 정보를 저장하거나 닫은 뒤 다른 환자를 선택하세요.','err');return;}
+    const c=state.mciCasualties.find(c=>c._key===b.dataset.transportEdit);if(!c||!canEditCard(state.user,c))return;
+    if(!state.transportDraft)state.transportDraft={key:c._key,cardNo:c.cardNo,incidentId:state.currentIncidentId,uid:secureIdentity.uid,hospital:c.hospital||'',departTime:c.departTime||'',arriveTime:c.arriveTime||'',baseline:JSON.parse(JSON.stringify(c._serverRecord||c))};
+    state.transportFeedback='';render();document.querySelector('[data-transport-field]')?.focus();
+  });
+  document.querySelectorAll('[data-transport-field]').forEach(input=>input.oninput=()=>{state.transportDraft[input.dataset.transportField]=input.value;});
+  const cancel=document.getElementById('transport-cancel');if(cancel)cancel.onclick=()=>{state.transportDraft=null;state.transportFeedback='';render();};
+  const save=document.getElementById('transport-save');if(save)save.onclick=async()=>{
+    if(state.transportSaving)return;
+    const d=state.transportDraft,c=state.mciCasualties.find(c=>c._key===d.key);
+    try {
+      if(d.incidentId!==state.currentIncidentId||d.uid!==secureIdentity?.uid||!c||!canEditCard(state.user,c)||!assertCanWrite('이송 정보 저장'))throw Error('재난방 또는 로그인 상태가 바뀌었습니다. 최신 환자 카드를 확인하세요.');
+      const {payload,expected}=buildTransportChange(d,d.baseline);if(!Object.keys(payload).length){state.transportDraft=null;render();return;}
+      state.transportSaving=true;state.transportFeedback='';render();
+      const result=await durableWrite({kind:'mci',method:'update',path:incPath('mciCasualties/'+d.key),incidentId:d.incidentId,expected,payload:{...payload,updatedByUid:secureIdentity.uid,_updatedBy:state.user.name,_updatedTeamId:state.user.teamId,_updatedAt:Date.now()}});
+      if(!result.ok&&!result.queued)throw Error(result.error||'저장하지 못했습니다. 입력은 유지됩니다.');
+      if(state.transportDraft===d)state.transportDraft=null;
+      window.__mciShowOutboxStatus?.(result.queued?'기기에 보관했습니다. 미전송함에서 전송 상태를 확인하세요.':'이송 정보를 저장했습니다.',result.queued?'err':'ok');
+    } catch(error){state.transportFeedback=error.message;} finally{state.transportSaving=false;render();}
+  };
+}
+
 function renderMain() {
   const team = TEAMS.find(t => t.id === state.user.teamId)
     || { id: state.user.teamId, name: '미상', color: '#64748b' };
@@ -3987,7 +4124,7 @@ function renderMain() {
   // observer가 어쩌다 입력 탭에 들어가 있으면 강제로 조회 탭으로
   if (observerMode) {
     if (state.view === 'input') state.view = 'dashboard';
-    if (state.mciTab === 'casualty') state.mciTab = 'situation';
+    if (['casualty','transport'].includes(state.mciTab)) state.mciTab = 'situation';
   }
   return `
     <div class="min-h-screen text-slate-100">
@@ -3999,7 +4136,7 @@ function renderMain() {
       ` : ''}
       <!-- PC 와이드 화면: 배경 띠는 전체 폭, 내용물은 max-w-5xl(1024px)로 중앙 정렬
            — 로비/관리자 화면과 동일한 폭 기준 (휴대폰에서는 변화 없음) -->
-      <header class="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800">
+      ${state.mode === 'mci' ? renderMciWorkspaceHeader(team,observerMode) : `<header class="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800">
         <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <div class="w-9 h-9 rounded-lg bg-gradient-to-br ${state.mode === 'mci' ? 'from-rose-600 to-pink-700' : 'from-red-600 to-red-700'} flex items-center justify-center shadow-lg shadow-red-900/50">
@@ -4104,12 +4241,12 @@ function renderMain() {
             </div>
           </div>
         `}
-      </header>
+      </header>`}
 
       <main class="max-w-5xl mx-auto pb-20">
         ${state.mode === 'general'
           ? (state.view === 'dashboard' ? renderDashboard() : renderInput())
-          : (state.mciTab === 'situation' ? renderMciSituation() : renderMciCasualtyForm())}
+          : (state.mciTab === 'situation' ? renderMciSituation() : state.mciTab === 'more' ? renderMciMore(observerMode) : renderPatientWorkspace(state.mciTab === 'transport'))}
         <footer class="px-4 py-6 mt-4 text-center">
           <div class="inline-flex items-center gap-2 text-[11px] text-slate-600 tracking-wider flex-wrap justify-center">
             <span class="w-8 h-px bg-slate-800"></span>
@@ -4319,7 +4456,8 @@ function renderResetPanel() {
 }
 
 function bindMainEvents() {
-  document.getElementById('logout-btn').onclick = () => {
+  const leaveButton=document.getElementById('logout-btn');
+  if(leaveButton)leaveButton.onclick = () => {
     // V2: 재난방 나가기 → 로비로 (세션은 유지)
     formDrafts = { incident: null, damage: null, mobil: { agencies: null, vehicles: null }, action: '' };
     leaveIncident();
@@ -4365,7 +4503,7 @@ function bindMainEvents() {
     };
   });
   document.querySelectorAll('.mci-tab-btn').forEach(btn => {
-    btn.onclick = () => { state.mciTab = btn.dataset.mciTab; render(); };
+    btn.onclick = () => { state.mciTab = btn.dataset.mciTab; render(); window.scrollTo({top:0}); };
   });
   const bt = document.getElementById('briefing-toggle');
   if (bt) {
@@ -4382,7 +4520,10 @@ function bindMainEvents() {
   if (state.adminModal) bindAdminModalEvents();
 
   if (state.mode === 'general' && state.view === 'input') bindInputEvents();
-  if (state.mode === 'mci' && state.mciTab === 'casualty') bindMciCasualtyEvents();
+  if (state.mode === 'mci' && ['casualty','transport'].includes(state.mciTab)) {
+    bindPatientWorkspace();
+    if(state.mciTab === 'casualty' && state.patientEditor)bindMciCasualtyEvents();
+  }
   if (state.mode === 'mci' && state.mciTab === 'situation') bindMciSituationEvents();
   if (state.viewMciCardKey) bindMciCardDetailModalEvents();
 }
@@ -5468,7 +5609,7 @@ function renderMciCasualtyForm() {
         <!-- 모드 전환 토글 (현장대원은 disable) -->
         <div class="flex bg-slate-950 rounded-md p-0.5 border border-slate-800 flex-shrink-0">
           <button id="mci-mode-simple" class="px-2 py-1 text-[11px] font-bold rounded ${inputMode === 'simple' ? 'bg-pink-600 text-white' : 'text-slate-400'}">간이</button>
-          <button id="mci-mode-full" class="px-2 py-1 text-[11px] font-bold rounded ${inputMode === 'full' ? 'bg-pink-600 text-white' : 'text-slate-400'}">풀 카드</button>
+          <button id="mci-mode-full" class="px-2 py-1 text-[11px] font-bold rounded ${inputMode === 'full' ? 'bg-pink-600 text-white' : 'text-slate-400'}">상세 입력</button>
         </div>
       </div>
 
@@ -5802,7 +5943,7 @@ function renderMciCasualtyForm() {
             <div class="text-[11px] text-slate-500 text-center py-2 border-t border-slate-800">
               <i data-lucide="info" class="w-3 h-3 inline mr-0.5"></i>
               간이 모드: 트리아지·기본정보·주증상만 입력합니다.<br>
-              생체징후·처치·이송은 구급팀이 풀 카드 모드에서 추가합니다.
+              생체징후·처치·이송은 구급팀이 상세 입력 모드에서 추가합니다.
             </div>
           `}
 
@@ -6516,7 +6657,7 @@ function initSwipeTabNav() {
     if (Math.abs(dx) < 70) return;                     // 최소 스와이프 거리
     if (Math.abs(dx) < Math.abs(dy) * 1.5) return;     // 세로 스크롤 우세면 무시
     const dir = dx < 0 ? 1 : -1;                       // 왼쪽으로 밀면 다음 탭
-    const tabs = state.mode === 'mci' ? ['situation', 'casualty'] : ['dashboard', 'input'];
+    const tabs = state.mode === 'mci' ? ['situation', 'casualty', 'transport', 'more'] : ['dashboard', 'input'];
     const cur = state.mode === 'mci' ? state.mciTab : state.view;
     const ni = tabs.indexOf(cur) + dir;
     if (ni < 0 || ni >= tabs.length) return;           // 끝 탭에서는 그대로
@@ -7321,8 +7462,8 @@ function renderMciSituation() {
             <div class="text-xs font-bold tracking-wider text-amber-300">미배정</div>
             <div class="text-3xl font-black mono mt-1 leading-none text-amber-400">${pending.length}</div>
           </button>
-          <button data-transport-card="in-transit" class="transport-card-clickable bg-slate-950 rounded-lg px-2 py-3 border-2 ${state.expandedTransport === 'in-transit' ? 'border-blue-500' : 'border-slate-800'} cursor-pointer hover:bg-slate-900 transition-colors" title="${state.expandedTransport === 'in-transit' ? '접기' : '이송중 환자 목록 펼치기'}">
-            <div class="text-xs font-bold tracking-wider text-blue-300">이송중</div>
+          <button data-transport-card="in-transit" class="transport-card-clickable bg-slate-950 rounded-lg px-2 py-3 border-2 ${state.expandedTransport === 'in-transit' ? 'border-blue-500' : 'border-slate-800'} cursor-pointer hover:bg-slate-900 transition-colors" title="${state.expandedTransport === 'in-transit' ? '접기' : '병원 배정·이송 중 환자 목록 펼치기'}">
+            <div class="text-xs font-bold tracking-wider text-blue-300">배정·이송 중</div>
             <div class="text-3xl font-black mono mt-1 leading-none text-blue-400">${transported.length - arrived.length}</div>
           </button>
           <button data-transport-card="arrived" class="transport-card-clickable bg-slate-950 rounded-lg px-2 py-3 border-2 ${state.expandedTransport === 'arrived' ? 'border-emerald-500' : 'border-slate-800'} cursor-pointer hover:bg-slate-900 transition-colors" title="${state.expandedTransport === 'arrived' ? '접기' : '병원 도착 환자 목록 펼치기'}">
@@ -7343,7 +7484,7 @@ function renderMciSituation() {
             label = '미배정'; color = '#f59e0b';
             patients = state.mciCasualties.filter(c => !c.hospital && !c.notTransported && c.triage !== 'dead');
           } else if (state.expandedTransport === 'in-transit') {
-            label = '이송중'; color = '#60a5fa';
+            label = '병원 배정·이송 중'; color = '#60a5fa';
             patients = state.mciCasualties.filter(c => c.hospital && !c.arriveTime && !c.notTransported);
           } else if (state.expandedTransport === 'arrived') {
             label = '병원 도착'; color = '#34d399';
@@ -8006,6 +8147,7 @@ function bindMciCardDetailModalEvents() {
       editDraft._baseRecord = JSON.parse(JSON.stringify(c._serverRecord || c));
       mciDraft = editDraft;
       state.viewMciCardKey = null;
+      state.patientEditor = true;
       state.mciTab = 'casualty';
       state.mciInputMode = 'full';   // 풀 카드 입력 모드로 진입
       render();
@@ -8110,7 +8252,7 @@ const HELP_CONTENT = {
 
       <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
         <h4 class="font-bold text-base mb-2">④ MCI 사상자 카드 입력 (가장 중요)</h4>
-        <p class="text-slate-400 text-xs mb-2">"사상자 카드" 탭 → 빠른 카드 또는 풀 카드 모드</p>
+        <p class="text-slate-400 text-xs mb-2">"사상자 카드" 탭 → 빠른 카드 또는 상세 입력 모드</p>
         <ol class="list-decimal list-inside space-y-1.5 text-slate-300 marker:text-pink-400 marker:font-bold">
           <li><strong>트리아지 분류</strong> (가장 큰 버튼) — STAR/JumpSTART 30초 분류 후 즉시 입력. 나중 수정 가능.<br>
             <div class="flex gap-1.5 mt-1 ml-5 text-[11px]">
@@ -8123,7 +8265,7 @@ const HELP_CONTENT = {
           <li><strong>기본 정보</strong> — 이름·연령·성별. <em class="text-amber-300">이름 모르면 비워두기 (자동 부여)</em></li>
           <li><strong>발견장소</strong> — 가능한 한 동·호수까지 (예: 102동 1503호 안방)</li>
           <li><strong>주증상</strong> — 한 줄로 요약 (예: 호흡곤란, 가슴통증)</li>
-          <li><strong>풀 카드 모드 추가 항목</strong>: 의식(AVPU)·생체징후·손상기전·손상부위·처치내용·이송 정보</li>
+          <li><strong>상세 입력 모드 추가 항목</strong>: 의식(AVPU)·생체징후·손상기전·손상부위·처치내용·이송 정보</li>
           <li><strong>미이송</strong> 토글 — 자체귀가하는 사람들은 이걸 켜기</li>
           <li>아래 <span class="bg-pink-600 text-white px-2 py-0.5 rounded text-xs font-bold">사상자 카드 저장</span> 클릭</li>
         </ol>
