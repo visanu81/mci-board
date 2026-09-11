@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:safety": "node tests/run.mjs",
+    "test:rules": "firebase emulators:exec --config firebase.emulator.json --project demo-mci-access --only database \"node --test tests/access-rules.test.mjs\"",
+    "test:auth": "node --test tests/agency-login.test.mjs"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.2",
+    "firebase": "12.19.0",
+    "firebase-tools": "15.30.0"
+  }
+}
