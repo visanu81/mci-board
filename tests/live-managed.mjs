@@ -1,5 +1,5 @@
 import fs from 'node:fs';import assert from 'node:assert/strict';import {createRequire} from 'node:module';
-import worker from '../worker.js';import {initializeApp,deleteApp} from 'firebase/app';import * as authSDK from 'firebase/auth';import * as dbSDK from 'firebase/database';import {createSessionController} from '../secure-session.js';
+import worker from '../worker.js';import {initializeApp,deleteApp} from 'firebase/app';import * as authSDK from 'firebase/auth';import * as dbSDK from 'firebase/database';import {createSessionController,sendBoundOperation} from '../secure-session.js';
 const require=createRequire(import.meta.url);const {requireAuth}=require('firebase-tools/lib/requireAuth');const cliAuth=require('firebase-tools/lib/auth');const {Client}=require('firebase-tools/lib/apiv2');
 if(process.env.MCI_LIVE_TEST_PROJECT!=='mci2-secure-visanu81')throw Error('Explicit isolated-test-project opt-in required');
 const project='mci2-secure-visanu81',config=JSON.parse(fs.readFileSync('security/firebase-web-config.json'));
@@ -39,6 +39,13 @@ try{
  const edits=await Promise.all([read(cardPath,normal.user,'PATCH',{notes:'현장 메모',updatedByUid:normal.user.uid}),read(cardPath,peer.user,'PATCH',{hospital:'가상 병원',updatedByUid:peer.user.uid})]);assert(edits.every(r=>r.ok));
  const merged=await (await read(cardPath,normal.user)).json();assert.equal(merged.notes,'현장 메모');assert.equal(merged.hospital,'가상 병원');pass('two independent logins preserve concurrent changes to different card fields');
  assert((await read(cardPath,normal.user,'PATCH',{notes:'first',updatedByUid:normal.user.uid})).ok);assert((await read(cardPath,peer.user,'PATCH',{notes:'last',updatedByUid:peer.user.uid})).ok);assert.equal((await (await read(cardPath,normal.user)).json()).notes,'last');pass('same-field writes are last-write-wins (documented limitation)');
+ const sender=async(expected,fields)=>{
+   const grant=await (await read('access/'+normal.user.uid,normal.user)).json();
+   return sendBoundOperation({path:cardPath,method:'update',expected,payload:{...fields,updatedByUid:normal.user.uid},securityContext:{uid:normal.user.uid,agencyId:tag,projectId:project}},
+     {currentIdentity:()=>({...grant,uid:normal.user.uid}),currentUser:()=>normal.user,projectId:project,databaseURL:config.databaseURL});
+ };
+ await assert.rejects(sender({notes:'first'},{notes:'stale overwrite'}),e=>e.code==='write_conflict');assert.equal((await (await read(cardPath,normal.user)).json()).notes,'last');pass('guarded sender blocks same-field stale edit on real Firebase');
+ await sender({notes:'last'},{notes:'approved edit'});const protectedCard=await (await read(cardPath,normal.user)).json();assert.equal(protectedCard.notes,'approved edit');assert.equal(protectedCard.hospital,'가상 병원');pass('conditional whole-card save passes rules and preserves other fields');
  const closing=await api('/api/admin/close',{incidentId:tag},admin.user);assert.equal(closing.status,200);pass('server closes and archives isolated incident');
  const closed=await (await read(path,admin.user)).json();assert(closed.closure && closed.closedAt);assert.equal(closed.title,'가상 재난');
  const savedArchive=await read('mci2/archives/close-'+closed.closure.id,admin.user);assert(savedArchive.ok);assert.equal((await savedArchive.json()).sourceIncidentId,tag);pass('closed original and archive both retained');

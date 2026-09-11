@@ -83,6 +83,21 @@ export async function runSafetyTests(html) {
     await y.replayOutbox({manual:true});
     equal(y.writes.map(w=>w.value.title),['older','newer'],'retry order reversed');
   });
+  await test('manual replay never bypasses a conflict decision',async()=>{
+    const x=harness();const id=x.outboxEnqueue({kind:'casualty',method:'update',path:'mci2/incidents/test/casualties/one',expected:{notes:'before'},payload:{notes:'mine'}});
+    const queue=JSON.parse(x.raw());queue.ops[id].status='failed';queue.ops[id].errorCode='write_conflict';queue.ops[id].conflictCurrent={notes:'colleague'};
+    const y=harness({raw:JSON.stringify(queue)});await y.replayOutbox({manual:true});assert(y.writes.length===0,'conflict was silently resent');
+    equal(JSON.parse(y.raw()).ops[id].payload,{notes:'mine'},'input lost');
+    equal(JSON.parse(y.raw()).ops[id].expected,{notes:'before'},'baseline lost');
+  });
+  await test('edited card persists original server values for changed fields',async()=>{
+    const x=harness({online:false});
+    const baseline={cardNo:1,name:'TEST',triage:'urgent',hospital:'',notes:'before'};
+    await x.saveMciCasualty({...baseline,notes:'mine'},'medical','tester','existing',baseline,{...baseline,notes:'before'});
+    const operation=Object.values(JSON.parse(x.raw()).ops)[0];
+    equal(operation.expected,{notes:'before'},'raw baseline missing');
+    equal(operation.payload.notes,'mine','input missing');
+  });
   const card = () => ({ cardNo: 1, name: 'TEST', triage: 'urgent', hospital: '', notes: '' });
   await test('MCI save rejects quota failure before any network write', async () => {
     const x = harness({ quota: true });

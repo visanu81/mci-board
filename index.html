@@ -942,6 +942,7 @@ function stopSecureSubscriptions() {
   _incidentUnsubFns.splice(0).forEach(fn => fn());
 }
 function onSecureIdentity(identity) {
+  document.getElementById('conflict-review')?.remove();
   const previous = secureIdentity;
   const changed = previous?.uid !== identity?.uid || previous?.role !== identity?.role || previous?.agencyId !== identity?.agencyId;
   secureIdentity = identity;
@@ -1385,7 +1386,7 @@ function _outboxSave(o) {
 function _newOpId() {
   return `op_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
-function outboxEnqueue({ kind, method, path, incidentId, payload, maxTries }) {
+function outboxEnqueue({ kind, method, path, incidentId, payload, expected, maxTries }) {
   const o = _outboxLoad(true);
   if (Object.keys(o.ops).length >= OUTBOX_MAX_OPS) _outboxEvictForSpace(o);
   const opId = _newOpId();
@@ -1402,6 +1403,7 @@ function outboxEnqueue({ kind, method, path, incidentId, payload, maxTries }) {
     // undefined 제거(RTDB set은 undefined throw) — JSON 왕복 정규화
     entry.payload = JSON.parse(JSON.stringify(payload == null ? {} : payload));
   }
+  if(expected)entry.expected=JSON.parse(JSON.stringify(expected));
   o.ops[opId] = entry;
   _outboxSave(o);
   updateOutboxBadge();
@@ -1455,12 +1457,12 @@ function outboxCleanup() {
 }
 
 // 현장 입력은 기기 보관 후 저장 당시 계정으로 전송한다.
-async function durableWrite({ kind, method, path, incidentId, payload }) {
+async function durableWrite({ kind, method, path, incidentId, payload, expected }) {
   if (POPOUT_DISPLAY) return { ok: false, queued: false };
   if (!path) return { ok: false, queued: false };   // incPath null 방어(재난방 미선택)
   let opId;
   try {
-    opId = outboxEnqueue({ kind, method, path, incidentId, payload });
+    opId = outboxEnqueue({ kind, method, path, incidentId, payload, expected });
   } catch (error) {
     updateOutboxBadge();
     window.__mciShowOutboxStatus?.(error.message, 'err');
@@ -1488,7 +1490,7 @@ async function _outboxSendOne(opId) {
     }
     // Earlier unsent edits on this record must finish before a newer edit.
     const earlier = Object.values(_outboxLoad(true).ops).some(x =>
-      x.opId !== opId && x.path === op.path && x.seq < op.seq && x.status !== 'sent');
+      x.opId !== opId && x.path === op.path && x.seq < op.seq && !['sent','discarded'].includes(x.status));
     if (earlier) return false;
     outboxMark(opId, { status: 'sending' });
   } catch { updateOutboxBadge(); return false; }
@@ -1504,12 +1506,12 @@ async function _outboxSendOne(opId) {
     if (!cur || cur.status !== 'sending') return false;
     const permDenied = /permission_denied/i.test(msg);
     const tries = (cur.tries || 0) + 1;
-    const failed = permDenied || tries >= (cur.maxTries || OUTBOX_DEFAULT_MAX_TRIES);
+    const failed = e.code==='write_conflict' || permDenied || tries >= (cur.maxTries || OUTBOX_DEFAULT_MAX_TRIES);
     const backoff = Math.min(60000, 1000 * Math.pow(2, tries));
     try {
       outboxMark(opId, {
         status: failed ? 'failed' : 'pending',
-        tries, lastError: msg, nextAttemptAt: Date.now() + backoff,
+        tries, lastError: e.message || msg, errorCode:e.code || null, conflictCurrent:e.current || null, nextAttemptAt: Date.now() + backoff,
       });
     } catch { updateOutboxBadge(); }
     return false;
@@ -1531,7 +1533,7 @@ async function replayOutbox(opts) {
       const o = _outboxLoad(true);
       let ch = false;
       Object.values(o.ops).forEach(x => {
-        if (x.status === 'failed' || x.status === 'sending') { x.status = 'pending'; x.tries = 0; x.nextAttemptAt = 0; x.lastError = null; ch = true; }
+        if (x.errorCode!=='write_conflict' && (x.status === 'failed' || x.status === 'sending')) { x.status = 'pending'; x.tries = 0; x.nextAttemptAt = 0; x.lastError = null; ch = true; }
       });
       if (ch) _outboxSave(o);
     }
@@ -1572,7 +1574,7 @@ function updateOutboxBadge() {
     const btn = document.createElement('button'); btn.id = 'outbox-badge-btn'; btn.type = 'button';
     btn.style.cssText = 'background:#111827;color:#fff;border:none;border-radius:9999px;padding:3px 10px;font-weight:800;font-size:12px;cursor:pointer;flex:none;';
     btn.textContent = '지금 재전송';
-    btn.onclick = () => replayOutbox({ manual: true });
+    btn.onclick = () => currentConflicts().length ? showConflictReview() : replayOutbox({ manual: true });
     el.append(txt, btn);
     document.body.appendChild(el);
   }
@@ -1590,8 +1592,44 @@ function updateOutboxBadge() {
     : `${ntxt}${ftxt}${sending}`;
   el.title = _outboxStorageError;
   const btn = document.getElementById('outbox-badge-btn');
+  btn.textContent = currentConflicts().length ? '충돌 확인' : '지금 재전송';
   btn.disabled = _outboxReplaying;
   btn.style.opacity = _outboxReplaying ? '0.5' : '1';
+}
+
+function currentConflicts() {
+  return Object.values(_outboxLoad().ops).filter(op=>op.status==='failed' && op.errorCode==='write_conflict' && mayReplay(op,secureIdentity,firebaseConfig?.projectId));
+}
+function showConflictReview() {
+  document.getElementById('conflict-review')?.remove();
+  const op=currentConflicts()[0];if(!op)return;
+  const panel=document.createElement('section');panel.id='conflict-review';
+  panel.style.cssText='position:fixed;inset:5vh 4vw;z-index:12000;background:#0f172a;color:#fff;border:2px solid #f59e0b;border-radius:16px;padding:20px;overflow:auto;max-width:760px;margin:auto;box-shadow:0 10px 40px #000';
+  const labels={notes:'메모',hospital:'이송 병원',name:'이름',age:'연령',gender:'성별',triage:'중증도',symptom:'주증상',symptoms:'주증상',rr:'호흡수',pulse:'맥박',spo2:'산소포화도',cardPhoto:'분류표 사진',patientPhoto:'환자 사진',cardNo:'카드 번호',location:'발견 장소',departTime:'출발 시각',arriveTime:'도착 시각',notTransported:'미이송',notTransportedReason:'미이송 사유'};
+  const text=(tag,value)=>{const el=document.createElement(tag);el.textContent=value;return el;};
+  panel.append(text('h2','동시 수정 확인'),text('p',op.lastError),text('p','서버 값 유지: 이번 기기의 수정 요청을 취소합니다. 내 입력 적용: 아래 입력을 다시 저장합니다.'));
+  const display=(key,value)=>/Photo$/.test(key)?(value?'사진 있음':'사진 없음'):value==null?'비어 있음':typeof value==='object'?JSON.stringify(value):String(value);
+  const table=document.createElement('table');table.style.cssText='width:100%;table-layout:fixed;border-collapse:collapse;margin:16px 0;overflow-wrap:anywhere';
+  const header=document.createElement('tr');for(const value of ['항목','서버 값','내 입력'])header.append(text('th',value));table.append(header);
+  for(const key of Object.keys(op.payload).filter(k=>!['updatedByUid','_updatedBy','_updatedTeamId','_updatedAt'].includes(k))){
+    const row=document.createElement('tr');for(const value of [labels[key]||key,op.conflictCurrent?display(key,op.conflictCurrent[key]):'최신 카드 확인 필요',display(key,op.payload[key])]){const cell=text('td',value);cell.style.cssText='padding:8px;border-bottom:1px solid #475569;vertical-align:top';row.append(cell);}table.append(row);
+  }
+  panel.append(table);
+  const act=(label,run)=>{const button=text('button',label);button.style.cssText='padding:10px 14px;margin:4px;background:#334155;border-radius:8px';button.onclick=run;panel.append(button);};
+  function resolve(keepMine){
+    try{
+      const current=_outboxLoad(true).ops[op.opId];
+      if(!current || current.updatedAt!==op.updatedAt || !mayReplay(current,secureIdentity,firebaseConfig?.projectId)){panel.remove();return;}
+      if(keepMine){
+        if(!op.conflictCurrent)return;
+        outboxMark(op.opId,{expected:op.conflictCurrent,status:'pending',errorCode:null,conflictCurrent:null,lastError:null,tries:0,nextAttemptAt:0});
+      }else outboxMark(op.opId,{status:'discarded',lastError:'사용자가 서버 값을 유지했습니다.'});
+      panel.remove();updateOutboxBadge();if(keepMine)replayOutbox();
+    }catch(error){window.__mciShowOutboxStatus?.(error.message,'err');}
+  }
+  act('서버 값 유지',()=>resolve(false));
+  if(op.conflictCurrent)act('내 입력 적용',()=>resolve(true));
+  act('나중에 확인',()=>panel.remove());document.body.append(panel);
 }
 
 // 비차단 토스트(전송 완료/공간부족 등)
@@ -1771,7 +1809,7 @@ async function deleteAction(key) {
   return saveFieldRecord('action', incPath('actions/'+key), undefined, 'remove');
 }
 
-async function saveCasualty(data, teamId, author, editKey, basePayload) {
+async function saveCasualty(data, teamId, author, editKey, basePayload, baseRecord) {
   if (!assertCanWrite('사상자 카드 저장')) return false;
   const formKey = 'casualty';
   setSaveStatus(formKey, { saving: true });
@@ -1799,6 +1837,7 @@ async function saveCasualty(data, teamId, author, editKey, basePayload) {
         kind: 'casualty', method: 'update',
         path: incPath(`casualties/${editKey}`),
         incidentId: state.currentIncidentId,
+        expected: baseRecord ? Object.fromEntries(Object.keys(changedCardFields(data, basePayload)).map(k=>[k,baseRecord[k]??null])) : undefined,
         payload: { ...changedCardFields(data, basePayload), updatedByUid: secureIdentity.uid, _updatedBy: author, _updatedTeamId: teamId, _updatedAt: Date.now() },
       });
     } else {
@@ -1839,7 +1878,7 @@ async function deleteCasualty(key) {
 }
 
 // MCI 사상자
-async function saveMciCasualty(data, teamId, author, editKey, basePayload) {
+async function saveMciCasualty(data, teamId, author, editKey, basePayload, baseRecord) {
   if (!assertCanWrite('MCI 사상자 카드 저장')) return false;
   const formKey = 'mciCasualty';
   setSaveStatus(formKey, { saving: true });
@@ -1867,6 +1906,7 @@ async function saveMciCasualty(data, teamId, author, editKey, basePayload) {
         kind: 'mci', method: 'update',
         path: incPath(`mciCasualties/${editKey}`),
         incidentId: state.currentIncidentId,
+        expected: baseRecord ? Object.fromEntries(Object.keys(changedCardFields(data, basePayload)).map(k=>[k,baseRecord[k]??null])) : undefined,
         payload: { ...changedCardFields(data, basePayload), updatedByUid: secureIdentity.uid, _updatedBy: author, _updatedTeamId: teamId, _updatedAt: Date.now() },
       });
     } else {
@@ -2104,7 +2144,7 @@ async function adminForceCloseIncident(incidentId, opts = {}) {
   if (secureIdentity?.role !== 'admin') return {ok:false,reason:'관리자 권한이 필요합니다.'};
   if (!navigator.onLine) return {ok:false,reason:'재난 종료는 인터넷 연결 후 실행하세요.'};
   try {
-    const pending=Object.values(_outboxLoad(true).ops).some(x=>x.incidentId===incidentId && x.status!=='sent');
+    const pending=Object.values(_outboxLoad(true).ops).some(x=>x.incidentId===incidentId && !['sent','discarded'].includes(x.status));
     if(pending)return {ok:false,reason:'이 기기에 미전송 기록이 있습니다. 미전송함을 먼저 확인하세요.'};
     return await serverAccess('/api/admin/close',{incidentId,...(opts.label?{label:opts.label}:{})});
   } catch(error) { return {ok:false,reason:error.message}; }
@@ -6866,7 +6906,7 @@ function bindMciCasualtyEvents() {
     }
     const payload = cardDraftPayload(_draft);
     payload.cardNo = _no;
-    const ok = await saveSelectedCasualty(payload, state.user.teamId, state.user.name, _draft._editKey, _draft._basePayload);
+    const ok = await saveSelectedCasualty(payload, state.user.teamId, state.user.name, _draft._editKey, _draft._basePayload, _draft._baseRecord);
 
     if (ok) {
       // 중복 번호였으면 저장은 하되 비차단 안내(목록에서도 빨갛게 표시됨)
@@ -6921,6 +6961,7 @@ function bindMciCasualtyEvents() {
         _editKey: btn.dataset.mciEdit,
       };
       editDraft._basePayload = JSON.parse(JSON.stringify(cardDraftPayload(editDraft)));
+      editDraft._baseRecord = JSON.parse(JSON.stringify(c));
       if (state.mode === 'general') csDraft = editDraft; else mciDraft = editDraft;
       state.mciInputMode = 'full';   // 수정은 풀 카드로 — 생체징후·이송 등 상세 보완 단계
       state.inspectCardKey = null;   // 상세보기 닫고 수정 폼 표시
@@ -7927,6 +7968,7 @@ function bindMciCardDetailModalEvents() {
         _editKey: c._key,
       };
       editDraft._basePayload = JSON.parse(JSON.stringify(cardDraftPayload(editDraft)));
+      editDraft._baseRecord = JSON.parse(JSON.stringify(c));
       mciDraft = editDraft;
       state.viewMciCardKey = null;
       state.mciTab = 'casualty';

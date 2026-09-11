@@ -56,6 +56,34 @@ export async function sendBoundOperation(op,{currentIdentity,currentUser,project
   const url=new URL(op.path+'.json',databaseURL.endsWith('/')?databaseURL:databaseURL+'/');
   url.searchParams.set('auth',token);
   const method={set:'PUT',update:'PATCH',remove:'DELETE'}[op.method];if(!method)throw Error('unsupported operation');
+  if(op.method==='update' && /\/(casualties|mciCasualties)\//.test(op.path)) {
+    const metadata=new Set(['updatedByUid','_updatedBy','_updatedTeamId','_updatedAt']);
+    const keys=Object.keys(op.payload).filter(key=>!metadata.has(key));
+    const conflict=(message,current)=>Object.assign(Error(message),{code:'write_conflict',current});
+    if(!op.expected)throw conflict('수정 전 기록이 없는 이전 입력입니다. 최신 카드를 확인하고 다시 수정하세요.');
+    const same=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
+    const signal=AbortSignal.timeout(12000);
+    for(let attempt=0;attempt<3;attempt++) {
+      const snapshot=await fetcher(url,{headers:{'X-Firebase-ETag':'true'},cache:'no-store',signal});
+      if(!snapshot.ok)throw Error(snapshot.status===401||snapshot.status===403?'permission_denied':'최신 카드 조회 실패');
+      const current=await snapshot.json(),etag=snapshot.headers.get('etag');
+      if(!current)throw conflict('다른 사용자가 이 카드를 삭제했습니다. 입력 내용은 기기에 보관됩니다.');
+      const expectedNow=Object.fromEntries(keys.map(key=>[key,current[key]??null]));
+      if(keys.some(key=>!same(current[key],op.expected[key]) && !same(current[key],op.payload[key])))throw conflict('다른 사용자가 같은 항목을 수정했습니다. 충돌 확인에서 저장할 내용을 선택하세요.',expectedNow);
+      if(!etag)throw Error('서버 버전을 확인하지 못했습니다. 다시 시도하세요.');
+      if(!mayReplay(op,currentIdentity(),projectId) || currentUser()?.uid!==user.uid)throw Error('permission_denied: 로그인 문맥이 변경되었습니다.');
+      const saved=await fetcher(url,{method:'PUT',headers:{'Content-Type':'application/json','if-match':etag},body:JSON.stringify({...current,...op.payload}),signal});
+      if(saved.status===412)continue;
+      if(!saved.ok)throw Error(saved.status===401||saved.status===403?'permission_denied':'기록 전송 실패 ('+saved.status+')');
+      return;
+    }
+    throw Error('다른 저장이 진행 중입니다. 잠시 후 재시도합니다.');
+  }
   const r=await fetcher(url,{method,headers:{'Content-Type':'application/json'},body:op.method==='remove'?undefined:JSON.stringify(op.payload),signal:AbortSignal.timeout(12000)});
   if(!r.ok)throw Error(r.status===401 || r.status===403?'permission_denied':'기록 전송 실패 ('+r.status+')');
+}
+function canonical(value) {
+  if(value===undefined || value===null)return null;
+  if(typeof value!=='object')return value;
+  return Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])]));
 }

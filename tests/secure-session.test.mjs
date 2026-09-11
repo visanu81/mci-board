@@ -31,8 +31,8 @@ test('browser sends only code, then exchanges custom token',async()=>{const h=ha
 import {sendBoundOperation} from '../secure-session.js';
 test('card REST request carries the original identity token',async()=>{
  let sent;
- await sendBoundOperation({...op(),method:'update',payload:{notes:'fixture'}},{currentIdentity:identity,currentUser:()=>({uid:'one',getIdToken:async()=> 'original-token'}),projectId:'mci2-test',databaseURL:cfg.firebase.databaseURL},async(url,options)=>{sent={url:new URL(url),options};return new Response('{}');});
- assert.equal(sent.url.searchParams.get('auth'),'original-token');assert.equal(sent.options.method,'PATCH');
+ await sendBoundOperation({...op(),method:'set',payload:{notes:'fixture'}},{currentIdentity:identity,currentUser:()=>({uid:'one',getIdToken:async()=> 'original-token'}),projectId:'mci2-test',databaseURL:cfg.firebase.databaseURL},async(url,options)=>{sent={url:new URL(url),options};return new Response('{}');});
+ assert.equal(sent.url.searchParams.get('auth'),'original-token');assert.equal(sent.options.method,'PUT');
 });
 test('identity change during token refresh prevents network send',async()=>{
  let current=identity(),sent=false;
