@@ -1,5 +1,6 @@
 // Production-source regression tests. No Firebase/network access or patient data.
 export async function runSafetyTests(html) {
+  html = html.replace(/\r\n/g, '\n');
   const results = [];
   const assert = (value, message) => { if (!value) throw new Error(message); };
   const equal = (a, b, message) => assert(JSON.stringify(a) === JSON.stringify(b), message);
@@ -14,10 +15,11 @@ export async function runSafetyTests(html) {
   };
   function harness(options = {}) {
     let raw = options.raw ?? null;
-    const writes = [], statuses = {}, notices = [];
+    const writes = [], statuses = {}, notices = [], storageKeys = [];
     const storage = {
       getItem() { if (options.readError) throw new Error('SecurityError'); return raw; },
       setItem(key, value) {
+        storageKeys.push(key);
         if (options.quota || (options.evictSent && value.includes('"status":"sent"'))) throw new Error('QuotaExceededError');
         raw = value;
       }
@@ -30,7 +32,7 @@ export async function runSafetyTests(html) {
     const saves = between('async function saveCasualty(', '// ==================== 데이터 내보내기');
     const patch = html.includes('function changedCardFields(')
       ? between('function changedCardFields(', 'function currentCasualtyDraft(') : '';
-    const source = core + '\n' + saves + '\n' + patch + `
+    const source = 'const DB_ROOT = ' + JSON.stringify(options.dbRoot ?? 'mci2') + ';\n' + core + '\n' + saves + '\n' + patch + `
       return {
         saveCasualty, saveMciCasualty, deleteCasualty, deleteMciCasualty,
         outboxCleanup, replayOutbox, outboxEnqueue,
@@ -45,7 +47,7 @@ export async function runSafetyTests(html) {
       () => ({ key: 'new-card' }), {}, { currentIncidentId: 'test', casualties: [], mciCasualties: [] },
       (suffix) => 'mci2/incidents/test/' + suffix, () => true,
       (key, value) => { statuses[key] = value; }, () => {}, () => 0, false, Promise.resolve(), () => {});
-    return { ...api, raw: () => raw, writes, statuses, notices };
+    return { ...api, raw: () => raw, writes, statuses, notices, storageKeys };
   }
   const card = () => ({ cardNo: 1, name: 'TEST', triage: 'urgent', hospital: '', notes: '' });
   await test('MCI save rejects quota failure before any network write', async () => {
@@ -179,6 +181,21 @@ export async function runSafetyTests(html) {
     for (const hostname of ['mci2.visanu81.workers.dev', 'localhost', 'preview.example', 'mci.visanu81.workers.dev.evil.example']) {
       equal(root({ hostname }), 'mci2', 'non-production host reached production data');
     }
+  });
+  await test('Both deployments retain their existing outbox storage keys', async () => {
+    for (const [dbRoot, key] of [['', 'mci_outbox_v1'], ['mci2', 'mci2_outbox_v1']]) {
+      const x = harness({ dbRoot });
+      assert(await x.saveMciCasualty(card(), 'medical', 'tester'), 'save failed');
+      assert(x.storageKeys.length > 0 && x.storageKeys.every(value => value === key), 'legacy outbox key changed');
+    }
+  });
+  await test('Form restoration displays numeric zero without clearing it', () => {
+    const assignment = html.match(/el\.value = _draft\[k\][^;]+;/)?.[0];
+    assert(assignment, 'form restoration missing');
+    const restore = new Function('el', '_draft', 'k', assignment);
+    const el = {};
+    restore(el, { rr: 0 }, 'rr'); equal(el.value, 0, 'zero cleared in form');
+    restore(el, {}, 'rr'); equal(el.value, '', 'missing value not blank');
   });
   await test('Every inline application script parses', () => {
     const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)];

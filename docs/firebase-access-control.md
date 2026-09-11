@@ -7,7 +7,7 @@
 - index.html은 익명 로그인을 실행한 뒤 관서 코드를 브라우저에서 비교하고, role을 localStorage에 보관한다.
 - 저장소의 firebase-database-rules.json은 익명 사용자를 포함한 auth != null 사용자에게 incidents·archives·config/agencyCodes의 넓은 읽기·쓰기를 허용한다.
 - mci와 mci2는 같은 Firebase 프로젝트를 사용하며 경로만 분리한다.
-- 실제 Firebase 콘솔에 적용된 규칙이 저장소와 같은지는 미확인이다.
+- 2026-09-11 CLI로 실제 적용 규칙을 읽었으며 운영 및 mci2 경로 모두 위의 auth != null 읽기·쓰기 조건을 확인했다. 환자 데이터는 조회하지 않았다.
 - 따라서 DB 규칙의 auth != null만 갑자기 역할 조건으로 바꾸면 현재 사용자 전체의 조회/입력이 막힐 수 있다.
 
 ## 제안하는 전환

@@ -1342,7 +1342,7 @@ function incPath(suffix) {
 //  · 대상: 사상자 카드 6경로만(자주+incPath 격리+단일노드 멱등). 그 외(사고개요/동원/관서코드/백업)는 제외.
 //  · 오프라인에서 set()은 거부가 아니라 무한 대기(hang)하므로: 오프라인 저장은 발사만 하고 기다리지 않음(낙관적 화면 반영),
 //    전송엔 12초 타임아웃을 둬 재전송 루프가 멈추지 않게 함. (실패해도 멱등이라 재전송 안전)
-const OUTBOX_KEY = 'mci_outbox_v1';
+const OUTBOX_KEY = DB_ROOT ? 'mci2_outbox_v1' : 'mci_outbox_v1';
 const OUTBOX_MAX_OPS = 500;
 const OUTBOX_DEFAULT_MAX_TRIES = 8;
 const OUTBOX_SENT_TTL_MS = 60 * 1000;
@@ -6988,7 +6988,7 @@ function bindMciCasualtyEvents() {
   ['name','age','rr','pulse','bpSys','bpDia','spo2','temp','symptom','drugs','hospital','departTime','arriveTime','notes','location','handoverUnit','handoverTime'].forEach(k => {
     const el = document.getElementById('mci-' + k);
     if (el) {
-      el.value = _draft[k] || '';
+      el.value = _draft[k] ?? '';
       // OCR로 자동 채워진 필드 강조 (사용자가 수정하면 해제)
       if (mciOcrFlags[k]) el.classList.add('ocr-filled');
       el.oninput = (e) => {
@@ -8369,7 +8369,7 @@ const HELP_CONTENT = {
       <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
         <h4 class="font-bold text-base mb-2">접속 방법</h4>
         <ul class="space-y-1.5 text-slate-300">
-          <li>📱 <strong>웹:</strong> <code class="text-cyan-300 bg-slate-800 px-2 py-0.5 rounded text-xs">https://mci.visanu81.workers.dev</code></li>
+          <li>📱 <strong>웹:</strong> <code class="text-cyan-300 bg-slate-800 px-2 py-0.5 rounded text-xs">https://mci2.visanu81.workers.dev</code></li>
           <li>🏠 <strong>휴대폰 홈에 설치:</strong> 첫 접속 시 하단에 "앱으로 설치하기" 핑크색 배너 → 탭하면 홈에 아이콘 생김</li>
           <li>⚡ <strong>오프라인 가능:</strong> 한 번 설치하면 와이파이·LTE 끊겨도 화면 뜸 (동기화는 통신 복구 시)</li>
         </ul>
