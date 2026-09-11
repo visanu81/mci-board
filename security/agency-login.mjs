@@ -6,7 +6,7 @@ const response = (data, status = 200) => new Response(JSON.stringify(data), {sta
 const b64 = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 const encoded = obj => b64(encoder.encode(JSON.stringify(obj)));
 const decode = text => Uint8Array.from(atob(text.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
-async function boundedJson(request) {
+export async function boundedJson(request) {
   const reader=request.body?.getReader(); if(!reader)throw Error('body');
   const chunks=[]; let size=0;
   try { for(;;){const {value,done}=await reader.read();if(done)break;size+=value.byteLength;if(size>1024){await reader.cancel();throw Error('size');}chunks.push(value);} }
@@ -14,7 +14,7 @@ async function boundedJson(request) {
   const bytes=new Uint8Array(size);let offset=0;for(const c of chunks){bytes.set(c,offset);offset+=c.byteLength;}
   return JSON.parse(new TextDecoder().decode(bytes));
 }
-function config(env) {
+export function config(env) {
   const account=JSON.parse(env.FIREBASE_SERVICE_ACCOUNT || 'null');
   const records=JSON.parse(env.MCI_LOGIN_RECORDS || 'null');
   const project=env.FIREBASE_PROJECT_ID;
@@ -23,10 +23,10 @@ function config(env) {
   const database=new URL(env.FIREBASE_DATABASE_URL);
   if(database.protocol!=='https:' || database.username || database.password || database.pathname!=='/' || database.search || database.hash || !(database.hostname===project+'-default-rtdb.firebaseio.com' || database.hostname.startsWith(project+'-default-rtdb.') && database.hostname.endsWith('.firebasedatabase.app')))throw Error('test database required');
   if(env.PUBLIC_ORIGIN!=='https://mci2.visanu81.workers.dev')throw Error('test origin required');
-  if(!env.AUTH_RATE_LIMIT?.limit || typeof env.MCI_CODE_PEPPER!=='string' || env.MCI_CODE_PEPPER.length<32 || !Array.isArray(records) || records.length>100)throw Error('bindings required');
+  if(!env.AUTH_RATE_LIMIT?.limit || typeof env.MCI_CODE_PEPPER!=='string' || env.MCI_CODE_PEPPER.length<32 || (env.MCI_CODE_STORE!=='database' && (!Array.isArray(records) || records.length>100)))throw Error('bindings required');
   return {account,records,database:database.origin,project};
 }
-async function signJwt(account,payload) {
+export async function signJwt(account,payload) {
   const der=decode(account.private_key.replace(/-----[^-]+-----|\s/g,''));
   const key=await crypto.subtle.importKey('pkcs8',der,{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['sign']);
   const data=encoded({alg:'RS256',typ:'JWT'})+'.'+encoded(payload);
@@ -47,26 +47,37 @@ export async function handleAgencyLogin(request,env,transport=fetch) {
     const code=body.code.trim().normalize('NFC');
     if(code.length<16 || code.length>128)return response({error:'진입 코드를 확인하세요.'},401);
     const key=await crypto.subtle.importKey('raw',encoder.encode(env.MCI_CODE_PEPPER),{name:'HMAC',hash:'SHA-256'},false,['verify']);
-    let match=null;
+    let match=null, codeId=null, accessToken=null;
+    if(env.MCI_CODE_STORE==='database'){
+      accessToken=await serviceToken(settings.account,transport);
+      const signKey=await crypto.subtle.importKey('raw',encoder.encode(env.MCI_CODE_PEPPER),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+      codeId=b64(await crypto.subtle.sign('HMAC',signKey,encoder.encode(code)));
+      const r=await transport(settings.database+'/serverCodes/'+codeId+'.json',{headers:{Authorization:'Bearer '+accessToken},signal:AbortSignal.timeout(10000)});
+      if(!r.ok)throw Error('code store');match=await r.json();
+    }
     // Verify every entry; neither plaintext codes nor role from the browser are trusted.
-    for(const record of settings.records){
+    for(const record of (env.MCI_CODE_STORE==='database'?[]:settings.records)){
       let ok=false;try{ok=await crypto.subtle.verify('HMAC',key,decode(record.codeHash),encoder.encode(code));}catch{}
       if(ok)match=record;
     }
     const now=Date.now();
-    if(!match || match.active!==true || !Number.isFinite(match.expiresAt) || match.expiresAt<=now || !['normal','observer','display','admin'].includes(match.role) || !/^[a-z0-9_-]{1,50}$/.test(match.agencyId) || typeof match.agencyName!=='string' || match.agencyName.length>50)return response({error:'진입 코드를 확인하세요.'},401);
+    if(!match || match.active!==true || !Number.isFinite(match.expiresAt) || match.expiresAt<=now || !['normal','observer','display','admin','hq'].includes(match.role) || !/^[a-z0-9_-]{1,50}$/.test(match.agencyId) || typeof match.agencyName!=='string' || match.agencyName.length>50)return response({error:'진입 코드를 확인하세요.'},401);
     const {account,database}=settings;
     const seconds=Math.floor(now/1000);
-    const assertion=await signJwt(account,{iss:account.client_email,scope:'https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email',aud:'https://oauth2.googleapis.com/token',iat:seconds,exp:seconds+300});
-    const oauth=await transport('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion}),signal:AbortSignal.timeout(10000)});
-    if(!oauth.ok)throw Error('oauth');
-    const {access_token}=await oauth.json();if(typeof access_token!=='string' || !access_token)throw Error('oauth');
+    const access_token=accessToken || await serviceToken(account,transport);
     const uid='mci2-'+crypto.randomUUID();
     const expiresAt=Math.min(now+12*60*60*1000,match.expiresAt);
-    const grant={agencyId:match.agencyId,agencyName:match.agencyName,role:match.role,environment:'test',active:true,expiresAt};
+    const grant={agencyId:match.agencyId,agencyName:match.agencyName,role:match.role,environment:'test',active:true,expiresAt,...(codeId?{codeId}:{})};
     const saved=await transport(database+'/access/'+encodeURIComponent(uid)+'.json',{method:'PUT',headers:{Authorization:'Bearer '+access_token,'Content-Type':'application/json'},body:JSON.stringify(grant),signal:AbortSignal.timeout(10000)});
     if(!saved.ok)throw Error('grant');
     const token=await signJwt(account,{iss:account.client_email,sub:account.client_email,aud:'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',iat:seconds,exp:seconds+300,uid,claims:{mci_env:'test'}});
     return response({token,expiresAt});
   }catch{return response({error:'로그인 연결에 실패했습니다. 잠시 후 다시 시도하세요.'},503);}
+}
+
+export async function serviceToken(account,transport=fetch) {
+ const seconds=Math.floor(Date.now()/1000);
+ const assertion=await signJwt(account,{iss:account.client_email,scope:'https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email',aud:'https://oauth2.googleapis.com/token',iat:seconds,exp:seconds+300});
+ const r=await transport('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion}),signal:AbortSignal.timeout(10000)});
+ if(!r.ok)throw Error('oauth');const body=await r.json();if(!body.access_token)throw Error('oauth');return body.access_token;
 }

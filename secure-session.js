@@ -8,7 +8,7 @@ export function validateTestConfig(value) {
   return Object.freeze({...c});
 }
 export function isActiveGrant(grant,now=Date.now()) {
-  return !!grant && grant.active===true && grant.environment==='test' && Number.isFinite(grant.expiresAt) && grant.expiresAt>now && ['normal','observer','display','admin'].includes(grant.role) && /^[a-z0-9_-]{1,50}$/.test(grant.agencyId || '');
+  return !!grant && grant.active===true && grant.environment==='test' && Number.isFinite(grant.expiresAt) && grant.expiresAt>now && ['normal','observer','display','admin','hq'].includes(grant.role) && /^[a-z0-9_-]{1,50}$/.test(grant.agencyId || '');
 }
 export function mayReplay(op,identity,projectId) {
   return !!identity && isActiveGrant(identity) && ['normal','admin'].includes(identity.role) && op?.securityContext?.projectId===projectId && op.securityContext.uid===identity.uid && op.securityContext.agencyId===identity.agencyId && typeof op.path==='string' && /^mci2\/incidents\/[^/]+\/(casualties|mciCasualties)\/[^/]+$/.test(op.path);

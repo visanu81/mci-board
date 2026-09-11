@@ -5,7 +5,8 @@
     "test:safety": "node tests/run.mjs",
     "test:rules": "firebase emulators:exec --config firebase.emulator.json --project demo-mci-access --only database \"node --test tests/access-rules.test.mjs\"",
     "test:auth": "node --test tests/agency-login.test.mjs",
-    "test:session": "node --test tests/secure-session.test.mjs tests/worker-auth.test.mjs tests/provision-config.test.mjs"
+    "test:session": "node --test tests/secure-session.test.mjs tests/worker-auth.test.mjs tests/provision-config.test.mjs",
+    "test:management": "node --test tests/access-management.test.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.2",

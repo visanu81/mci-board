@@ -921,7 +921,7 @@ import {
   getDatabase, ref, set, get, onValue as firebaseOnValue, remove, push, update, child, query, orderByChild, equalTo
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 import {
-  getAuth, signInWithCustomToken, signOut, onAuthStateChanged
+  getAuth, initializeAuth, inMemoryPersistence, signInWithCustomToken, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 import { validateTestConfig, isActiveGrant, mayReplay, sendBoundOperation, createSessionController } from './secure-session.js';
@@ -946,11 +946,12 @@ function onSecureIdentity(identity) {
   secureIdentity = identity;
   if (!changed) return;
   stopSecureSubscriptions();
-  if (previous && !identity) {
+  if (previous && !identity && !POPOUT_DISPLAY) {
     secureDraftBackup = JSON.parse(JSON.stringify({ projectId: firebaseConfig.projectId, uid: previous.uid, incidentId: state.currentIncidentId, mciDraft, csDraft }));
     try { localStorage.setItem('mci2_secure_draft_backup', JSON.stringify(secureDraftBackup)); } catch {}
     startupError = '로그인이 종료됐습니다. 작성 중이던 카드 입력은 복구용으로 보관했습니다.';
   }
+  state.agencyCodesList=[]; state.issuedCode=null; state.managedCodeDraft={}; state.pendingCodeRevoke=null; AGENCY_CODES={};
   state.incidents = []; state.archives = []; state.casualties = []; state.mciCasualties = [];
   state.actions = []; state.incident = null; state.damages = {}; state.mobilizations = {};
   if (!identity) {
@@ -963,15 +964,17 @@ function onSecureIdentity(identity) {
   if (!previous || previous.uid !== identity.uid) {
     resetMciDraft(); resetCsDraft();
     state.currentIncidentId = null; state.user = null;
-    state.view2 = identity.role === 'admin' ? 'admin' : identity.role === 'observer' ? 'observer' : identity.role === 'display' ? 'display' : 'lobby';
+    state.view2 = identity.role === 'admin' ? 'admin' : ['observer','hq'].includes(identity.role) ? 'observer' : identity.role === 'display' ? 'display' : 'lobby';
   }
+  if(identity.role==='display' && identity.incidentId)state.currentIncidentId=identity.incidentId;
   bindRealtime(); render();
+  if(identity.role==='admin')void refreshManagedCodes();
 }
 async function initializeSecureApp() {
   const r = await fetch('/api/auth/config', {cache:'no-store'});
   if (!r.ok) throw Error('테스트 인증 설정이 아직 완료되지 않았습니다.');
   firebaseConfig = validateTestConfig(await r.json());
-  app = initializeApp(firebaseConfig); db = getDatabase(app); auth = getAuth(app);
+  app = initializeApp(firebaseConfig, POPOUT_DISPLAY ? 'display-'+crypto.randomUUID() : '[DEFAULT]'); db = getDatabase(app); auth = POPOUT_DISPLAY ? initializeAuth(app,{persistence:inMemoryPersistence}) : getAuth(app);
   secureSession = createSessionController({auth,db,sdk:{ref,onValue:firebaseOnValue,onAuthStateChanged,signInWithCustomToken,signOut},onChange:onSecureIdentity});
 }
 
@@ -1050,7 +1053,7 @@ const TEAMS = [
 
 // 권한 헬퍼 (V2)
 // V2 역할: 'normal'(일반 관서) / 'observer'(본부, 읽기만) / 'display'(표출, TV 전시) / 'admin'(한경승, 전권)
-const isObserver = () => state.session?.role === 'observer' || state.session?.role === 'display';
+const isObserver = () => ['observer','display','hq'].includes(state.session?.role);
 const isAdmin    = () => state.session?.role === 'admin';
 const isDisplay  = () => state.session?.role === 'display';
 const canWrite   = () => !isObserver();   // 본부119/표출119는 모든 쓰기 차단
@@ -1613,9 +1616,10 @@ function bindRealtime() {
   _globalUnsubFns.splice(0).forEach(fn => fn());
   // V2 — 인덱스: 진행 중 재난 목록 (로비/관찰자/관리자 모두 사용)
   const incidentsRef = ref(db, rootPath('incidents'));
-  const visibleIncidents = secureIdentity.role === 'admin' ? incidentsRef : query(incidentsRef,orderByChild('agencyId'),equalTo(secureIdentity.agencyId));
+  const scopedId=secureIdentity.incidentId;
+  const visibleIncidents = scopedId ? ref(db,rootPath('incidents')+'/'+scopedId) : ['admin','hq'].includes(secureIdentity.role) ? incidentsRef : query(incidentsRef,orderByChild('agencyId'),equalTo(secureIdentity.agencyId));
   _globalUnsubFns.push(onValue(visibleIncidents, snap => {
-    const v = snap.val() || {};
+    const raw=snap.val(); const v = scopedId ? (raw ? {[scopedId]:raw} : {}) : (raw || {});
     state.incidents = Object.entries(v).map(([k, val]) => ({ ...val, _key: k }));
     // P0-2: 사용자가 보고 있던 재난이 강제 종료(closedAt)되면 자동 이탈 + 알림
     if (state.currentIncidentId) {
@@ -1662,8 +1666,7 @@ function bindRealtime() {
   }
 }
 
-async function saveAgencyCode() { alert('새 진입 코드는 테스트 인증 설정에서 발급합니다.'); return false; }
-async function deleteAgencyCode() { alert('권한 회수는 테스트 인증 설정에서 처리합니다.'); return false; }
+
 // V2 — 재난방 변경 시 재구독 (currentIncidentId 기준)
 function rebindIncidentRealtime() {
   if (!isActiveGrant(secureIdentity)) return;
@@ -2381,6 +2384,7 @@ function render() {
 }
 
 function renderAuth() {
+  if(POPOUT_DISPLAY)return `<div class="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center"><h1 class="text-2xl font-bold">표출 창 연결</h1><p>${escapeHtml(startupError || "입력 창의 승인을 기다리고 있습니다. 연결이 끊기거나 새로고침했다면 입력 창에서 표출 버튼을 다시 눌러주세요.")}</p><button id="display-wait-close" class="bg-slate-700 rounded px-4 py-2">창 닫기</button></div>`;
   return `
     <div class="min-h-screen flex items-center justify-center px-4">
       <div class="w-full max-w-md">
@@ -2413,6 +2417,7 @@ function renderAuth() {
 }
 
 function bindAuthEvents() {
+  if(POPOUT_DISPLAY){const close=document.getElementById('display-wait-close');if(close)close.onclick=()=>window.close();return;}
   const input=document.getElementById('auth-input'), btn=document.getElementById('auth-btn'), err=document.getElementById('auth-error');
   if (startupError) { err.textContent=startupError; err.classList.remove('hidden'); }
   let pending=false;
@@ -2517,7 +2522,7 @@ function renderV2Header(title, subtitle, opts = {}) {
   const sess = state.session;
   const agencyName = sess?.agency?.name || '';
   const roleBadge = sess?.role === 'admin'    ? '<span class="px-2 py-0.5 rounded bg-purple-900/40 text-purple-300 text-[10px] mono">ADMIN</span>'
-                  : sess?.role === 'observer' ? '<span class="px-2 py-0.5 rounded bg-sky-900/40 text-sky-300 text-[10px] mono">OBSERVER</span>'
+                  : ['observer','hq'].includes(sess?.role) ? '<span class="px-2 py-0.5 rounded bg-sky-900/40 text-sky-300 text-[10px] mono">OBSERVER</span>'
                   : sess?.role === 'display'  ? '<span class="px-2 py-0.5 rounded bg-rose-900/40 text-rose-300 text-[10px] mono">DISPLAY</span>'
                   :                              '<span class="px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300 text-[10px] mono">' + agencyName + '</span>';
   return `
@@ -2624,7 +2629,7 @@ function renderObserverLobby() {
     `;
   }).join('');
   return `
-    ${renderV2Header('본부 통합 모니터링', '모든 관서의 진행 중 재난을 읽기 전용으로 봅니다')}
+    ${renderV2Header(secureIdentity?.role==='hq'?'본부 통합 모니터링':'관서 모니터링',secureIdentity?.role==='hq'?'모든 관서의 진행 중 재난을 읽기 전용으로 봅니다':'승인된 관서의 재난을 읽기 전용으로 봅니다')}
     <div class="max-w-5xl mx-auto px-4 py-6">
       <div class="text-sm font-bold text-slate-400 mb-4">전체 진행 중 재난 (${all.length})</div>
       ${all.length === 0 ? '<div class="text-center text-sm text-slate-500 py-12">현재 진행 중인 재난이 없습니다.</div>' : groups}
@@ -3809,125 +3814,22 @@ function renderAdminConsole() {
 
 // ----- 관리자 콘솔 — 관서 코드 관리 패널 (CRUD) -----
 function renderAdminAgencyCodesPanel() {
-  const list = [...state.agencyCodesList].sort((a, b) => {
-    // admin → observer → display → normal 순 + 가나다순
-    const order = { admin: 0, observer: 1, display: 2, normal: 3 };
-    const oa = order[a.role] ?? 9, ob = order[b.role] ?? 9;
-    if (oa !== ob) return oa - ob;
-    return (a.name || '').localeCompare(b.name || '', 'ko');
-  });
-  const adminCount = list.filter(e => e.role === 'admin').length;
-  const isAddOpen  = !!state.adminCodeAddOpen;
-
-  return `
-    <div class="bg-slate-900 border border-purple-800/50 rounded-xl p-4">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-sm font-bold text-purple-300 flex items-center gap-2">
-          <i data-lucide="key-round" class="w-4 h-4"></i>관서 코드 관리 (${list.length})
-        </h2>
-        <button id="admin-code-add-toggle" class="text-[11px] px-2.5 py-1 rounded font-bold ${
-          isAddOpen ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-purple-600 hover:bg-purple-700 text-white'
-        }">
-          ${isAddOpen ? '✕ 취소' : '+ 코드 추가'}
-        </button>
-      </div>
-
-      ${isAddOpen ? `
-        <div class="bg-slate-950 border border-purple-700/50 rounded-lg p-3 mb-3">
-          <div class="text-[10px] tracking-wider uppercase text-purple-300 mb-2">새 관서 코드 추가</div>
-          <div class="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_130px] gap-2 mb-2">
-            <input id="admin-code-add-code" type="text" placeholder="진입 코드 (예: 강남119)"
-              class="bg-slate-900 border border-slate-800 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-purple-500" />
-            <input id="admin-code-add-name" type="text" placeholder="표시명 (예: 강남)"
-              class="bg-slate-900 border border-slate-800 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-purple-500" />
-            <input id="admin-code-add-id" type="text" placeholder="id (선택, 영문/숫자)"
-              class="bg-slate-900 border border-slate-800 rounded-md px-2.5 py-1.5 text-xs mono focus:outline-none focus:border-purple-500" />
-            <select id="admin-code-add-role" class="bg-slate-900 border border-slate-800 rounded-md px-2 py-1.5 text-xs">
-              <option value="normal">normal · 일반관서</option>
-              <option value="observer">observer · 읽기전용</option>
-              <option value="display">display · TV 표출</option>
-              <option value="admin">admin · 전권</option>
-            </select>
-          </div>
-          <div class="flex items-center justify-between">
-            <div class="text-[10px] text-slate-500 leading-relaxed">
-              id를 비우면 <span class="mono text-slate-400">auto_xxxxxx</span> 형식으로 자동 생성됩니다. id는 생성 후 변경 불가.
-            </div>
-            <button id="admin-code-add-save" class="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-xs font-bold flex items-center gap-1">
-              <i data-lucide="plus" class="w-3.5 h-3.5"></i>저장
-            </button>
-          </div>
-          <div id="admin-code-add-result" class="text-[11px] mt-2 min-h-[14px]"></div>
-        </div>
-      ` : ''}
-
-      <div class="space-y-1.5">
-        ${list.length === 0 ? `
-          <div class="text-xs text-slate-500 py-4 text-center">관서 코드가 없습니다. 위 "+ 코드 추가"로 추가하세요.</div>
-        ` : list.map(e => {
-          const isEditing   = state.adminCodeEditKey === e._key;
-          const isLastAdmin = e.role === 'admin' && adminCount <= 1;
-          const roleColor =
-              e.role === 'admin'    ? 'bg-purple-900/40 text-purple-200 border-purple-700/50'
-            : e.role === 'observer' ? 'bg-sky-900/40 text-sky-200 border-sky-700/50'
-            : e.role === 'display'  ? 'bg-rose-900/40 text-rose-200 border-rose-700/50'
-            :                          'bg-emerald-900/40 text-emerald-200 border-emerald-700/50';
-
-          return isEditing ? `
-            <div class="bg-slate-950 border border-amber-700/50 rounded-lg p-2.5">
-              <div class="text-[10px] tracking-wider uppercase text-amber-400 mb-2">코드 수정 중</div>
-              <div class="grid grid-cols-1 sm:grid-cols-[1fr_1fr_130px_auto] gap-2 mb-2">
-                <input data-edit-code class="bg-slate-900 border border-slate-800 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-amber-500" value="${escapeHtml(e.code || '')}" placeholder="진입 코드" />
-                <input data-edit-name class="bg-slate-900 border border-slate-800 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-amber-500" value="${escapeHtml(e.name || '')}" placeholder="표시명" />
-                <select data-edit-role class="bg-slate-900 border border-slate-800 rounded-md px-2 py-1 text-xs">
-                  <option value="normal"   ${e.role === 'normal'   ? 'selected' : ''}>normal</option>
-                  <option value="observer" ${e.role === 'observer' ? 'selected' : ''}>observer</option>
-                  <option value="display"  ${e.role === 'display'  ? 'selected' : ''}>display</option>
-                  <option value="admin"    ${e.role === 'admin'    ? 'selected' : ''}>admin</option>
-                </select>
-                <div class="flex gap-1">
-                  <button data-code-save="${e._key}" class="code-save-btn px-3 py-1 rounded-md bg-emerald-700 hover:bg-emerald-600 text-xs font-bold">저장</button>
-                  <button class="code-cancel-btn px-3 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-xs">취소</button>
-                </div>
-              </div>
-              <div class="flex items-center gap-3 text-[10px] text-slate-500">
-                <span>id: <span class="mono text-slate-400">${escapeHtml(e.id || '')}</span> <span class="text-slate-600">(고정)</span></span>
-                ${isLastAdmin ? '<span class="text-amber-400">마지막 admin — 역할 변경 불가</span>' : ''}
-              </div>
-              <div data-edit-result="${e._key}" class="text-[11px] mt-1.5 min-h-[14px]"></div>
-            </div>
-          ` : `
-            <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-2.5">
-              <span class="mono text-sm text-slate-100 font-bold flex-shrink-0">${escapeHtml(e.code || '')}</span>
-              <span class="text-slate-700">·</span>
-              <span class="text-sm text-slate-300 truncate">${escapeHtml(e.name || '')}</span>
-              <span class="text-[10px] px-1.5 py-0.5 rounded mono border font-bold ${roleColor}">${e.role}</span>
-              <span class="text-[10px] text-slate-600 mono ml-1 truncate">id:${escapeHtml(e.id || '')}</span>
-              <button data-code-edit="${e._key}" class="code-edit-btn ml-auto text-slate-500 hover:text-amber-400 p-1 flex-shrink-0" title="수정" aria-label="코드 수정">
-                <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-              </button>
-              ${isLastAdmin ? `
-                <span class="text-slate-700 p-1 flex-shrink-0" title="마지막 admin 코드는 삭제할 수 없습니다">
-                  <i data-lucide="lock" class="w-3.5 h-3.5"></i>
-                </span>
-              ` : `
-                <button data-code-del="${e._key}" data-code-label="${escapeHtml(e.code || '')}" class="code-del-btn text-slate-600 hover:text-red-400 p-1 flex-shrink-0" title="삭제" aria-label="코드 삭제">
-                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                </button>
-              `}
-            </div>
-          `;
-        }).join('')}
-      </div>
-      <div id="admin-code-result" class="text-[11px] mt-2 min-h-[14px]"></div>
-
-      <div class="text-[10px] text-slate-500 mt-3 pt-2 border-t border-slate-800 leading-relaxed">
-        <i data-lucide="info" class="w-3 h-3 inline mr-0.5 text-slate-600"></i>
-        진입 코드를 변경하면 해당 관서의 신규 로그인부터 적용됩니다. 이미 로그인된 세션은 영향받지 않습니다.<br>
-        id를 변경하지 않는 한, 기존 재난 데이터(소속 관서)는 안전하게 유지됩니다.
-      </div>
+  const draft=state.managedCodeDraft||{},busy=!!state.managedCodeBusy;
+  const roles={normal:'일반 관서',observer:'관서 관찰자',display:'표출 전용',admin:'관리자',hq:'본부 통합 관찰'};
+  return `<section class="bg-slate-900 border border-purple-800 rounded-xl p-4">
+    <h2 class="font-bold text-purple-300 mb-3">관서 진입 코드 관리</h2>
+    <p class="text-xs text-slate-400 mb-3">코드는 서버가 발급하며 발급 직후 한 번 표시됩니다. 폐기하면 해당 코드로 로그인한 단말도 접근이 차단됩니다.</p>
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+      <input id="managed-agency-id" value="${escapeHtml(draft.agencyId||'')}" maxlength="50" placeholder="관서 ID (영문·숫자·_·-)" class="bg-slate-950 border border-slate-700 rounded p-2 text-sm">
+      <input id="managed-agency-name" value="${escapeHtml(draft.agencyName||'')}" maxlength="50" placeholder="관서 표시명" class="bg-slate-950 border border-slate-700 rounded p-2 text-sm">
+      <select id="managed-role" class="bg-slate-950 border border-slate-700 rounded p-2 text-sm">${Object.entries(roles).map(([k,v])=>`<option value="${k}" ${(draft.role||'normal')===k?'selected':''}>${v}</option>`).join('')}</select>
+      <label class="text-xs">유효기간(일)<input id="managed-days" type="number" min="1" max="30" value="${escapeHtml(String(draft.days??7))}" class="bg-slate-950 border border-slate-700 rounded p-2 w-full"></label>
     </div>
-  `;
+    <div class="flex gap-2 my-3"><button id="managed-create" ${busy?'disabled':''} class="bg-purple-700 rounded px-4 py-2 text-sm">새 코드 발급</button><button id="managed-refresh" class="bg-slate-700 rounded px-4 py-2 text-sm">목록 새로고침</button></div>
+    ${state.issuedCode?`<div class="border border-emerald-700 p-3 rounded mb-3"><p class="text-sm mb-2">새 진입 코드 — 전달 후 닫아주세요.</p><code class="break-all select-all">${escapeHtml(state.issuedCode.code)}</code><p class="text-xs mt-2">만료: ${escapeHtml(new Date(state.issuedCode.expiresAt).toLocaleString('ko-KR'))}</p><button id="managed-copy" class="bg-emerald-800 rounded px-3 py-1 mt-2">복사</button><button id="managed-dismiss" class="ml-2 px-3 py-1">표시 닫기</button></div>`:''}
+    <p class="text-sm text-amber-300 my-2" role="status">${escapeHtml(state.managedCodeMessage||'')}</p>
+    <div class="space-y-2">${state.agencyCodesList.map(r=>`<div class="border border-slate-800 rounded p-2 flex flex-wrap items-center gap-2 text-sm"><strong>${escapeHtml(r.agencyName)}</strong><span>${escapeHtml(r.agencyId)}</span><span>${escapeHtml(roles[r.role]||r.role)}</span><span class="text-xs text-slate-400">${r.active && r.expiresAt>Date.now()?'사용 가능':'폐기/만료'} · ${escapeHtml(new Date(r.expiresAt).toLocaleString('ko-KR'))}</span>${r.active?`<button data-managed-revoke="${escapeHtml(r.id)}" class="ml-auto bg-red-950 rounded px-3 py-1" ${r.id===secureIdentity?.codeId?'disabled':''}>${r.id===secureIdentity?.codeId?'현재 관리자 코드':'폐기'}</button>${state.pendingCodeRevoke===r.id?`<span class="text-xs text-red-300">로그인 단말도 차단합니다.</span><button data-managed-confirm="${escapeHtml(r.id)}" class="bg-red-700 rounded px-3 py-1">폐기 확인</button><button id="managed-cancel-revoke" class="px-3 py-1">취소</button>`:''}`:''}</div>`).join('')||'<p class="text-sm text-slate-500">발급된 코드가 없습니다.</p>'}</div>
+  </section>`;
 }
 
 function bindAdminConsoleEvents() {
@@ -4024,110 +3926,43 @@ function bindAdminConsoleEvents() {
 }
 
 // ----- 관리자 콘솔 — 관서 코드 관리 이벤트 바인딩 -----
-function bindAdminAgencyCodesEvents() {
-  // 코드 추가 폼 토글
-  const toggleBtn = document.getElementById('admin-code-add-toggle');
-  if (toggleBtn) {
-    toggleBtn.onclick = () => {
-      state.adminCodeAddOpen = !state.adminCodeAddOpen;
-      // 추가 폼이 열릴 때 다른 인라인 수정도 중단
-      if (state.adminCodeAddOpen) state.adminCodeEditKey = null;
-      render();
-    };
-  }
-
-  // 코드 추가 — 저장
-  const addSave = document.getElementById('admin-code-add-save');
-  if (addSave) {
-    addSave.onclick = async () => {
-      const codeEl = document.getElementById('admin-code-add-code');
-      const nameEl = document.getElementById('admin-code-add-name');
-      const idEl   = document.getElementById('admin-code-add-id');
-      const roleEl = document.getElementById('admin-code-add-role');
-      const result = document.getElementById('admin-code-add-result');
-      const payload = {
-        code: codeEl?.value || '',
-        name: nameEl?.value || '',
-        id:   idEl?.value || '',
-        role: roleEl?.value || 'normal',
-      };
-      if (result) result.innerHTML = '<span class="text-amber-400">저장 중...</span>';
-      const r = await saveAgencyCode(null, payload);
-      if (r.ok) {
-        if (result) result.innerHTML = `<span class="text-emerald-400">✓ "${escapeHtml(payload.code)}" 추가 완료</span>`;
-        // 입력값 비우기 + 폼 닫기는 사용자 선택 — 일단 입력만 비움
-        if (codeEl) codeEl.value = '';
-        if (nameEl) nameEl.value = '';
-        if (idEl)   idEl.value = '';
-        setTimeout(() => { if (result) result.innerHTML = ''; }, 3000);
-      } else {
-        if (result) result.innerHTML = `<span class="text-red-400">실패: ${escapeHtml(r.reason || '알 수 없는 오류')}</span>`;
-      }
-    };
-  }
-
-  // 코드 수정 — 진입
-  document.querySelectorAll('.code-edit-btn').forEach(btn => {
-    btn.onclick = () => {
-      state.adminCodeEditKey = btn.dataset.codeEdit;
-      state.adminCodeAddOpen = false;
-      render();
-    };
-  });
-
-  // 코드 수정 — 취소
-  document.querySelectorAll('.code-cancel-btn').forEach(btn => {
-    btn.onclick = () => {
-      state.adminCodeEditKey = null;
-      render();
-    };
-  });
-
-  // 코드 수정 — 저장
-  document.querySelectorAll('.code-save-btn').forEach(btn => {
-    btn.onclick = async () => {
-      const key = btn.dataset.codeSave;
-      const row = btn.closest('.bg-slate-950');
-      if (!row) return;
-      const codeEl = row.querySelector('[data-edit-code]');
-      const nameEl = row.querySelector('[data-edit-name]');
-      const roleEl = row.querySelector('[data-edit-role]');
-      const result = row.querySelector(`[data-edit-result="${key}"]`);
-      const payload = {
-        code: codeEl?.value || '',
-        name: nameEl?.value || '',
-        role: roleEl?.value || 'normal',
-      };
-      if (result) result.innerHTML = '<span class="text-amber-400">저장 중...</span>';
-      const r = await saveAgencyCode(key, payload);
-      if (r.ok) {
-        // 수정 완료 → 인라인 폼 닫기 (Firebase 구독으로 자동 갱신됨)
-        state.adminCodeEditKey = null;
-        render();
-      } else {
-        if (result) result.innerHTML = `<span class="text-red-400">실패: ${escapeHtml(r.reason || '알 수 없는 오류')}</span>`;
-      }
-    };
-  });
-
-  // 코드 삭제
-  document.querySelectorAll('.code-del-btn').forEach(btn => {
-    btn.onclick = async () => {
-      const key   = btn.dataset.codeDel;
-      const label = btn.dataset.codeLabel || '';
-      const result = document.getElementById('admin-code-result');
-      if (!confirm(`관서 코드 "${label}" 을(를) 삭제하시겠습니까?\n\n· 해당 코드로는 더 이상 로그인할 수 없습니다.\n· 이미 진행 중인 재난(소속 관서 id 참조)은 안전하게 유지됩니다.\n· 이 작업은 되돌릴 수 없습니다.`)) return;
-      if (result) result.innerHTML = '<span class="text-amber-400">삭제 중...</span>';
-      const r = await deleteAgencyCode(key);
-      if (r.ok) {
-        if (result) result.innerHTML = `<span class="text-emerald-400">✓ "${escapeHtml(label)}" 삭제 완료</span>`;
-        setTimeout(() => { if (result) result.innerHTML = ''; }, 3000);
-      } else {
-        if (result) result.innerHTML = `<span class="text-red-400">실패: ${escapeHtml(r.reason || '알 수 없는 오류')}</span>`;
-      }
-    };
-  });
+async function serverAccess(path,body) {
+  const user=auth.currentUser,uid=secureIdentity?.uid;
+  if(!user || user.uid!==uid)throw Error('다시 로그인해주세요.');
+  const token=await user.getIdToken();
+  if(auth.currentUser?.uid!==uid || secureIdentity?.uid!==uid)throw Error('로그인이 변경되었습니다.');
+  const r=await fetch(path,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});
+  const result=await r.json();if(!r.ok)throw Error(result.error||'서버 연결에 실패했습니다.');
+  if(secureIdentity?.uid!==uid)throw Error('로그인이 변경되었습니다.');
+  return result;
 }
+async function refreshManagedCodes() {
+  if(secureIdentity?.role!=='admin')return;
+  try{
+    const result=await serverAccess('/api/admin/codes');
+    state.agencyCodesList=result.codes;AGENCY_CODES={};
+    result.codes.filter(r=>r.active && r.expiresAt>Date.now()).forEach(r=>{AGENCY_CODES[r.agencyId+':'+r.role]={id:r.agencyId,name:r.agencyName,role:r.role};});
+  }catch(e){state.managedCodeMessage=e.message;}
+  render();
+}
+function bindAdminAgencyCodesEvents() {
+  for(const [id,key] of [['managed-agency-id','agencyId'],['managed-agency-name','agencyName'],['managed-role','role'],['managed-days','days']]){const el=document.getElementById(id);if(el)el.oninput=()=>{state.managedCodeDraft={...(state.managedCodeDraft||{}),[key]:el.value};};}
+  const refresh=document.getElementById('managed-refresh');if(refresh)refresh.onclick=()=>void refreshManagedCodes();
+  const create=document.getElementById('managed-create');if(create)create.onclick=async()=>{
+    const body={action:'create',agencyId:document.getElementById('managed-agency-id').value.trim(),agencyName:document.getElementById('managed-agency-name').value.trim(),role:document.getElementById('managed-role').value,days:Number(document.getElementById('managed-days').value)};
+    if(state.managedCodeBusy)return;state.managedCodeBusy=true;create.disabled=true;create.textContent='발급 중...';state.managedCodeMessage='발급 중...';
+    try{state.issuedCode=await serverAccess('/api/admin/codes',body);state.managedCodeMessage='코드를 발급했습니다.';await refreshManagedCodes();}catch(e){state.managedCodeMessage=e.message;}finally{state.managedCodeBusy=false;render();}
+  };
+  document.querySelectorAll('[data-managed-revoke]').forEach(btn=>{btn.onclick=()=>{state.pendingCodeRevoke=btn.dataset.managedRevoke;render();};});
+  const cancel=document.getElementById('managed-cancel-revoke');if(cancel)cancel.onclick=()=>{state.pendingCodeRevoke=null;render();};
+  document.querySelectorAll('[data-managed-confirm]').forEach(btn=>{btn.onclick=async()=>{
+    btn.disabled=true;
+    try{await serverAccess('/api/admin/codes',{action:'revoke',id:btn.dataset.managedConfirm});state.pendingCodeRevoke=null;state.managedCodeMessage='코드를 폐기했습니다.';await refreshManagedCodes();}catch(e){state.managedCodeMessage=e.message;render();}
+  };});
+  const close=document.getElementById('managed-dismiss');if(close)close.onclick=()=>{state.issuedCode=null;render();};
+  const copy=document.getElementById('managed-copy');if(copy)copy.onclick=async()=>{try{await navigator.clipboard.writeText(state.issuedCode.code);copy.textContent='복사됨';}catch{state.managedCodeMessage='코드를 직접 선택해 복사해주세요.';render();}};
+}
+
 
 // ==================== V2 — 재난 생성/합류/이탈 ====================
 
@@ -4186,7 +4021,7 @@ function leaveIncident() {
   state.user = null;
   // 진입 시점의 view2로 복원
   state.view2 = state.session.role === 'admin' ? 'admin'
-              : state.session.role === 'observer' ? 'observer'
+              : ['observer','hq'].includes(state.session.role) ? 'observer'
               : 'lobby';
   localStorage.removeItem('disaster_currentIncidentId');
   localStorage.removeItem('disaster_user');
@@ -4547,10 +4382,20 @@ function bindMainEvents() {
   const openDisplayBtn = document.getElementById('open-display-btn');
   if (openDisplayBtn) {
     openDisplayBtn.onclick = () => {
-      const url = `${location.pathname}?popout=display&incident=${encodeURIComponent(state.currentIncidentId || '')}`;
-      // 같은 이름 재사용 → 이미 떠 있으면 새로 안 만들고 그 창을 다시 가리킴
-      window.open(url, 'mciDisplayPopout', 'popup=yes,width=1600,height=900');
+      const incidentId=state.currentIncidentId,nonce=crypto.randomUUID();
+      const url=`${location.pathname}?popout=display&nonce=${encodeURIComponent(nonce)}`;
+      const popup=window.open(url,'mciDisplay-'+nonce,'popup=yes,width=1600,height=900');
+      if(!popup){alert('표출 창을 열려면 팝업을 허용해주세요.');return;}
+      let timer;
+      const ready=async event=>{
+        if(event.origin!==location.origin || event.source!==popup || event.data?.type!=='mci-display-ready' || event.data.nonce!==nonce)return;
+        window.removeEventListener('message',ready);clearTimeout(timer);
+        try{const result=await serverAccess('/api/auth/display',{incidentId});popup.postMessage({type:'mci-display-token',nonce,token:result.token},location.origin);}catch(e){popup.close();alert(e.message);}
+      };
+      window.addEventListener('message',ready);
+      timer=setTimeout(()=>{window.removeEventListener('message',ready);},30000);
     };
+
   }
 
   // 관리 버튼은 observer에게는 숨겨져 있음 → null 체크
@@ -8256,7 +8101,7 @@ const HELP_CONTENT = {
         <ul class="space-y-1.5 text-slate-300">
           <li>📱 <strong>웹:</strong> <code class="text-cyan-300 bg-slate-800 px-2 py-0.5 rounded text-xs">https://mci2.visanu81.workers.dev</code></li>
           <li>🏠 <strong>휴대폰 홈에 설치:</strong> 첫 접속 시 하단에 "앱으로 설치하기" 핑크색 배너 → 탭하면 홈에 아이콘 생김</li>
-          <li>⚡ <strong>오프라인 가능:</strong> 한 번 설치하면 와이파이·LTE 끊겨도 화면 뜸 (동기화는 통신 복구 시)</li>
+          <li>⚡ <strong>통신 중단:</strong> 이미 열린 승인 세션의 카드 입력은 임시 보관 후 재전송합니다. 새 로그인과 앱 재시작에는 통신 연결이 필요합니다.</li>
         </ul>
       </section>
       <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
@@ -8265,10 +8110,10 @@ const HELP_CONTENT = {
           <table class="w-full text-xs">
             <thead><tr class="text-slate-500 border-b border-slate-800"><th class="text-left py-2 px-2">코드 종류</th><th class="text-left py-2 px-2">예시</th><th class="text-left py-2 px-2">권한</th></tr></thead>
             <tbody class="text-slate-300">
-              <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300 text-[10px] mono font-bold">NORMAL</span></td><td class="py-2 px-2 mono">동두천119, 양주119, 의정부119 등</td><td class="py-2 px-2">소속 관서 재난 입력·조회</td></tr>
-              <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-sky-900/40 text-sky-300 text-[10px] mono font-bold">OBSERVER</span></td><td class="py-2 px-2 mono">본부119</td><td class="py-2 px-2">모든 재난 읽기 전용</td></tr>
+              <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300 text-[10px] mono font-bold">NORMAL</span></td><td class="py-2 px-2 mono">관리자 발급 코드</td><td class="py-2 px-2">소속 관서 재난 입력·조회</td></tr>
+              <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-sky-900/40 text-sky-300 text-[10px] mono font-bold">OBSERVER</span></td><td class="py-2 px-2 mono">관리자 발급 코드</td><td class="py-2 px-2">소속 관서 읽기 전용</td></tr>
               <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-300 text-[10px] mono font-bold">ADMIN</span></td><td class="py-2 px-2 mono">*** (관리자 별도 안내)</td><td class="py-2 px-2">시스템 전권 (관서코드·강제종료·백업)</td></tr>
-              <tr><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-violet-900/40 text-violet-300 text-[10px] mono font-bold">DISPLAY</span></td><td class="py-2 px-2 mono">상황판119</td><td class="py-2 px-2">TV/모니터용 표출 화면</td></tr>
+              <tr class="border-b border-slate-800/50"><td class="py-2 px-2">HQ</td><td class="py-2 px-2">관리자 발급 코드</td><td class="py-2 px-2">모든 관서 읽기 전용</td></tr><tr><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-violet-900/40 text-violet-300 text-[10px] mono font-bold">DISPLAY</span></td><td class="py-2 px-2 mono">관리자 발급 / 입력 창에서 열기</td><td class="py-2 px-2">TV/모니터용 표출 화면</td></tr>
             </tbody>
           </table>
         </div>
@@ -8376,18 +8221,18 @@ const HELP_CONTENT = {
           <li><strong>새 재난 시작</strong> — 임의 관서 명의로 재난 생성 (관서 대행)</li>
           <li><strong>진행 중 재난</strong> — 모든 관서의 재난 목록, 클릭 진입 또는 [종료] 강제 종료</li>
           <li><strong>백업 이력</strong> — 종료된 재난의 자동 백업, 엑셀 다운로드·삭제</li>
-          <li><strong>관서 코드 관리</strong> — 코드 추가·수정·삭제 (CRUD)</li>
+          <li><strong>관서 코드 관리</strong> — 코드 발급·복사·폐기</li>
         </ol>
       </section>
 
       <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
         <h4 class="font-bold text-base mb-2">관서 코드 관리</h4>
-        <p class="text-slate-300 mb-2"><strong class="text-purple-300">+ 코드 추가</strong> 버튼:</p>
+        <p class="text-slate-300 mb-2"><strong class="text-purple-300">새 코드 발급</strong> 버튼:</p>
         <ul class="space-y-1.5 text-slate-300 ml-4 list-disc marker:text-purple-400">
-          <li><strong>진입 코드</strong> — 로그인할 때 입력하는 문자열 (예: 강남119)</li>
+          <li><strong>진입 코드</strong> — 서버가 무작위로 생성하며 발급 직후 한 번 표시됩니다. 복사하여 대상자에게 전달하세요.</li>
           <li><strong>표시명</strong> — 화면에 보일 짧은 이름 (예: 강남)</li>
-          <li><strong>id</strong> — 영문·숫자 (비워두면 <code class="bg-slate-800 px-1.5 py-0.5 rounded text-xs">auto_xxxxxx</code> 자동 생성). <em class="text-amber-300">생성 후 변경 불가</em></li>
-          <li><strong>역할</strong> — normal · observer · admin · display 중 선택</li>
+          <li><strong>관서 ID</strong> — 영문·숫자·_·-로 입력합니다. 같은 관서에 추가 코드를 발급할 때는 같은 ID를 사용합니다.</li>
+          <li><strong>역할</strong> — 일반 관서 · 관서 관찰자 · 표출 전용 · 관리자 · 본부 통합 관찰 중 선택합니다.</li><li><strong>유효기간</strong> — 1~30일. 폐기하면 이미 로그인한 단말도 접근이 차단됩니다.</li>
         </ul>
         <p class="text-[11px] text-slate-500 mt-2">⚠ 마지막 admin 코드는 삭제 불가 (시스템 잠금 방지)</p>
       </section>
@@ -8422,7 +8267,7 @@ const HELP_CONTENT = {
   `,
 
   observer: `
-    <h3 class="text-xl font-bold mb-3 text-sky-300">🔭 본부 — 관찰자 (본부119)</h3>
+    <h3 class="text-xl font-bold mb-3 text-sky-300">🔭 본부 통합 관찰 (HQ)</h3>
     <div class="space-y-4">
       <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
         <h4 class="font-bold text-base mb-2">권한 및 화면</h4>
@@ -8577,7 +8422,7 @@ const HELP_CONTENT = {
           새 코드를 추가하고 싶어요
         </summary>
         <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
-          관리자에게 요청하세요. 관리자 콘솔 → "관서 코드 관리" → "+ 코드 추가"에서 즉시 추가 가능합니다. 추가 즉시 모든 사용자에게 반영됨.
+          관리자에게 발급을 요청하세요. 관리자 콘솔 → "관서 진입 코드 관리" → "새 코드 발급"에서 코드를 만들고 대상자에게 전달합니다.
         </div>
       </details>
 
@@ -8698,6 +8543,16 @@ async function boot() {
   // 오프라인이거나 5초 안에 응답 없으면 일단 진행 (캐시 화면 표시).
   await authReady;
   secureSession?.start();
+  if(POPOUT_DISPLAY && window.opener){
+    const nonce=new URLSearchParams(location.search).get('nonce');
+    const accept=async event=>{
+      if(event.origin!==location.origin || event.source!==window.opener || event.data?.type!=='mci-display-token' || event.data.nonce!==nonce)return;
+      window.removeEventListener('message',accept);
+      try{await signInWithCustomToken(auth,event.data.token);}catch{startupError='표출 인증에 실패했습니다. 입력 창에서 다시 열어주세요.';render();}
+    };
+    window.addEventListener('message',accept);
+    window.opener.postMessage({type:'mci-display-ready',nonce},location.origin);
+  }
   render();
 
   // 오프라인 안전 큐: 부팅 시 미전송분 재전송 + 배지 + 온/오프라인 이벤트 + 주기 점검

@@ -11,12 +11,12 @@ let env;
 const now = Date.now();
 const card = (uid, name = '가상환자') => ({createdByUid:uid,updatedByUid:uid,timestamp:now-1000,name,triage:'urgent',rr:0,notes:'원본',cardPhoto:'PHOTO'});
 const record = (agencyId, uid) => ({agencyId,createdByUid:uid,title:'가상 재난',startedAt:now-10000,mciCasualties:{one:card(uid)},casualties:{one:card(uid)}});
-const session = (agencyId,role='normal',extra={}) => ({agencyId,role,active:true,environment:'test',expiresAt:now+3600000,...extra});
+const session = (agencyId,role='normal',extra={}) => ({agencyId,role,codeId:'base-code',active:true,environment:'test',expiresAt:now+3600000,...extra});
 const db = (uid, claims = {mci_env:'test'}) => uid ? env.authenticatedContext(uid,claims).database() : env.unauthenticatedContext().database();
 const at = (uid,path) => ref(db(uid),path);
 before(async()=>{
  env=await initializeTestEnvironment({projectId,database:{host:'127.0.0.1',port:19000,rules:fs.readFileSync('security/database.test.rules.json','utf8')}});
- await env.withSecurityRulesDisabled(async ctx=>set(ref(ctx.database()),{access:{alice:session('a'),bob:session('b'),peer:session('a'),reader:session('a','observer'),display:session('a','display'),admin:session('hq','admin'),expired:session('a','normal',{expiresAt:now-1}),revoked:session('a','normal',{active:false}),wrongEnv:session('a','normal',{environment:'production'})},mci2:{incidents:{a:record('a','alice'),b:record('b','bob'),closed:{...record('a','alice'),closedAt:now-10}},archives:{sample:{data:'가상 보관함'}},config:{agencyCodes:{secret:'fixture-only'}}}}));
+ await env.withSecurityRulesDisabled(async ctx=>set(ref(ctx.database()),{serverCodes:{'base-code':{active:true,expiresAt:now+3600000}},access:{alice:session('a'),bob:session('b'),peer:session('a'),reader:session('a','observer'),display:session('a','display'),admin:session('hq','admin'),expired:session('a','normal',{expiresAt:now-1}),revoked:session('a','normal',{active:false}),wrongEnv:session('a','normal',{environment:'production'})},mci2:{incidents:{a:record('a','alice'),b:record('b','bob'),closed:{...record('a','alice'),closedAt:now-10}},archives:{sample:{data:'가상 보관함'}},config:{agencyCodes:{secret:'fixture-only'}}}}));
 });
 after(async()=>{if(env)await env.cleanup();});
 for(const uid of [null,'unapproved','expired','revoked','wrongEnv']) {
@@ -75,4 +75,48 @@ test('revocation takes effect without changing token',async()=>{
  const r=at('peer','mci2/incidents/a/title');await assertSucceeds(get(r));
  await env.withSecurityRulesDisabled(ctx=>update(ref(ctx.database(),'access/peer'),{active:false}));
  await assertFails(update(at('peer','mci2/incidents/a/mciCasualties/one'),{notes:'after revoke',updatedByUid:'peer'}));
+});
+// Managed-code and delegated display-session boundaries.
+test('clients including admins cannot read server code records',async()=>{await assertFails(get(at('alice','serverCodes')));await assertFails(get(at('admin','serverCodes')));});
+test('code revocation cancels both active access and data reads',async()=>{
+ await env.withSecurityRulesDisabled(ctx=>update(ref(ctx.database()),{'serverCodes/managed':{active:true,expiresAt:Date.now()+60000},'access/managed-user':session('a','normal',{codeId:'managed'})}));
+ await assertSucceeds(get(at('managed-user','mci2/incidents/a')));
+ await assertSucceeds(get(at('managed-user','access/managed-user')));
+ await env.withSecurityRulesDisabled(ctx=>update(ref(ctx.database(),'serverCodes/managed'),{active:false}));
+ await assertFails(get(at('managed-user','mci2/incidents/a')));
+ await assertFails(get(at('managed-user','access/managed-user')));
+});
+test('expired code denies an otherwise valid grant',async()=>{
+ await env.withSecurityRulesDisabled(ctx=>update(ref(ctx.database()),{'serverCodes/expired-code':{active:true,expiresAt:Date.now()-1000},'access/expired-code-user':session('a','normal',{codeId:'expired-code'})}));
+ await assertFails(get(at('expired-code-user','mci2/incidents/a')));
+});
+test('delegated display can read only one incident and cannot write',async()=>{
+ await env.withSecurityRulesDisabled(ctx=>set(ref(ctx.database(),'access/delegated'),session('a','display',{parentUid:'alice',incidentId:'a'})));
+ await assertSucceeds(get(at('delegated','mci2/incidents/a')));
+ await assertFails(get(at('delegated','mci2/incidents/closed')));
+ await assertFails(get(query(at('delegated','mci2/incidents'),orderByChild('agencyId'),equalTo('a'))));
+ await assertFails(update(at('delegated','mci2/incidents/a'),{title:'forbidden'}));
+});
+test('parent revocation prevents delegated display access',async()=>{
+ await env.withSecurityRulesDisabled(ctx=>update(ref(ctx.database()),{'access/display-parent':session('a'),'access/child-display':session('a','display',{parentUid:'display-parent',incidentId:'a'})}));
+ await assertSucceeds(get(at('child-display','access/child-display')));
+ await env.withSecurityRulesDisabled(ctx=>update(ref(ctx.database(),'access/display-parent'),{active:false}));
+ await assertFails(get(at('child-display','access/child-display')));
+ await assertFails(get(at('child-display','mci2/incidents/a')));
+});
+
+test('legacy grants without managed code cannot access data or own grant',async()=>{
+ const legacy=session('a');delete legacy.codeId;
+ await env.withSecurityRulesDisabled(ctx=>set(ref(ctx.database(),'access/legacy'),legacy));
+ await assertFails(get(at('legacy','access/legacy')));
+ await assertFails(get(at('legacy','mci2/incidents/a')));
+});
+test('HQ has cross-agency read-only access without archive or code administration',async()=>{
+ await env.withSecurityRulesDisabled(ctx=>set(ref(ctx.database(),'access/hq-reader'),session('hq','hq')));
+ await assertSucceeds(get(at('hq-reader','mci2/incidents')));
+ await assertSucceeds(get(at('hq-reader','mci2/incidents/b')));
+ await assertFails(update(at('hq-reader','mci2/incidents/b'),{title:'forbidden'}));
+ await assertFails(set(at('hq-reader','mci2/incidents/hq-new'),record('hq','hq-reader')));
+ await assertFails(get(at('hq-reader','mci2/archives')));
+ await assertFails(get(at('hq-reader','serverCodes')));
 });

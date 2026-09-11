@@ -1,67 +1,58 @@
-# mci2 서버 인증 연결 검증
+# mci2 서버 인증·관서 코드 관리 검증
 
 2026-09-11. 브랜치 `codex/mci2-access-control`, PR #3.
 
-## 상태
+## 현재 상태
 
-서버 로그인 모듈을 Worker에, 서버 승인 세션을 실제 진입 화면에 연결했다. 이 브랜치는 아직 배포하지 않았다. 운영 mci와 현재 mci2는 이전 배포 상태를 유지한다.
+별도 Firebase 프로젝트 `mci2-secure-visanu81`에 웹 앱, 싱가포르 Realtime Database, Authentication과 접근 규칙을 구성했다. 이메일·익명 가입과 과금 연결은 비활성이다. 운영 프로젝트 `disester-f3669`는 변경하지 않았다.
 
-사용자의 새 프로젝트 생성 승인에 따라 `mci2-secure-visanu81`(MCI2 Secure Test)을 생성했다. 웹 앱과 싱가포르(asia-southeast1) Realtime Database를 만들고, `firebase.secure.json`으로 테스트 규칙을 배포했다. 서버에서 다시 읽은 규칙이 로컬 파일과 일치한다. Firebase Authentication을 초기화하고 이메일·익명 가입을 비활성화했다. 과금 연결은 비활성 상태(billingEnabled=false)다. 테스트 전용 `mci2-login` 서비스 계정을 만들고 이 프로젝트에만 `roles/firebasedatabase.admin` 역할을 부여했다. 키와 진입 코드 해시는 Cloudflare 후보 버전의 Secret에 연결했다. 보안 버전의 서비스 트래픽 전환은 아직 하지 않았다.
+최신 Cloudflare 후보 버전은 `da42a705-f659-413b-a22a-fa8610ff0700`(태그 managed-access-final)다. 서버 Secret과 코드를 `versions upload`로 함께 업로드했으며 서비스 트래픽은 전환하지 않았다. mci2 서비스 버전은 기존 `939f0bb6-e85c-4c34-8680-b9db6cad5cf2`를 유지한다. 후보 URL의 브라우저 Origin은 허용하지 않으므로 현장 로그인 주소로 안내하지 않는다.
 
-`security/database.test.rules.json`은 별도 테스트 프로젝트용이다. 기존 운영 프로젝트 disester-f3669에 적용하면 운영 접근을 차단하므로 적용하면 안 된다.
+## 구현한 권한과 화면
 
-## 연결한 동작
+- `/api/auth/login`: 무작위 진입 코드의 HMAC를 서버 전용 `serverCodes`에서 확인한다. 코드 원문·역할·관서 정보를 브라우저 입력에서 신뢰하지 않는다. 권한 기록을 저장한 후 custom token을 발급한다. 세션은 최대 12시간 또는 코드 만료까지다.
+- `/api/admin/codes`: 현재 승인된 관리자만 목록 조회, 무작위 코드 발급, 폐기를 할 수 있다. 새 코드는 192비트 난수이고 원문은 발급 응답에 한 번만 포함된다. 유효기간은 1~30일이다. 목록은 메타데이터만 반환하고 코드 원문은 복원하지 않는다.
+- 관리자 화면은 발급·복사·표시 닫기·폐기 확인/취소를 제공한다. 이전의 직접 코드 수정은 폐기 후 재발급으로 대체했다. 코드 목록에서 관서 디렉터리를 구성한다.
+- ETag 조건부 저장으로 동시 변경을 감지한다. 현재 로그인에 사용한 관리자 코드의 자기 폐기와 마지막 유효 관리자 코드 폐기를 방지한다.
+- 권한의 `codeId`와 코드 활성/만료를 매 DB 요청에서 확인한다. 코드 폐기 시 신규 로그인, 기존 단말의 읽기·쓰기, 연결된 표출 세션이 차단된다. 이전 후보의 관리 코드 없는 구형 토큰도 거부한다.
+- 일반 관서는 소속 관서에서 허용된 작업을 수행한다. 관서 관찰자(observer)는 소속 관서만 읽는다. 본부 관찰자(hq)는 모든 관서를 읽되 수정·코드 관리·보관함 접근은 할 수 없다. 관리자(admin)는 전체 관리 권한을 갖는다.
+- `/api/auth/display`: 승인된 일반 사용자/관리자가 지정한 재난에만 표출 세션을 발급한다. 새 UID, display 역할, 재난 ID, 부모 UID와 만료를 서버가 고정한다. 부모 권한 회수·만료와 코드 폐기가 표출 권한에도 적용된다.
+- 표출 창은 별도 Firebase 앱과 메모리 인증을 사용한다. 입력 창의 로그인을 교체하거나 입력 복구본을 덮어쓰지 않는다. 토큰은 URL·localStorage에 넣지 않고 출처·창·nonce를 확인한 postMessage로 전달한다. 새로고침 시 입력 창에서 다시 열도록 안내한다.
+- `/api/auth/config`는 공개 웹 설정만 반환하고 API 응답은 캐시하지 않는다. OCR는 Firebase 서명과 현재 서버 권한을 확인하며 normal/admin만 호출할 수 있다.
+- 카드 미전송 기록은 UID·관서·프로젝트에 연결한다. 다른 로그인으로 재전송하지 않고, 전송 토큰을 고정하여 계정 변경 중 다른 사용자 토큰으로 저장되는 일을 막는다. 권한 종료 때 MCI/일반 카드 초안은 복구 파일로 보존한다.
 
-- `/api/auth/config`: 공개 Firebase 웹 설정만 반환한다. mci2- 접두사의 별도 프로젝트와 일치하는 DB/인증 도메인만 허용한다. 미설정·운영 설정은 503으로 거부한다.
-- `/api/auth/login`: 브라우저가 보낸 코드만 서버 Secret의 HMAC와 비교한다. 클라이언트가 role/agencyId를 지정할 수 없다. 승인 권한 기록 저장 후 5분 유효 custom token을 발급한다. 코드 유효기간과 12시간 중 짧은 시간까지 단말별 권한을 승인한다.
-- 화면은 custom token으로 로그인하고 `/access/{uid}`의 서버 권한을 구독한다. 기존 익명 로그인, 공개 SEED 코드, localStorage 역할 복원을 제거했다. 재난 목록은 관서 조건으로 조회하고 보관함은 관리자만 구독한다.
-- 만료·회수·로그아웃 때 데이터 구독을 중단하고 목록을 비운다. 이전 구독에서 늦게 도착한 응답도 세대 번호로 차단한다.
-- 작성 중이던 MCI/일반 사상자 카드 초안은 복구용 JSON으로 보관한다. 저장소 오류 시 메모리 복구본을 유지하며 로그인 화면에서 내려받을 수 있다. 사고개요·피해·동원 등 모든 입력 폼의 복구를 구현한 것은 아니다.
-- 카드 신규 작성자/수정자 UID와 재난 생성자 UID를 기록한다. 다른 로그인·프로젝트·관서에 속한 미전송 작업은 보내지 않는다. 구형 mci2_outbox_v1은 건드리지 않고 mci2_secure_outbox_v1을 사용한다.
-- 카드 전송은 Firebase SDK의 지연 쓰기 대신 원래 사용자 ID 토큰을 고정한 REST 요청을 쓴다. 토큰 갱신 중 계정이 바뀌면 요청을 보내지 않는다. 서버에 이미 도착한 요청은 취소를 보장할 수 없지만 다른 로그인 토큰으로 재발행되지 않는다.
-- OCR는 테스트 Firebase 서명 토큰 외에 현재 서버 권한을 조회한다. 만료/회수 또는 읽기 전용 역할은 Anthropic 호출 전에 거부한다.
-- 인증 API는 no-store이며 서비스 워커도 /api/를 캐시하지 않는다. 앱 모듈 secure-session.js를 앱 셸에 추가했다. 초안 캐시 버전은 v95-secure-test다.
+## 검증 결과
 
-## 검증
+- DB Emulator: 69개 통과. 관서/역할/코드 만료·폐기, 구형 토큰 거부, 본부 읽기 범위, 표출의 재난 제한과 부모 권한 회수 포함.
+- 서버 로그인: 17개 통과.
+- 세션·Worker·프로젝트 설정: 32개 통과.
+- 코드 관리·표출 API: 14개 통과. 역할 위조, 다른 관서, 임의 코드 지정, 자기 폐기, ETag 충돌 포함.
+- HTML 저장 회귀: 19개 통과. 사진·0 보존, 저장소 오류·손상 큐 보존, 스크립트 구문 포함.
+- 실제 Firebase: 17개 통과. 관리자 코드 발급 → 새 코드 로그인 → 가상 재난 생성 → 본부 읽기/쓰기 차단 → 독립 표출 로그인 → 코드 폐기 → 실시간 세션 종료와 부모/표출 접근 차단. 구형 후보 토큰 거부도 확인했다.
+- 실제 Cloudflare 후보 `3e47083f-cf28-41ba-8b36-c2db6a5933ce`에서도 위 17개 흐름 통과. 이후 도움말·관리자 입력 보존을 반영한 최종 후보에서는 공개 설정·Origin 차단·토큰 발급/교환·자기 권한 조회 5개를 추가 확인했다. 실제 레이트 리미터와 Secret을 거쳤다. 테스트 요청에서 Cloudflare 전용 IP 헤더를 제거한 후 검증했다(로컬 모의 요청에만 해당 헤더를 설정한다).
+- 브라우저 가상 데이터: 관리자 로그인, 코드 발급, 일회 표시 닫기, 화면 내 폐기 확인, 폐기/만료 상태 표시를 확인했다. 목록 갱신 후 작성 중인 관서 정보가 보존되는 것도 확인했다. 입력 창에서 표출 버튼을 누른 후 입력 화면 유지도 확인했다. 현재 내부 브라우저에서 팝업 자식 창을 검사할 수 없어 실제 두 창의 postMessage 완료와 TV 화면은 별도 검증이 남았다.
+- Worker 업로드 성공: 37.11 KiB 번들. 정적 업로드에는 index.html, secure-session.js, sw.js 변경만 포함됐고 비밀 파일·tests·security 소스는 제외됐다.
+- 실제 시험은 생성한 가상 계정과 가상 재난만 사용했다. 검증용 데이터·계정·코드를 정리했고 운영 환자 데이터는 조회·복사하지 않았다.
 
-- `npm run test:rules`: Database Emulator 4.11.2, 62/62 통과(규칙 변경 없음).
-- `npm run test:auth`: 서버 코드 확인/토큰 발급, 17/17 통과(모듈 변경 없음).
-- `npm run test:safety`: 실제 HTML 저장 함수 회귀 검사, 19/19 통과.
-- `npm run test:session`: 브라우저 세션/재전송 및 Worker 인증·OCR 검사, 32/32 통과. 실제 생성한 일회성 RSA 키로 토큰 서명을 검증하고 외부 응답을 모의 구현한다.
-- 로컬 브라우저: 잘못된 코드 거부 → 정상 코드 로그인 → 관서 로비 → 재난 합류 → 구급팀장 선택 → 카드 메모 저장 → 사진·작성자 유지 확인. 권한 회수 후 로그인 화면과 카드 입력 복구 버튼 확인. REST 토큰 고정 전송 후에도 실제 화면 저장 결과 확인.
-- Workers dry-run 통과: AUTH_RATE_LIMIT(120회/60초), ASSETS, 27.23KiB Worker 번들. 실제 배포는 안 했다.
-- 모든 시험은 가상 데이터로 실행했다. 실제 환자 데이터 조회·복사는 하지 않았다.
+## 설정과 재검증
 
-## 실제 Firebase 및 Cloudflare 검증 (2026-09-11)
+테스트 서비스 계정 `mci2-login`은 새 프로젝트에서만 `roles/firebasedatabase.admin` 권한을 가진다. 키는 Git/정적 배포 제외 경로에 보관하고 Cloudflare의 `FIREBASE_SERVICE_ACCOUNT` Secret으로 사용한다. `MCI_CODE_PEPPER`도 Secret이다. `MCI_CODE_STORE=database`를 사용하며 기존 `MCI_LOGIN_RECORDS`는 현재 로그인 경로에서 사용하지 않는다.
 
-- 실제 Firebase 16개 검사 통과: 서비스 계정 OAuth, 잘못된 코드 거부, 3개 계정 로그인 및 실시간 권한 구독, 가상 재난·카드 저장/수정, 사진·0 보존, 관찰자 조회/쓰기 차단, 타 관서·미인증 조회 차단, 자기 권한 승격 차단, 회수·재로그인·만료.
-- Cloudflare 후보 URL 5개 검사 통과: 테스트 공개 설정, 허용되지 않은 Origin 차단, 실제 서버 Secret으로 custom token 발급, Firebase 교환, 자신의 서버 권한 읽기. 모의 레이트 리미터를 사용하는 로컬 검증과 달리 이 로그인 요청은 실제 Cloudflare에서 처리했다.
-- 두 검증 모두 가상 계정과 생성 데이터만 사용하고 정리했다. 기존 운영 데이터는 복사하거나 조회하지 않았다. 후보 URL의 브라우저 Origin은 허용하지 않으므로 이 URL을 현장 테스트용 로그인 주소로 안내하지 않는다.
-- 재실행: 서비스 계정 파일을 Git/배포 제외 경로에 준비하고 PowerShell에서 `$env:MCI_LIVE_TEST_PROJECT='mci2-secure-visanu81'; node tests/live-firebase.mjs`. 이 명령은 실제 테스트 프로젝트에 일시적인 검증 사용자와 데이터를 만들므로 기본 단위 테스트에는 포함하지 않는다.
+초기 일반·관찰자·관리자 코드 3개는 서버 코드 저장소로 이전했다. 유효기간은 2026-09-18 02:17 UTC까지다. 코드를 폐기하면 진행 중 로그인도 차단된다. 코드가 모두 만료된 경우 인증된 운영자의 서버 설정을 통한 복구 발급이 필요하다.
 
-## 구성한 리소스와 남은 서버 설정
+실제 검증은 기본 단위 테스트에서 자동 실행하지 않는다. 비공개 설정을 준비한 뒤 PowerShell에서 `$env:MCI_LIVE_TEST_PROJECT='mci2-secure-visanu81'; node tests/live-managed.mjs`를 실행한다. `MCI_LIVE_WORKER_URL`을 해당 mci2 후보 URL로 지정하면 Cloudflare를 경유한다. 대상 프로젝트와 후보 URL을 엄격히 제한한다. 기존 `tests/live-firebase.mjs`도 이 관리 코드 검증으로 연결된다.
 
-생성한 프로젝트 ID: `mci2-secure-visanu81`, 표시 이름 `MCI2 Secure Test`.
-기존 Firebase 프로젝트와 별개로 테스트 DB와 웹 앱을 구성했다. Firebase가 실제 발급한 인증 도메인은 `mci2--visanu81.firebaseapp.com`이며 해당 프로젝트에만 허용한다. 공개 웹 설정은 `security/firebase-web-config.json`과 Worker vars에 반영했다. 요금제 업그레이드·결제 연결·운영 데이터 복사는 하지 않는다.
+## 서비스 전환 전 남은 확인
 
-Worker Secret: FIREBASE_SERVICE_ACCOUNT(테스트 전용), MCI_CODE_PEPPER, MCI_LOGIN_RECORDS. 2026-09-11 후보 버전 `bce33644-11d8-4c31-9916-d3bc7e1f3e2f`에 저장했다. `versions upload --secrets-file`을 사용해 기존 mci2 배포를 전환하지 않았다. 현재 트래픽 버전은 `939f0bb6-e85c-4c34-8680-b9db6cad5cf2`다.
-공개 설정: FIREBASE_PROJECT_ID, FIREBASE_DATABASE_URL, FIREBASE_WEB_CONFIG, PUBLIC_ORIGIN.
-PUBLIC_ORIGIN은 https://mci2.visanu81.workers.dev만 허용한다.
-
-검증용 관서에 일반·관찰자·관리자 코드 3개를 각각 무작위 192비트로 발급했다. 유효기간은 2026-09-18 02:17 UTC까지다. 평문 코드는 Git/정적 배포에서 제외한 로컬 파일에만 보관하며, 서버에는 HMAC 해시를 저장했다. 기존 공개 관서명/관리자명 기반 코드는 재사용하지 않는다. 코드 폐기 시 이미 발급된 UID 권한도 회수해야 한다. 레이트 리미터 namespace_id 2026091101은 실제 적용 전에 계정 내 충돌 여부를 확인한다. 제한은 Cloudflare 위치별이며 전역의 정확한 제한이 아니다. 다수 단말이 같은 IP를 사용하는 현장 특성도 검증해야 한다.
-
-## 배포 전 남은 기능 검증
-
-1. 실제 별도 Firebase에서 custom token 교환, 권한 구독, 가상 카드 생성·조회·수정, 재로그인·회수·만료를 검증했다. 실제 모바일 UI를 통한 종합 검증과 역할별 전체 업무 검증은 남아 있다. 현재 테스트 규칙은 관리자 외 모든 역할을 단일 관서에 제한한다. 본부의 전 관서 모니터링은 승인된 읽기 범위에 맞춘 추가 설계가 필요하다.
-2. 관서 코드 관리 UI는 기존 DB 직접 변경을 막고 안내만 표시한다. 안전한 서버 관리 API·새 코드 발급 UI는 아직 연결하지 않았다. 관리자 관서 디렉터리도 새 서버 설정에서 제공해야 한다.
-3. 기존 팝아웃은 원창 Firebase 로그인을 공유한다. 독립된 표출 전용 서버 세션 발급과 원창 로그인 보존은 아직 검증되지 않았다. 이 흐름을 완료하기 전 기존 표출 기능과 동등하다고 볼 수 없다.
-4. 완전 오프라인 상태에서 앱을 새로 여는 경우 설정/서버 권한을 확인할 수 없어 새 로그인을 허용하지 않는다. 이미 열린 승인 세션의 카드 오프라인 큐와 별도로 현장 재시작 요구를 검토해야 한다.
-5. 새 프로젝트로 이전 데이터/미전송 작업을 자동 복사하지 않는다. 기존 큐를 보존하며 UID가 달라진 작업의 수동 확인·이관 절차가 필요하다. 사고개요·피해·동원 등 카드 외 쓰기는 기존 SDK 경로이므로 계정 변경·오프라인 재전송까지 별도 검증해야 한다.
-6. 모바일 두 단말, 권한 만료 중 입력, 동일 필드 충돌, 관리자 종료/보관/재개 흐름, 단말 공유 시 복구 파일 보존 정책을 검증한다. 이번 변경만으로 전체 운영 전환 준비가 끝난 것은 아니다.
+1. 실제 Chrome/Edge의 두 창에서 표출 토큰 전달·입력 로그인 보존·새로고침 안내와 모바일 화면을 검증한다.
+2. 사고개요·피해·동원·조치사항 등 카드 외 쓰기는 기존 Firebase SDK 경로다. 계정 변경·오프라인 재전송 및 해당 입력 폼 복구를 보강해야 한다.
+3. 관리자 종료/보관/재개와 두 단말의 동시 수정 흐름을 종합 검증한다. 같은 필드 충돌을 자동 병합하지 않는다.
+4. 완전 오프라인에서 앱을 새로 열면 서버 설정·권한을 확인할 수 없어 새 로그인을 허용하지 않는다. 이미 열린 승인 세션의 카드 큐와 별도로 현장 재시작 요구를 확인해야 한다.
+5. 이전 DB 데이터나 구형 미전송 큐를 새 프로젝트로 자동 복사하지 않는다. UID가 달라진 미전송 작업의 확인·이관 절차가 필요하다.
 
 ## 공식 참고
 
+- [Firebase 인증 지속성](https://firebase.google.com/docs/auth/web/auth-state-persistence)
+- [Realtime Database 조건부 저장](https://firebase.google.com/docs/database/rest/save-data)
 - [Firebase custom token](https://firebase.google.com/docs/auth/admin/create-custom-tokens)
-- [Realtime Database 규칙](https://firebase.google.com/docs/database/security/rules-conditions)
-- [Database Emulator](https://firebase.google.com/docs/emulator-suite/connect_rtdb)
-- [Workers 호출 제한](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
+- [Workers 버전과 Secret](https://developers.cloudflare.com/workers/configuration/secrets/)
