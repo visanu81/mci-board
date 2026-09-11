@@ -6,7 +6,7 @@
 
 서버 로그인 모듈을 Worker에, 서버 승인 세션을 실제 진입 화면에 연결했다. 이 브랜치는 아직 배포하지 않았다. 운영 mci와 현재 mci2는 이전 배포 상태를 유지한다.
 
-사용자의 새 프로젝트 생성 승인에 따라 `mci2-secure-visanu81`(MCI2 Secure Test)을 생성했다. 웹 앱과 싱가포르(asia-southeast1) Realtime Database를 만들고, `firebase.secure.json`으로 테스트 규칙을 배포했다. 서버에서 다시 읽은 규칙이 로컬 파일과 일치한다. Firebase Authentication을 초기화하고 이메일·익명 가입을 비활성화했다. 과금 연결은 비활성 상태(billingEnabled=false)다. 서비스 계정·키·새 진입 코드는 아직 생성하지 않았으며 Worker 보안 버전도 미배포다.
+사용자의 새 프로젝트 생성 승인에 따라 `mci2-secure-visanu81`(MCI2 Secure Test)을 생성했다. 웹 앱과 싱가포르(asia-southeast1) Realtime Database를 만들고, `firebase.secure.json`으로 테스트 규칙을 배포했다. 서버에서 다시 읽은 규칙이 로컬 파일과 일치한다. Firebase Authentication을 초기화하고 이메일·익명 가입을 비활성화했다. 과금 연결은 비활성 상태(billingEnabled=false)다. 테스트 전용 `mci2-login` 서비스 계정을 만들고 이 프로젝트에만 `roles/firebasedatabase.admin` 역할을 부여했다. 키와 진입 코드 해시는 Cloudflare 후보 버전의 Secret에 연결했다. 보안 버전의 서비스 트래픽 전환은 아직 하지 않았다.
 
 `security/database.test.rules.json`은 별도 테스트 프로젝트용이다. 기존 운영 프로젝트 disester-f3669에 적용하면 운영 접근을 차단하므로 적용하면 안 된다.
 
@@ -32,20 +32,27 @@
 - Workers dry-run 통과: AUTH_RATE_LIMIT(120회/60초), ASSETS, 27.23KiB Worker 번들. 실제 배포는 안 했다.
 - 모든 시험은 가상 데이터로 실행했다. 실제 환자 데이터 조회·복사는 하지 않았다.
 
+## 실제 Firebase 및 Cloudflare 검증 (2026-09-11)
+
+- 실제 Firebase 16개 검사 통과: 서비스 계정 OAuth, 잘못된 코드 거부, 3개 계정 로그인 및 실시간 권한 구독, 가상 재난·카드 저장/수정, 사진·0 보존, 관찰자 조회/쓰기 차단, 타 관서·미인증 조회 차단, 자기 권한 승격 차단, 회수·재로그인·만료.
+- Cloudflare 후보 URL 5개 검사 통과: 테스트 공개 설정, 허용되지 않은 Origin 차단, 실제 서버 Secret으로 custom token 발급, Firebase 교환, 자신의 서버 권한 읽기. 모의 레이트 리미터를 사용하는 로컬 검증과 달리 이 로그인 요청은 실제 Cloudflare에서 처리했다.
+- 두 검증 모두 가상 계정과 생성 데이터만 사용하고 정리했다. 기존 운영 데이터는 복사하거나 조회하지 않았다. 후보 URL의 브라우저 Origin은 허용하지 않으므로 이 URL을 현장 테스트용 로그인 주소로 안내하지 않는다.
+- 재실행: 서비스 계정 파일을 Git/배포 제외 경로에 준비하고 PowerShell에서 `$env:MCI_LIVE_TEST_PROJECT='mci2-secure-visanu81'; node tests/live-firebase.mjs`. 이 명령은 실제 테스트 프로젝트에 일시적인 검증 사용자와 데이터를 만들므로 기본 단위 테스트에는 포함하지 않는다.
+
 ## 구성한 리소스와 남은 서버 설정
 
 생성한 프로젝트 ID: `mci2-secure-visanu81`, 표시 이름 `MCI2 Secure Test`.
 기존 Firebase 프로젝트와 별개로 테스트 DB와 웹 앱을 구성했다. Firebase가 실제 발급한 인증 도메인은 `mci2--visanu81.firebaseapp.com`이며 해당 프로젝트에만 허용한다. 공개 웹 설정은 `security/firebase-web-config.json`과 Worker vars에 반영했다. 요금제 업그레이드·결제 연결·운영 데이터 복사는 하지 않는다.
 
-Worker Secret: FIREBASE_SERVICE_ACCOUNT(테스트 전용), MCI_CODE_PEPPER, MCI_LOGIN_RECORDS.
+Worker Secret: FIREBASE_SERVICE_ACCOUNT(테스트 전용), MCI_CODE_PEPPER, MCI_LOGIN_RECORDS. 2026-09-11 후보 버전 `bce33644-11d8-4c31-9916-d3bc7e1f3e2f`에 저장했다. `versions upload --secrets-file`을 사용해 기존 mci2 배포를 전환하지 않았다. 현재 트래픽 버전은 `939f0bb6-e85c-4c34-8680-b9db6cad5cf2`다.
 공개 설정: FIREBASE_PROJECT_ID, FIREBASE_DATABASE_URL, FIREBASE_WEB_CONFIG, PUBLIC_ORIGIN.
 PUBLIC_ORIGIN은 https://mci2.visanu81.workers.dev만 허용한다.
 
-진입 코드는 암호학적으로 무작위인 최소 128비트 값을 새로 발급한다. 기존 공개 관서명/관리자명 기반 코드는 재사용하지 않는다. 코드 폐기 시 이미 발급된 UID 권한도 회수해야 한다. 레이트 리미터 namespace_id 2026091101은 실제 적용 전에 계정 내 충돌 여부를 확인한다. 제한은 Cloudflare 위치별이며 전역의 정확한 제한이 아니다. 다수 단말이 같은 IP를 사용하는 현장 특성도 검증해야 한다.
+검증용 관서에 일반·관찰자·관리자 코드 3개를 각각 무작위 192비트로 발급했다. 유효기간은 2026-09-18 02:17 UTC까지다. 평문 코드는 Git/정적 배포에서 제외한 로컬 파일에만 보관하며, 서버에는 HMAC 해시를 저장했다. 기존 공개 관서명/관리자명 기반 코드는 재사용하지 않는다. 코드 폐기 시 이미 발급된 UID 권한도 회수해야 한다. 레이트 리미터 namespace_id 2026091101은 실제 적용 전에 계정 내 충돌 여부를 확인한다. 제한은 Cloudflare 위치별이며 전역의 정확한 제한이 아니다. 다수 단말이 같은 IP를 사용하는 현장 특성도 검증해야 한다.
 
 ## 배포 전 남은 기능 검증
 
-1. 실제 별도 Firebase에서 custom token 교환, 권한 구독, CRUD 및 재로그인을 종합 검증한다. 현재 테스트 규칙은 관리자 외 모든 역할을 단일 관서에 제한한다. 본부의 전 관서 모니터링은 승인된 읽기 범위에 맞춘 추가 설계가 필요하다.
+1. 실제 별도 Firebase에서 custom token 교환, 권한 구독, 가상 카드 생성·조회·수정, 재로그인·회수·만료를 검증했다. 실제 모바일 UI를 통한 종합 검증과 역할별 전체 업무 검증은 남아 있다. 현재 테스트 규칙은 관리자 외 모든 역할을 단일 관서에 제한한다. 본부의 전 관서 모니터링은 승인된 읽기 범위에 맞춘 추가 설계가 필요하다.
 2. 관서 코드 관리 UI는 기존 DB 직접 변경을 막고 안내만 표시한다. 안전한 서버 관리 API·새 코드 발급 UI는 아직 연결하지 않았다. 관리자 관서 디렉터리도 새 서버 설정에서 제공해야 한다.
 3. 기존 팝아웃은 원창 Firebase 로그인을 공유한다. 독립된 표출 전용 서버 세션 발급과 원창 로그인 보존은 아직 검증되지 않았다. 이 흐름을 완료하기 전 기존 표출 기능과 동등하다고 볼 수 없다.
 4. 완전 오프라인 상태에서 앱을 새로 여는 경우 설정/서버 권한을 확인할 수 없어 새 로그인을 허용하지 않는다. 이미 열린 승인 세션의 카드 오프라인 큐와 별도로 현장 재시작 요구를 검토해야 한다.

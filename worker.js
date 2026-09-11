@@ -9,8 +9,8 @@ import { validateTestConfig, isActiveGrant } from './secure-session.js';
    보안 구조:
    - Anthropic API 키는 Worker Secret(ANTHROPIC_API_KEY)에만 존재.
      클라이언트(index.html)에는 절대 노출되지 않음.
-   - 호출 자격: Firebase 익명 인증 토큰(Bearer)을 서버에서 직접 서명 검증.
-     우리 앱(disester-f3669 프로젝트)에서 발급된 유효 토큰만 통과.
+   - 호출 자격: Firebase 테스트 인증 토큰(Bearer)의 서명과 현재 서버 권한 검증.
+     별도 mci2 테스트 프로젝트의 승인된 쓰기 역할만 통과.
    - 추가 가드: 요청 크기 제한 + 사용자(uid)별 분당 호출 제한.
 
    키 등록(1회): Cloudflare 대시보드 → Workers & Pages → mci →
