@@ -12,5 +12,22 @@
   },
   "compatibility_flags": [
     "nodejs_compat"
-  ]
+  ],
+  "ratelimits": [
+    {
+      "name": "AUTH_RATE_LIMIT",
+      "namespace_id": "2026091101",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    }
+  ],
+  "vars": {
+    "FIREBASE_PROJECT_ID": "mci2-secure-visanu81",
+    "FIREBASE_DATABASE_URL": "https://mci2-secure-visanu81-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "FIREBASE_WEB_CONFIG": "{\"projectId\":\"mci2-secure-visanu81\",\"appId\":\"1:569718226021:web:4c4a358d5813aa7ed99a8c\",\"apiKey\":\"AIzaSyDzr3t2tzSye30mcVFaVQORU77eaKzKIiI\",\"authDomain\":\"mci2--visanu81.firebaseapp.com\",\"databaseURL\":\"https://mci2-secure-visanu81-default-rtdb.asia-southeast1.firebasedatabase.app\",\"storageBucket\":\"mci2-secure-visanu81.firebasestorage.app\",\"messagingSenderId\":\"569718226021\"}",
+    "PUBLIC_ORIGIN": "https://mci2.visanu81.workers.dev",
+    "MCI_CODE_STORE": "database"
+  }
 }

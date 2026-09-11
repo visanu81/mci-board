@@ -1,0 +1,350 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "access": {
+      "$uid": {
+        ".read": "(auth != null && auth.uid === $uid && auth.token.mci_env === 'test') && (root.child('access').child(auth.uid).child('codeId').exists() && (root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('active').val() === true && root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('expiresAt').val() > now)) && (!root.child('access').child(auth.uid).child('parentUid').exists() || (root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('active').val() === true && root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('expiresAt').val() > now))",
+        ".write": false
+      }
+    },
+    "mci2": {
+      "incidents": {
+        ".read": "(auth != null && auth.token.mci_env === 'test' && root.child('access').child(auth.uid).child('active').val() === true && root.child('access').child(auth.uid).child('environment').val() === 'test' && root.child('access').child(auth.uid).child('expiresAt').isNumber() && root.child('access').child(auth.uid).child('expiresAt').val() > now && ((root.child('access').child(auth.uid).child('role').val() === 'admin' || root.child('access').child(auth.uid).child('role').val() === 'hq') || ((root.child('access').child(auth.uid).child('role').val() === 'normal' || root.child('access').child(auth.uid).child('role').val() === 'observer' || root.child('access').child(auth.uid).child('role').val() === 'display') && query.orderByChild === 'agencyId' && query.equalTo === root.child('access').child(auth.uid).child('agencyId').val()))) && (root.child('access').child(auth.uid).child('codeId').exists() && (root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('active').val() === true && root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('expiresAt').val() > now)) && (!root.child('access').child(auth.uid).child('parentUid').exists() || (root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('active').val() === true && root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('expiresAt').val() > now)) && !root.child('access').child(auth.uid).child('incidentId').exists()",
+        ".indexOn": [
+          "agencyId",
+          "startedAt",
+          "closedAt"
+        ],
+        "$incidentId": {
+          ".read": "(auth != null && auth.token.mci_env === 'test' && root.child('access').child(auth.uid).child('active').val() === true && root.child('access').child(auth.uid).child('environment').val() === 'test' && root.child('access').child(auth.uid).child('expiresAt').isNumber() && root.child('access').child(auth.uid).child('expiresAt').val() > now && ((root.child('access').child(auth.uid).child('role').val() === 'admin' || root.child('access').child(auth.uid).child('role').val() === 'hq') || ((root.child('access').child(auth.uid).child('role').val() === 'normal' || root.child('access').child(auth.uid).child('role').val() === 'observer' || root.child('access').child(auth.uid).child('role').val() === 'display') && root.child('access').child(auth.uid).child('agencyId').val() === data.child('agencyId').val()))) && (root.child('access').child(auth.uid).child('codeId').exists() && (root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('active').val() === true && root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('expiresAt').val() > now)) && (!root.child('access').child(auth.uid).child('parentUid').exists() || (root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('active').val() === true && root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('expiresAt').val() > now)) && (!root.child('access').child(auth.uid).child('incidentId').exists() || root.child('access').child(auth.uid).child('incidentId').val() === $incidentId)",
+          ".write": "((auth != null && auth.token.mci_env === 'test' && root.child('access').child(auth.uid).child('active').val() === true && root.child('access').child(auth.uid).child('environment').val() === 'test' && root.child('access').child(auth.uid).child('expiresAt').isNumber() && root.child('access').child(auth.uid).child('expiresAt').val() > now && (root.child('access').child(auth.uid).child('role').val() === 'admin' || (root.child('access').child(auth.uid).child('role').val() === 'normal' && !data.exists() && newData.exists() && newData.child('agencyId').val() === root.child('access').child(auth.uid).child('agencyId').val() && newData.child('createdByUid').val() === auth.uid && !newData.child('closedAt').exists()))) && (root.child('access').child(auth.uid).child('codeId').exists() && (root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('active').val() === true && root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('expiresAt').val() > now)) && (!root.child('access').child(auth.uid).child('parentUid').exists() || (root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('active').val() === true && root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('expiresAt').val() > now))) && (!root.child('mci2').child('incidents').child($incidentId).child('closure').exists() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists())",
+          ".validate": "newData.hasChildren(['agencyId','createdByUid','title','startedAt']) && (!data.exists() || (newData.child('agencyId').val() === data.child('agencyId').val() && newData.child('createdByUid').val() === data.child('createdByUid').val())) && !newData.child('closure').exists() && !newData.child('closedAt').exists()",
+          "agencyId": {
+            ".validate": "newData.isString() && newData.val().length <= 50"
+          },
+          "createdByUid": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "title": {
+            ".validate": "newData.isString() && newData.val().length <= 200",
+            ".write": "((auth != null && auth.token.mci_env === 'test' && root.child('access').child(auth.uid).child('active').val() === true && root.child('access').child(auth.uid).child('environment').val() === 'test' && root.child('access').child(auth.uid).child('expiresAt').isNumber() && root.child('access').child(auth.uid).child('expiresAt').val() > now && (root.child('access').child(auth.uid).child('role').val() === 'admin' || (root.child('access').child(auth.uid).child('role').val() === 'normal' && root.child('access').child(auth.uid).child('agencyId').val() === root.child('mci2').child('incidents').child($incidentId).child('agencyId').val() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists()))) && (root.child('access').child(auth.uid).child('codeId').exists() && (root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('active').val() === true && root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('expiresAt').val() > now)) && (!root.child('access').child(auth.uid).child('parentUid').exists() || (root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('active').val() === true && root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('expiresAt').val() > now))) && (!root.child('mci2').child('incidents').child($incidentId).child('closure').exists() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists())"
+          },
+          "type": {
+            ".validate": "newData.isString() && newData.val().length <= 50",
+            ".write": "((auth != null && auth.token.mci_env === 'test' && root.child('access').child(auth.uid).child('active').val() === true && root.child('access').child(auth.uid).child('environment').val() === 'test' && root.child('access').child(auth.uid).child('expiresAt').isNumber() && root.child('access').child(auth.uid).child('expiresAt').val() > now && (root.child('access').child(auth.uid).child('role').val() === 'admin' || (root.child('access').child(auth.uid).child('role').val() === 'normal' && root.child('access').child(auth.uid).child('agencyId').val() === root.child('mci2').child('incidents').child($incidentId).child('agencyId').val() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists()))) && (root.child('access').child(auth.uid).child('codeId').exists() && (root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('active').val() === true && root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('expiresAt').val() > now)) && (!root.child('access').child(auth.uid).child('parentUid').exists() || (root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('active').val() === true && root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('expiresAt').val() > now))) && (!root.child('mci2').child('incidents').child($incidentId).child('closure').exists() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists())"
+          },
+          "startedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "createdBy": {
+            ".validate": "newData.isString() && newData.val().length <= 100"
+          },
+          "closedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "closedBy": {
+            ".validate": "newData.isString() && newData.val().length <= 100"
+          },
+          "lastActivityAt": {
+            ".write": "((auth != null && auth.token.mci_env === 'test' && root.child('access').child(auth.uid).child('active').val() === true && root.child('access').child(auth.uid).child('environment').val() === 'test' && root.child('access').child(auth.uid).child('expiresAt').isNumber() && root.child('access').child(auth.uid).child('expiresAt').val() > now && (root.child('access').child(auth.uid).child('role').val() === 'admin' || (root.child('access').child(auth.uid).child('role').val() === 'normal' && root.child('access').child(auth.uid).child('agencyId').val() === root.child('mci2').child('incidents').child($incidentId).child('agencyId').val() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists()))) && (root.child('access').child(auth.uid).child('codeId').exists() && (root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('active').val() === true && root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('expiresAt').val() > now)) && (!root.child('access').child(auth.uid).child('parentUid').exists() || (root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('active').val() === true && root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('expiresAt').val() > now))) && (!root.child('mci2').child('incidents').child($incidentId).child('closure').exists() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists())",
+            ".validate": "newData.isNumber()"
+          },
+          "incident": {
+            ".write": "((auth != null && auth.token.mci_env === 'test' && root.child('access').child(auth.uid).child('active').val() === true && root.child('access').child(auth.uid).child('environment').val() === 'test' && root.child('access').child(auth.uid).child('expiresAt').isNumber() && root.child('access').child(auth.uid).child('expiresAt').val() > now && (root.child('access').child(auth.uid).child('role').val() === 'admin' || (root.child('access').child(auth.uid).child('role').val() === 'normal' && root.child('access').child(auth.uid).child('agencyId').val() === root.child('mci2').child('incidents').child($incidentId).child('agencyId').val() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists()))) && (root.child('access').child(auth.uid).child('codeId').exists() && (root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('active').val() === true && root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('expiresAt').val() > now)) && (!root.child('access').child(auth.uid).child('parentUid').exists() || (root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('active').val() === true && root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('expiresAt').val() > now))) && (!root.child('mci2').child('incidents').child($incidentId).child('closure').exists() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists())",
+            "$field": {
+              ".validate": "(newData.isString() && newData.val().length <= 5000) || ($field === '_at' && newData.isNumber())"
+            }
+          },
+          "damages": {
+            ".write": "((auth != null && auth.token.mci_env === 'test' && root.child('access').child(auth.uid).child('active').val() === true && root.child('access').child(auth.uid).child('environment').val() === 'test' && root.child('access').child(auth.uid).child('expiresAt').isNumber() && root.child('access').child(auth.uid).child('expiresAt').val() > now && (root.child('access').child(auth.uid).child('role').val() === 'admin' || (root.child('access').child(auth.uid).child('role').val() === 'normal' && root.child('access').child(auth.uid).child('agencyId').val() === root.child('mci2').child('incidents').child($incidentId).child('agencyId').val() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists()))) && (root.child('access').child(auth.uid).child('codeId').exists() && (root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('active').val() === true && root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('expiresAt').val() > now)) && (!root.child('access').child(auth.uid).child('parentUid').exists() || (root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('active').val() === true && root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('expiresAt').val() > now))) && (!root.child('mci2').child('incidents').child($incidentId).child('closure').exists() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists())"
+          },
+          "mobilizations": {
+            ".write": "((auth != null && auth.token.mci_env === 'test' && root.child('access').child(auth.uid).child('active').val() === true && root.child('access').child(auth.uid).child('environment').val() === 'test' && root.child('access').child(auth.uid).child('expiresAt').isNumber() && root.child('access').child(auth.uid).child('expiresAt').val() > now && (root.child('access').child(auth.uid).child('role').val() === 'admin' || (root.child('access').child(auth.uid).child('role').val() === 'normal' && root.child('access').child(auth.uid).child('agencyId').val() === root.child('mci2').child('incidents').child($incidentId).child('agencyId').val() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists()))) && (root.child('access').child(auth.uid).child('codeId').exists() && (root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('active').val() === true && root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('expiresAt').val() > now)) && (!root.child('access').child(auth.uid).child('parentUid').exists() || (root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('active').val() === true && root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('expiresAt').val() > now))) && (!root.child('mci2').child('incidents').child($incidentId).child('closure').exists() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists())"
+          },
+          "actions": {
+            ".write": "((auth != null && auth.token.mci_env === 'test' && root.child('access').child(auth.uid).child('active').val() === true && root.child('access').child(auth.uid).child('environment').val() === 'test' && root.child('access').child(auth.uid).child('expiresAt').isNumber() && root.child('access').child(auth.uid).child('expiresAt').val() > now && (root.child('access').child(auth.uid).child('role').val() === 'admin' || (root.child('access').child(auth.uid).child('role').val() === 'normal' && root.child('access').child(auth.uid).child('agencyId').val() === root.child('mci2').child('incidents').child($incidentId).child('agencyId').val() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists()))) && (root.child('access').child(auth.uid).child('codeId').exists() && (root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('active').val() === true && root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('expiresAt').val() > now)) && (!root.child('access').child(auth.uid).child('parentUid').exists() || (root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('active').val() === true && root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('expiresAt').val() > now))) && (!root.child('mci2').child('incidents').child($incidentId).child('closure').exists() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists())"
+          },
+          "casualties": {
+            "$cardId": {
+              ".write": "((auth != null && auth.token.mci_env === 'test' && root.child('access').child(auth.uid).child('active').val() === true && root.child('access').child(auth.uid).child('environment').val() === 'test' && root.child('access').child(auth.uid).child('expiresAt').isNumber() && root.child('access').child(auth.uid).child('expiresAt').val() > now && (root.child('access').child(auth.uid).child('role').val() === 'admin' || (root.child('access').child(auth.uid).child('role').val() === 'normal' && root.child('access').child(auth.uid).child('agencyId').val() === root.child('mci2').child('incidents').child($incidentId).child('agencyId').val() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists())) && (newData.exists() || root.child('access').child(auth.uid).child('role').val() === 'admin' || data.child('createdByUid').val() === auth.uid)) && (root.child('access').child(auth.uid).child('codeId').exists() && (root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('active').val() === true && root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('expiresAt').val() > now)) && (!root.child('access').child(auth.uid).child('parentUid').exists() || (root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('active').val() === true && root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('expiresAt').val() > now))) && (!root.child('mci2').child('incidents').child($incidentId).child('closure').exists() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists())",
+              ".validate": "newData.hasChildren(['createdByUid','updatedByUid','timestamp','name','triage']) && newData.child('updatedByUid').val() === auth.uid && ((!data.exists() && newData.child('createdByUid').val() === auth.uid) || (data.exists() && newData.child('createdByUid').val() === data.child('createdByUid').val() && newData.child('timestamp').val() === data.child('timestamp').val()))",
+              "createdByUid": {
+                ".validate": "newData.isString() && newData.val().length <= 128"
+              },
+              "updatedByUid": {
+                ".validate": "newData.isString() && newData.val().length <= 128"
+              },
+              "timestamp": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= now"
+              },
+              "cardNo": {
+                ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= 999999"
+              },
+              "triage": {
+                ".validate": "newData.val() === 'emergency' || newData.val() === 'urgent' || newData.val() === 'nonurgent' || newData.val() === 'dead'"
+              },
+              "name": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "age": {
+                ".validate": "newData.isString() && newData.val().length <= 30"
+              },
+              "gender": {
+                ".validate": "newData.isString() && newData.val().length <= 10"
+              },
+              "notes": {
+                ".validate": "newData.isString() && newData.val().length <= 3000"
+              },
+              "symptom": {
+                ".validate": "newData.isString() && newData.val().length <= 1000"
+              },
+              "location": {
+                ".validate": "newData.isString() && newData.val().length <= 500"
+              },
+              "hospital": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "mechanism": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "drugs": {
+                ".validate": "newData.isString() && newData.val().length <= 500"
+              },
+              "cardPhoto": {
+                ".validate": "newData.isString() && newData.val().length <= 2000000"
+              },
+              "patientPhoto": {
+                ".validate": "newData.isString() && newData.val().length <= 2000000"
+              },
+              "$other": {
+                ".validate": false
+              },
+              "handoverUnit": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "handoverTime": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "departTime": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "arriveTime": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "consciousness": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "notTransportedReason": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "teamId": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "author": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "_updatedBy": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "_updatedTeamId": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "isPediatric": {
+                ".validate": "newData.isBoolean()"
+              },
+              "isFirefighter": {
+                ".validate": "newData.isBoolean()"
+              },
+              "notTransported": {
+                ".validate": "newData.isBoolean()"
+              },
+              "_autoNamed": {
+                ".validate": "newData.isBoolean()"
+              },
+              "rr": {
+                ".validate": "(newData.isNumber() && newData.val() >= 0 && newData.val() <= 400) || (newData.isString() && newData.val().length <= 10)"
+              },
+              "pulse": {
+                ".validate": "(newData.isNumber() && newData.val() >= 0 && newData.val() <= 400) || (newData.isString() && newData.val().length <= 10)"
+              },
+              "bpSys": {
+                ".validate": "(newData.isNumber() && newData.val() >= 0 && newData.val() <= 400) || (newData.isString() && newData.val().length <= 10)"
+              },
+              "bpDia": {
+                ".validate": "(newData.isNumber() && newData.val() >= 0 && newData.val() <= 400) || (newData.isString() && newData.val().length <= 10)"
+              },
+              "spo2": {
+                ".validate": "(newData.isNumber() && newData.val() >= 0 && newData.val() <= 400) || (newData.isString() && newData.val().length <= 10)"
+              },
+              "temp": {
+                ".validate": "(newData.isNumber() && newData.val() >= 0 && newData.val() <= 400) || (newData.isString() && newData.val().length <= 10)"
+              },
+              "_updatedAt": {
+                ".validate": "newData.isNumber() && newData.val() <= now"
+              },
+              "injuryParts": {
+                ".validate": true,
+                "$index": {
+                  ".validate": "$index.matches(/^([0-9]|[12][0-9])$/) && newData.isString() && newData.val().length <= 100"
+                }
+              },
+              "treatments": {
+                ".validate": true,
+                "$index": {
+                  ".validate": "$index.matches(/^([0-9]|[12][0-9])$/) && newData.isString() && newData.val().length <= 100"
+                }
+              }
+            }
+          },
+          "mciCasualties": {
+            "$cardId": {
+              ".write": "((auth != null && auth.token.mci_env === 'test' && root.child('access').child(auth.uid).child('active').val() === true && root.child('access').child(auth.uid).child('environment').val() === 'test' && root.child('access').child(auth.uid).child('expiresAt').isNumber() && root.child('access').child(auth.uid).child('expiresAt').val() > now && (root.child('access').child(auth.uid).child('role').val() === 'admin' || (root.child('access').child(auth.uid).child('role').val() === 'normal' && root.child('access').child(auth.uid).child('agencyId').val() === root.child('mci2').child('incidents').child($incidentId).child('agencyId').val() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists())) && (newData.exists() || root.child('access').child(auth.uid).child('role').val() === 'admin' || data.child('createdByUid').val() === auth.uid)) && (root.child('access').child(auth.uid).child('codeId').exists() && (root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('active').val() === true && root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('expiresAt').val() > now)) && (!root.child('access').child(auth.uid).child('parentUid').exists() || (root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('active').val() === true && root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('expiresAt').val() > now))) && (!root.child('mci2').child('incidents').child($incidentId).child('closure').exists() && !root.child('mci2').child('incidents').child($incidentId).child('closedAt').exists())",
+              ".validate": "newData.hasChildren(['createdByUid','updatedByUid','timestamp','name','triage']) && newData.child('updatedByUid').val() === auth.uid && ((!data.exists() && newData.child('createdByUid').val() === auth.uid) || (data.exists() && newData.child('createdByUid').val() === data.child('createdByUid').val() && newData.child('timestamp').val() === data.child('timestamp').val()))",
+              "createdByUid": {
+                ".validate": "newData.isString() && newData.val().length <= 128"
+              },
+              "updatedByUid": {
+                ".validate": "newData.isString() && newData.val().length <= 128"
+              },
+              "timestamp": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= now"
+              },
+              "cardNo": {
+                ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= 999999"
+              },
+              "triage": {
+                ".validate": "newData.val() === 'emergency' || newData.val() === 'urgent' || newData.val() === 'nonurgent' || newData.val() === 'dead'"
+              },
+              "name": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "age": {
+                ".validate": "newData.isString() && newData.val().length <= 30"
+              },
+              "gender": {
+                ".validate": "newData.isString() && newData.val().length <= 10"
+              },
+              "notes": {
+                ".validate": "newData.isString() && newData.val().length <= 3000"
+              },
+              "symptom": {
+                ".validate": "newData.isString() && newData.val().length <= 1000"
+              },
+              "location": {
+                ".validate": "newData.isString() && newData.val().length <= 500"
+              },
+              "hospital": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "mechanism": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "drugs": {
+                ".validate": "newData.isString() && newData.val().length <= 500"
+              },
+              "cardPhoto": {
+                ".validate": "newData.isString() && newData.val().length <= 2000000"
+              },
+              "patientPhoto": {
+                ".validate": "newData.isString() && newData.val().length <= 2000000"
+              },
+              "$other": {
+                ".validate": false
+              },
+              "handoverUnit": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "handoverTime": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "departTime": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "arriveTime": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "consciousness": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "notTransportedReason": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "teamId": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "author": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "_updatedBy": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "_updatedTeamId": {
+                ".validate": "newData.isString() && newData.val().length <= 100"
+              },
+              "isPediatric": {
+                ".validate": "newData.isBoolean()"
+              },
+              "isFirefighter": {
+                ".validate": "newData.isBoolean()"
+              },
+              "notTransported": {
+                ".validate": "newData.isBoolean()"
+              },
+              "_autoNamed": {
+                ".validate": "newData.isBoolean()"
+              },
+              "rr": {
+                ".validate": "(newData.isNumber() && newData.val() >= 0 && newData.val() <= 400) || (newData.isString() && newData.val().length <= 10)"
+              },
+              "pulse": {
+                ".validate": "(newData.isNumber() && newData.val() >= 0 && newData.val() <= 400) || (newData.isString() && newData.val().length <= 10)"
+              },
+              "bpSys": {
+                ".validate": "(newData.isNumber() && newData.val() >= 0 && newData.val() <= 400) || (newData.isString() && newData.val().length <= 10)"
+              },
+              "bpDia": {
+                ".validate": "(newData.isNumber() && newData.val() >= 0 && newData.val() <= 400) || (newData.isString() && newData.val().length <= 10)"
+              },
+              "spo2": {
+                ".validate": "(newData.isNumber() && newData.val() >= 0 && newData.val() <= 400) || (newData.isString() && newData.val().length <= 10)"
+              },
+              "temp": {
+                ".validate": "(newData.isNumber() && newData.val() >= 0 && newData.val() <= 400) || (newData.isString() && newData.val().length <= 10)"
+              },
+              "_updatedAt": {
+                ".validate": "newData.isNumber() && newData.val() <= now"
+              },
+              "injuryParts": {
+                ".validate": true,
+                "$index": {
+                  ".validate": "$index.matches(/^([0-9]|[12][0-9])$/) && newData.isString() && newData.val().length <= 100"
+                }
+              },
+              "treatments": {
+                ".validate": true,
+                "$index": {
+                  ".validate": "$index.matches(/^([0-9]|[12][0-9])$/) && newData.isString() && newData.val().length <= 100"
+                }
+              }
+            }
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "archives": {
+        ".read": "(auth != null && auth.token.mci_env === 'test' && root.child('access').child(auth.uid).child('active').val() === true && root.child('access').child(auth.uid).child('environment').val() === 'test' && root.child('access').child(auth.uid).child('expiresAt').isNumber() && root.child('access').child(auth.uid).child('expiresAt').val() > now && root.child('access').child(auth.uid).child('role').val() === 'admin') && (root.child('access').child(auth.uid).child('codeId').exists() && (root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('active').val() === true && root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('expiresAt').val() > now)) && (!root.child('access').child(auth.uid).child('parentUid').exists() || (root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('active').val() === true && root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('expiresAt').val() > now))",
+        ".write": false,
+        "$archiveId": {
+          ".write": "((auth != null && auth.token.mci_env === 'test' && root.child('access').child(auth.uid).child('active').val() === true && root.child('access').child(auth.uid).child('environment').val() === 'test' && root.child('access').child(auth.uid).child('expiresAt').isNumber() && root.child('access').child(auth.uid).child('expiresAt').val() > now && root.child('access').child(auth.uid).child('role').val() === 'admin') && (root.child('access').child(auth.uid).child('codeId').exists() && (root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('active').val() === true && root.child('serverCodes').child(root.child('access').child(auth.uid).child('codeId').val()).child('expiresAt').val() > now)) && (!root.child('access').child(auth.uid).child('parentUid').exists() || (root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('active').val() === true && root.child('access').child(root.child('access').child(auth.uid).child('parentUid').val()).child('expiresAt').val() > now))) && !$archiveId.beginsWith('close-') && !data.child('closureId').exists() && !newData.child('closureId').exists()"
+        }
+      },
+      "config": {
+        ".read": false,
+        ".write": false
+      }
+    }
+  }
+}

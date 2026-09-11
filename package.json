@@ -1,0 +1,22 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:ocr": "node --test tests/ocr-review.test.mjs tests/worker-auth.test.mjs",
+    "test:safety": "node tests/run.mjs",
+    "test:rules": "firebase emulators:exec --config firebase.emulator.json --project demo-mci-access --only database \"node --test tests/access-rules.test.mjs\"",
+    "test:auth": "node --test tests/agency-login.test.mjs",
+    "test:session": "node --test tests/secure-session.test.mjs tests/worker-auth.test.mjs tests/provision-config.test.mjs",
+    "test:management": "node --test tests/access-management.test.mjs",
+    "test:close": "node --test tests/incident-close.test.mjs",
+    "test:display": "node --test tests/display-session.test.mjs",
+    "test:conflict": "node --test tests/card-conflict.test.mjs",
+    "test:lifecycle": "node --test tests/card-lifecycle.test.mjs",
+    "test:workspace": "node --test tests/workspace.test.mjs tests/field-workspace.test.mjs"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.2",
+    "firebase": "12.19.0",
+    "firebase-tools": "15.30.0"
+  }
+}

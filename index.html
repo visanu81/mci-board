@@ -679,6 +679,108 @@
   .display-hospital-grid::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
   .display-hospital-grid::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
   .display-hospital-grid::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+/* Task-oriented MCI navigation */
+.workspace-header{position:sticky;top:0;z-index:30;background:#0b1220;border-bottom:1px solid #334155}
+.workspace-heading{max-width:1024px;margin:auto;padding:16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.workspace-eyebrow{font-size:11px;color:#93c5fd;font-weight:700;letter-spacing:.08em}
+.workspace-connection{font-size:12px;color:#cbd5e1;max-width:130px;text-align:right;flex-shrink:0}
+.workspace-nav{max-width:1024px;margin:auto;display:flex;background:#0f172a}
+.workspace-nav button{flex:1;min-height:56px;display:flex;align-items:center;justify-content:center;gap:8px;color:#94a3b8;font-size:14px;border-bottom:3px solid transparent}
+.workspace-nav button.is-current{color:#93c5fd;background:#172554;border-color:#60a5fa;font-weight:700}
+.workspace-page{padding:20px 16px;display:grid;gap:16px}
+.workspace-button,.workspace-primary,.workspace-actions button{min-height:44px;padding:10px 14px;border-radius:10px;font-size:14px;font-weight:600;background:#1e293b;color:#e2e8f0;border:1px solid #475569}
+.workspace-primary{background:#2563eb;color:white;border-color:#3b82f6;flex-shrink:0}
+.workspace-primary:disabled{opacity:.55}
+.workspace-actions{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.workspace-filters{display:flex;flex-wrap:wrap;gap:12px}
+.workspace-filters label{flex:1;min-width:130px;font-size:14px;color:#cbd5e1;display:grid;gap:6px}
+.workspace-filters input,.workspace-filters select{min-height:44px;width:100%;min-width:0;background:#0b1220;border:1px solid #475569;border-radius:8px;padding:10px;color:#f1f5f9;font-size:16px}
+.workspace-patients{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
+.workspace-patient{padding:16px;border:1px solid #334155;border-radius:14px;background:#111c2e;overflow-wrap:anywhere}
+.field-summary{padding-bottom:0}
+#camera-crop-wrap{position:relative;max-width:100%;line-height:0}
+#camera-preview-img{display:block;max-width:100%;max-height:calc(100dvh - 370px);object-fit:contain}
+#camera-crop-outline{position:absolute;inset:0;border:3px solid #60a5fa;box-shadow:0 0 0 100vmax #0008;pointer-events:none}
+#camera-preview{overflow:hidden}
+.ocr-crop-controls{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:13px}
+.ocr-crop-controls label{display:flex;align-items:center;gap:6px;min-width:0}.ocr-crop-controls input{min-width:0;width:100%;height:32px}
+.ocr-review-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}.ocr-review-grid img{max-width:100%;max-height:60vh;object-fit:contain}
+.ocr-review-row{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;border-bottom:1px solid #334155;padding:10px 0}.ocr-review-row input[type=checkbox]{width:24px;height:24px;margin-top:12px}
+.ocr-review-row input:not([type=checkbox]),.ocr-review-row select{background:#0f172a;border:1px solid #64748b;border-radius:6px;padding:8px;color:#f1f5f9;font-size:16px;width:100%;min-width:0;min-height:44px}
+.ocr-review-row label{font-size:14px}.ocr-review-row small{display:block;color:#cbd5e1}
+#camera-message{z-index:5}#camera-modal button{min-height:44px}#camera-modal>div:last-of-type{max-height:46vh;overflow:auto}
+body.outdoor-mode #camera-modal .bg-slate-950{background:#020617!important;color:#f1f5f9!important}
+body.outdoor-mode #camera-modal .bg-slate-800,body.outdoor-mode #camera-modal .bg-slate-700{background:#1e293b!important;color:#f1f5f9!important}
+#camera-engine,#camera-original-link{color:#93c5fd!important}
+@media(max-width:700px){.ocr-review-grid{grid-template-columns:1fr}.ocr-review-grid img{max-height:30vh}.ocr-review-grid>div:first-child{position:sticky;top:-16px;background:#020617;z-index:1}}
+.display-incident-info{flex-shrink:0;margin-bottom:16px;padding:12px 16px;border:1px solid #475569;border-radius:12px;background:#111c2e;max-height:24vh;overflow:auto;font-size:clamp(16px,1.05vw,22px);line-height:1.5}
+.display-incident-facts{display:grid;grid-template-columns:minmax(180px,1fr) minmax(0,2fr) minmax(0,1fr);gap:8px 20px}
+.display-incident-facts>div{min-width:0;overflow-wrap:anywhere}
+.display-incident-info dt,.display-incident-label{color:#93c5fd;font-weight:700;font-size:.85em;margin-right:8px}
+.display-incident-info dt,.display-incident-info dd{display:inline}
+.display-incident-extra{margin-top:6px;overflow-wrap:anywhere;white-space:pre-wrap}
+.display-incident-overview{margin-top:8px;padding-top:8px;border-top:1px solid #334155;white-space:pre-wrap;overflow-wrap:anywhere}
+body.outdoor-mode .display-incident-info{background:#fff;color:#0f172a;border-color:#94a3b8}
+body.outdoor-mode .display-incident-info dt,body.outdoor-mode .display-incident-label{color:#1d4ed8}
+body.outdoor-mode .display-incident-overview{border-color:#cbd5e1}
+@media(max-width:900px){.display-incident-facts{grid-template-columns:minmax(0,1fr) minmax(0,2fr)}.display-incident-facts>div:last-child{grid-column:1/-1}}
+.field-facts{display:grid;gap:8px;margin-top:12px;font-size:14px}
+.field-facts>div{display:grid;grid-template-columns:84px minmax(0,1fr);gap:10px}
+.field-facts dt{color:#94a3b8}.field-facts dd{white-space:pre-wrap;overflow-wrap:anywhere}
+.field-summary-text{font-size:14px;line-height:1.6;margin-top:10px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:4.8em;overflow:auto}
+.field-tabs{display:flex;flex-wrap:wrap;gap:8px}
+.field-tabs .is-current{background:#2563eb!important;color:#fff!important;border-color:#60a5fa}
+.field-timeline{display:grid;gap:12px;margin-top:14px}
+.field-timeline li{padding:8px 0;border-bottom:1px solid #334155;overflow-wrap:anywhere}
+.field-timeline p{white-space:pre-wrap;margin-top:4px;font-size:14px}
+.field-workspace input,.field-workspace textarea{font-size:16px!important;min-height:44px;min-width:0}
+.field-workspace label{font-size:14px!important}
+.field-workspace button{min-height:44px}
+.field-workspace #save-incident,.field-workspace #save-mobil,.field-workspace #save-damage,.field-workspace #add-action{background:#2563eb;color:#fff}
+body.outdoor-mode .field-facts dt{color:#475569}
+body.outdoor-mode .field-timeline li{border-color:#cbd5e1}
+.transport-editor{display:grid;gap:12px;border-color:#60a5fa}
+body.outdoor-mode .workspace-header,body.outdoor-mode .workspace-nav,body.outdoor-mode .workspace-patient{background:#fff;color:#0f172a;border-color:#94a3b8}
+body.outdoor-mode .workspace-filters input,body.outdoor-mode .workspace-filters select{background:#fff;color:#0f172a}
+body.outdoor-mode .workspace-filters label,body.outdoor-mode .workspace-connection{color:#334155}
+body.outdoor-mode .workspace-nav button.is-current{background:#dbeafe;color:#1d4ed8}
+@media(max-width:767px){
+ .workspace-heading{padding:10px 16px}.workspace-nav{position:fixed;bottom:0;left:0;right:0;padding-bottom:env(safe-area-inset-bottom);border-top:1px solid #475569;z-index:40}
+ .workspace-nav button{flex-direction:column;gap:3px;font-size:12px;min-height:60px;border-bottom:0;border-top:3px solid transparent}
+ .workspace-nav button.is-current{border-top-color:#60a5fa}.mci-workspace main{padding-bottom:150px}
+ .mci-workspace #outbox-badge{bottom:calc(76px + env(safe-area-inset-bottom))!important}
+ .mci-workspace:has(.mci-save-dock) #outbox-badge{bottom:calc(140px + env(safe-area-inset-bottom))!important}
+}
+
+/* Field input: explicit action area, larger controls, shared action color. */
+.mci-workspace #outdoor-toggle,.mci-workspace #help-btn{display:none}
+.mci-editor-return{padding:12px 16px 0;gap:6px}
+.mci-editor-return p{margin:0;font-size:12px}
+.mci-input-form label{font-size:14px!important;letter-spacing:normal!important}
+.mci-input-form input:not([type=checkbox]):not([type=file]),.mci-input-form textarea,.mci-input-form select{font-size:16px!important;min-height:44px}
+.mci-input-form button,.mci-input-form summary{min-height:44px;font-size:14px!important}
+.mci-input-form summary{align-items:center}
+.mci-input-form [class*="text-[10px]"],.mci-input-form [class*="text-[11px]"]{font-size:13px}
+.mci-input-form .mci-input-heading{flex-wrap:wrap;gap:8px}
+.mci-input-form #mci-mode-simple,.mci-input-form #mci-mode-full{padding:10px 14px}
+.mci-input-form #mci-mode-simple.bg-pink-600,.mci-input-form #mci-mode-full.bg-pink-600,
+.mci-input-form #mci-ocr-btn,.mci-input-form #mci-save-btn:not(:disabled),.mci-input-form #mci-save-fab{background:#2563eb!important;background-image:none!important;color:#fff!important}
+.mci-input-form [class*="text-pink-"]{color:#93c5fd!important}
+body.outdoor-mode .mci-input-form [class*="text-pink-"]{color:#1d4ed8!important}
+.mci-save-dock{position:sticky;bottom:12px;z-index:30;padding:10px;background:#0f172a;border:1px solid #475569;border-radius:12px;margin-top:12px}
+.mci-save-dock #mci-save-fab{position:static!important;width:100%;justify-content:center;border-radius:8px;min-height:48px;box-shadow:none!important}
+body.outdoor-mode .mci-save-dock{background:#fff;border-color:#94a3b8}
+@media(max-width:767px){
+ .mci-workspace main{padding-bottom:240px}
+ .mci-workspace .mci-save-dock{position:fixed;left:0;right:0;bottom:calc(60px + env(safe-area-inset-bottom));margin:0;padding:8px 16px;border-radius:0;border-width:1px 0 0}
+ .mci-input-form .mci-mode-heading{flex-wrap:wrap;padding:8px 12px;gap:8px}
+ .mci-input-form .mci-mode-heading>div:first-child{display:none}
+ .mci-input-form .mci-mode-heading>div:last-child{display:flex;width:100%}
+ .mci-input-form .mci-mode-heading button{flex:1}
+ .mci-workspace input,.mci-workspace textarea,.mci-workspace select{scroll-margin-block:130px 220px}
+}
+
 </style>
 
 <!-- ============================================================================
@@ -804,8 +906,15 @@
     </div>
 
     <!-- ② 캡처 미리보기 -->
-    <div id="camera-preview" class="absolute inset-0 hidden flex items-center justify-center">
-      <img id="camera-preview-img" alt="캡처 이미지" class="max-w-full max-h-full" />
+    <div id="camera-preview" class="absolute inset-0 hidden flex items-center justify-center overflow-auto">
+      <div id="camera-crop-wrap"><img id="camera-preview-img" alt="캡처 이미지" /><div id="camera-crop-outline"></div></div>
+    </div>
+
+    <div id="camera-review" class="absolute inset-0 hidden overflow-auto bg-slate-950 p-4 text-slate-100">
+      <p id="camera-engine" class="text-blue-300 font-bold mb-2"></p>
+      <p class="text-sm mb-3">원본을 확인하고 반영할 항목을 체크하세요. 기존 입력값은 유지됩니다. 중증도·의식·숫자는 반드시 대조하세요.</p>
+      <div class="ocr-review-grid"><div><img id="camera-review-img" alt="인식에 사용한 카드 원본" /><a id="camera-original-link" target="_blank" rel="noopener" class="text-blue-300 underline">원본 크게 보기</a></div><div id="camera-review-fields"></div></div>
+      <label class="flex items-center gap-2 mt-3"><input id="camera-attach-card" type="checkbox" checked />카드 사진도 첨부</label>
     </div>
 
     <!-- ③ 분석 중 오버레이 -->
@@ -823,9 +932,15 @@
   <div class="px-4 py-4 bg-slate-950 border-t border-slate-800 flex-shrink-0">
     <!-- 라이브 화면 버튼 -->
     <div id="camera-live-actions" class="flex items-center justify-center gap-4">
+      <button id="camera-file" class="px-4 py-3 rounded-lg bg-slate-800 text-white">사진 선택</button>
       <button id="camera-capture" class="w-16 h-16 rounded-full bg-pink-600 hover:bg-pink-500 border-4 border-white shadow-2xl flex items-center justify-center" title="촬영" aria-label="촬영">
         <i data-lucide="camera" class="w-7 h-7 text-white"></i>
       </button>
+    </div>
+    <div id="camera-crop-controls" class="hidden text-white mb-3">
+      <p class="text-sm mb-2">카드를 똑바로 촬영하고 반사광·흐림을 확인하세요. 테두리 밖 여백을 줄일 수 있습니다.</p>
+      <div class="ocr-crop-controls"><label>위 여백 <input data-crop="top" type="range" min="0" max="45" value="0" /></label><label>아래 여백 <input data-crop="bottom" type="range" min="0" max="45" value="0" /></label><label>왼쪽 여백 <input data-crop="left" type="range" min="0" max="45" value="0" /></label><label>오른쪽 여백 <input data-crop="right" type="range" min="0" max="45" value="0" /></label></div>
+      <div class="flex gap-2 items-center mt-2"><button id="camera-rotate" class="bg-slate-800 px-3 py-2 rounded">90° 회전</button><label class="text-sm flex items-center gap-2"><input id="camera-detail" type="checkbox" checked />작은 글씨 확대 분석 (사진 3장 분석)</label></div>
     </div>
     <!-- 미리보기 화면 버튼 -->
     <div id="camera-preview-actions" class="hidden items-center justify-between gap-3">
@@ -835,7 +950,10 @@
       <button id="camera-analyze" class="flex-1 py-3 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-sm font-bold flex items-center justify-center gap-2">
         <i data-lucide="sparkles" class="w-4 h-4"></i>분석 시작
       </button>
+      <button id="camera-local" class="hidden flex-1 py-3 rounded-lg bg-slate-700 text-white text-sm">일반 문자 인식</button>
     </div>
+    <div id="camera-review-actions" class="hidden gap-3"><button id="camera-review-back" class="flex-1 py-3 rounded-lg bg-slate-800 text-white">사진으로 돌아가기</button><button id="camera-apply" class="flex-1 py-3 rounded-lg bg-blue-600 text-white font-bold">선택 항목 반영</button></div>
+    <input id="camera-file-input" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" />
   </div>
 
   <canvas id="camera-canvas" class="hidden"></canvas>
@@ -918,34 +1036,77 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getDatabase, ref, set, get, onValue, remove, push, update, child
+  getDatabase, ref, set, get, onValue as firebaseOnValue, remove, push, update, child, query, orderByChild, equalTo
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 import {
-  getAuth, signInAnonymously, onAuthStateChanged
+  getAuth, initializeAuth, inMemoryPersistence, signInWithCustomToken, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-// ==================== Firebase 설정 ====================
-const firebaseConfig = {
-  apiKey: "AIzaSyCocowQ4hwCPPvCVkGgvy4EGGi41-KwkNE",
-  authDomain: "disester-f3669.firebaseapp.com",
-  databaseURL: "https://disester-f3669-default-rtdb.firebaseio.com",
-  projectId: "disester-f3669",
-  storageBucket: "disester-f3669.firebasestorage.app",
-  messagingSenderId: "136688201837",
-  appId: "1:136688201837:web:737908cb5feb9313f24f64",
-  measurementId: "G-QFV3PBY1VB"
-};
+import {OCR_LABELS,normalizeOcrCandidates,extractLocalOcrCandidates,selectedOcrPatch,ocrContextMatches} from './ocr-core.js';
+import {connectDisplayParent,connectDisplayChild} from './display-session.js';
+import { validateTestConfig, isActiveGrant, mayReplay, sendBoundOperation, createSessionController } from './secure-session.js';
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const auth = getAuth(app);
+// ==================== Firebase 설정 ====================
+let firebaseConfig, app, db, auth, secureSession;
+let secureIdentity = null, startupError = '', secureDraftBackup = null;
+const _globalUnsubFns = [];
+let _subscriptionGeneration = 0;
+function onValue(target, callback, onError) {
+  const generation = _subscriptionGeneration;
+  return firebaseOnValue(target, snap => {if(generation===_subscriptionGeneration && isActiveGrant(secureIdentity))callback(snap);}, error => {if(generation===_subscriptionGeneration)onError?.(error);});
+}
+function stopSecureSubscriptions() {
+  _subscriptionGeneration++;
+  _globalUnsubFns.splice(0).forEach(fn => fn());
+  _incidentUnsubFns.splice(0).forEach(fn => fn());
+}
+function onSecureIdentity(identity) {
+  document.getElementById('conflict-review')?.remove();
+  const previous = secureIdentity;
+  const changed = previous?.uid !== identity?.uid || previous?.role !== identity?.role || previous?.agencyId !== identity?.agencyId;
+  secureIdentity = identity;
+  if(changed)state.firebaseConnected=null;
+  if (!changed) return;
+  closeCameraModal();
+  stopSecureSubscriptions();
+  if (previous && !identity && !POPOUT_DISPLAY) {
+    secureDraftBackup = JSON.parse(JSON.stringify({ projectId: firebaseConfig.projectId, uid: previous.uid, incidentId: state.currentIncidentId, mciDraft, csDraft, transportDraft:state.transportDraft }));
+    try { localStorage.setItem('mci2_secure_draft_backup', JSON.stringify(secureDraftBackup)); } catch {}
+    startupError = '로그인이 종료됐습니다. 작성 중이던 카드 입력은 복구용으로 보관했습니다.';
+  }
+  state.agencyCodesList=[]; state.issuedCode=null; state.managedCodeDraft={}; state.pendingCodeRevoke=null;state.managedReplaceId=null;state.pendingCodeFinish=null; AGENCY_CODES={};
+  state.incidents = []; state.archives = []; state.casualties = []; state.mciCasualties = [];
+  state.actions = []; state.incident = null; state.damages = {}; state.mobilizations = {};
+  if (!identity) {
+    state.session = null; state.authed = false; state.view2 = 'auth';
+    render(); return;
+  }
+  startupError = '';
+  state.session = {agencyId:identity.agencyId,agency:{id:identity.agencyId,name:identity.agencyName || identity.agencyId,role:identity.role},role:identity.role};
+  state.authed = true;
+  if (!previous || previous.uid !== identity.uid) {
+    resetMciDraft(); resetCsDraft(); state.transportDraft=null; state.patientEditor=false;
+    state.currentIncidentId = null; state.user = null;
+    state.view2 = identity.role === 'admin' ? 'admin' : ['observer','hq'].includes(identity.role) ? 'observer' : identity.role === 'display' ? 'display' : 'lobby';
+  }
+  if(identity.role==='display' && identity.incidentId)state.currentIncidentId=identity.incidentId;
+  bindRealtime(); render();
+  if(identity.role==='admin')void refreshManagedCodes();
+}
+async function initializeSecureApp() {
+  const r = await fetch('/api/auth/config', {cache:'no-store'});
+  if (!r.ok) throw Error('테스트 인증 설정이 아직 완료되지 않았습니다.');
+  firebaseConfig = validateTestConfig(await r.json());
+  app = initializeApp(firebaseConfig, POPOUT_DISPLAY ? 'display-'+crypto.randomUUID() : '[DEFAULT]'); db = getDatabase(app); auth = POPOUT_DISPLAY ? initializeAuth(app,{persistence:inMemoryPersistence}) : getAuth(app);
+  secureSession = createSessionController({auth,db,sdk:{ref,onValue:firebaseOnValue,onAuthStateChanged,signInWithCustomToken,signOut},onChange:onSecureIdentity});
+}
 
 // ==================== 데이터 네임스페이스 ====================
 // 같은 소스를 두 Worker에 배포한다. 확인된 운영 호스트에서만 운영 경로를 사용한다.
 // mci2·미리보기·로컬 실행은 테스트 경로를 사용해 소스 복사 시 운영 데이터 접근을 막는다.
 // 운영 도메인을 추가할 때에는 이 허용 목록을 명시적으로 검토한다.
 const PRODUCTION_HOSTS = ['mci.visanu81.workers.dev'];
-const DB_ROOT = PRODUCTION_HOSTS.includes(location.hostname) ? '' : 'mci2';
+const DB_ROOT = 'mci2';
 const rootPath = (p) => (DB_ROOT ? `${DB_ROOT}/${p}` : p);
 
 // ==================== 표출 팝아웃 창 ====================
@@ -955,63 +1116,10 @@ const rootPath = (p) => (DB_ROOT ? `${DB_ROOT}/${p}` : p);
 // (본 창의 로그인이 끊기지 않게). 표출 역할이라 쓰기도 차단됨(읽기 전용).
 const POPOUT_DISPLAY = new URLSearchParams(location.search).get('popout') === 'display';
 
-// ==================== Firebase 익명 인증 ====================
-// Database Rules에서 auth != null 요구 → 외부 직접 API 호출 차단.
-// 첫 페이지 로드 시 익명 사용자로 자동 로그인 (사용자 눈에는 안 보임).
-// 오프라인일 땐 5초 후 타임아웃 → 일반 진행 (캐시된 화면 표시).
-const authReady = new Promise((resolve) => {
-  let resolved = false;
-  const finish = (user) => {
-    if (resolved) return;
-    resolved = true;
-    resolve(user || null);
-  };
-  onAuthStateChanged(auth, (user) => {
-    if (user) {
-      console.log('[Auth] 익명 인증 완료');
-      finish(user);
-    }
-  });
-  signInAnonymously(auth).catch((err) => {
-    console.warn('[Auth] 익명 인증 실패 (네트워크?):', err.code);
-    finish(null);
-  });
-  // 안전망: 5초 안에 응답 없으면 일단 진행 (오프라인 캐시 시나리오)
-  setTimeout(() => finish(null), 5000);
-});
-
-// ==================== V2 진입 코드 매핑 ====================
-// 동두천119/양주119/... → 각 관서 로비 (소속 관서 재난만 보임)
-// 본부119                 → 통합 로비 (모든 재난 읽기 전용)
-// 한경승                  → 관리자 콘솔 (전권)
-//
-// V5: Firebase /config/agencyCodes 에서 동기화. 첫 부팅 시 비어있으면 아래 SEED로 채움.
-// AGENCY_CODES는 코드(로그인 문자열)→정보 맵 형태로 유지 (기존 호출부 호환).
-const DEFAULT_AGENCY_CODES_SEED = [
-  { code: "동두천119", id: 'dongduchun',  name: '동두천', role: 'normal'   },
-  { code: "양주119",   id: 'yangju',      name: '양주',   role: 'normal'   },
-  { code: "의정부119", id: 'uijeongbu',   name: '의정부', role: 'normal'   },
-  { code: "포천119",   id: 'pocheon',     name: '포천',   role: 'normal'   },
-  { code: "연천119",   id: 'yeoncheon',   name: '연천',   role: 'normal'   },
-  { code: "파주119",   id: 'paju',        name: '파주',   role: 'normal'   },
-  { code: "구리119",   id: 'guri',        name: '구리',   role: 'normal'   },
-  { code: "본부119",   id: 'headquarter', name: '본부',   role: 'observer' },
-  { code: "표출119",   id: 'display',     name: '표출',   role: 'display'  },
-  { code: "한경승",    id: 'admin',       name: '관리자', role: 'admin'    },
-];
-// 초기값 (Firebase 응답 전 로그인 가능하도록 SEED 기반)
-let AGENCY_CODES = Object.fromEntries(
-  DEFAULT_AGENCY_CODES_SEED.map(e => [e.code, { id: e.id, name: e.name, role: e.role }])
-);
-// 코드 → 관서 정보 조회 (NFC normalize로 한글 자모 분리 입력도 안전 처리)
-const findAgencyByCode = (code) => {
-  const norm = String(code || '').trim().normalize('NFC');
-  for (const k of Object.keys(AGENCY_CODES)) {
-    if (k.normalize('NFC') === norm) return AGENCY_CODES[k];
-  }
-  return null;
-};
-// (구버전 ACCESS_CODE는 P0-3에서 제거됨 — 이제 권한 기반 isAdmin() 체크 사용)
+// ==================== 서버 인증 ====================
+const authReady = initializeSecureApp().catch(error => { startupError = error.message; });
+// 진입 코드와 역할은 서버에서만 확인한다. 공개 SEED 또는 localStorage 역할을 사용하지 않는다.
+let AGENCY_CODES = {};
 
 // ==================== 병원 자동완성 프리셋 ====================
 // 경기북부 권역 주요 응급의료기관(시드). 실제 입력 시 datalist 자동완성으로 활용되며,
@@ -1068,13 +1176,20 @@ const TEAMS = [
 
 // 권한 헬퍼 (V2)
 // V2 역할: 'normal'(일반 관서) / 'observer'(본부, 읽기만) / 'display'(표출, TV 전시) / 'admin'(한경승, 전권)
-const isObserver = () => state.session?.role === 'observer' || state.session?.role === 'display';
+const isObserver = () => ['observer','display','hq'].includes(state.session?.role);
 const isAdmin    = () => state.session?.role === 'admin';
 const isDisplay  = () => state.session?.role === 'display';
 const canWrite   = () => !isObserver();   // 본부119/표출119는 모든 쓰기 차단
 // === observer 쓰기 차단 헬퍼 (P0-1) ===
 // save/delete 함수에서 호출 → 본부 계정의 모든 쓰기 작업 차단
 function assertCanWrite(action = '저장') {
+  if (!isActiveGrant(secureIdentity) || !['normal','admin'].includes(secureIdentity.role)) {
+    alert('로그인과 쓰기 권한을 확인해주세요. 입력 내용은 유지됩니다.'); return false;
+  }
+  const selected = state.incidents.find(i=>i._key===state.currentIncidentId);
+  if (selected?.closure || selected?.closedAt) {
+    alert('종료 처리 중이거나 종료된 재난입니다. 입력 내용은 유지됩니다.'); return false;
+  }
   if (isObserver()) {
     alert(`본부 계정은 ${action}/수정/삭제 권한이 없습니다 (읽기 전용)`);
     return false;
@@ -1090,7 +1205,7 @@ const canEditCard = (user, card) => {
   if (isAdmin())    return true;          // 관리자: 전권
   if (!user || !card) return false;
   if (isFieldOnly(user.teamId)) {
-    return card.author === user.name;
+    return card.createdByUid === secureIdentity?.uid;
   }
   return true;
 };
@@ -1241,7 +1356,9 @@ let state = {
   mode: 'mci',                      // 기본 진입 모드: 다수사상자(MCI)
   view: 'dashboard',
   inputTab: 'incident',
+  firebaseConnected: null, patientEditor:false, patientSearch:'', patientFilter:'all', transportSearch:'', transportFilter:'all', transportDraft:null, transportSaving:false, transportFeedback:'',
   mciTab: 'situation',              // 기본 MCI 탭: 통합 상황판
+  fieldTab: 'incident',
   mciInputMode: 'simple',
   // 재난 데이터 (현재 합류한 재난방 기준)
   incident: null,
@@ -1342,7 +1459,7 @@ function incPath(suffix) {
 //  · 대상: 사상자 카드 6경로만(자주+incPath 격리+단일노드 멱등). 그 외(사고개요/동원/관서코드/백업)는 제외.
 //  · 오프라인에서 set()은 거부가 아니라 무한 대기(hang)하므로: 오프라인 저장은 발사만 하고 기다리지 않음(낙관적 화면 반영),
 //    전송엔 12초 타임아웃을 둬 재전송 루프가 멈추지 않게 함. (실패해도 멱등이라 재전송 안전)
-const OUTBOX_KEY = DB_ROOT ? 'mci2_outbox_v1' : 'mci_outbox_v1';
+const OUTBOX_KEY = 'mci2_secure_outbox_v1';
 const OUTBOX_MAX_OPS = 500;
 const OUTBOX_DEFAULT_MAX_TRIES = 8;
 const OUTBOX_SENT_TTL_MS = 60 * 1000;
@@ -1389,16 +1506,29 @@ function _outboxSave(o) {
   }
   _outboxStorageError = '';
 }
+// All cooperating tabs take send before store; never wait for send while holding store.
+function _outboxLock(kind, run) {
+  if (!navigator.locks?.request) {
+    _outboxStorageError = '이 브라우저는 안전한 미전송함 저장을 지원하지 않습니다. 최신 Chrome 또는 Edge를 사용해주세요.';
+    return Promise.reject(new Error(_outboxStorageError));
+  }
+  return navigator.locks.request(OUTBOX_KEY + ':' + kind, {mode:'exclusive'}, run);
+}
 function _newOpId() {
   return `op_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
-function outboxEnqueue({ kind, method, path, incidentId, payload, maxTries }) {
+async function outboxEnqueue({ kind, method, path, incidentId, payload, expected, maxTries }) {
+  const securityContext = {projectId:firebaseConfig.projectId,uid:secureIdentity.uid,agencyId:secureIdentity.agencyId};
+  payload = method === "remove" ? undefined : JSON.parse(JSON.stringify(payload ?? {}));
+  expected = expected ? JSON.parse(JSON.stringify(expected)) : undefined;
+  return _outboxLock("store", () => {
   const o = _outboxLoad(true);
   if (Object.keys(o.ops).length >= OUTBOX_MAX_OPS) _outboxEvictForSpace(o);
   const opId = _newOpId();
   const now = Date.now();
   const entry = {
-    opId, seq: o.seq++, kind, method, path,
+    opId, seq: o.seq++, kind, method, path, creationGuard:true,
+    securityContext,
     incidentId: incidentId || null,
     status: 'pending', tries: 0,
     maxTries: maxTries || OUTBOX_DEFAULT_MAX_TRIES,
@@ -1408,21 +1538,28 @@ function outboxEnqueue({ kind, method, path, incidentId, payload, maxTries }) {
     // undefined 제거(RTDB set은 undefined throw) — JSON 왕복 정규화
     entry.payload = JSON.parse(JSON.stringify(payload == null ? {} : payload));
   }
+  if(expected)entry.expected=JSON.parse(JSON.stringify(expected));
   o.ops[opId] = entry;
   _outboxSave(o);
   updateOutboxBadge();
   return opId;
+  });
 }
-function outboxMark(opId, patch) {
+async function outboxMark(opId, patch, expectedUpdatedAt) {
+  return _outboxLock("store", () => {
   const o = _outboxLoad(true);
-  if (!o.ops[opId]) return;
-  Object.assign(o.ops[opId], patch, { updatedAt: Date.now() });
+  if (!o.ops[opId] || (expectedUpdatedAt !== undefined && (o.ops[opId].updatedAt !== expectedUpdatedAt || o.ops[opId].status !== "failed" || !mayReplay(o.ops[opId],secureIdentity,firebaseConfig?.projectId)))) return false;
+  Object.assign(o.ops[opId], patch, { updatedAt: Math.max(Date.now(), o.ops[opId].updatedAt + 1) });
   _outboxSave(o);
   updateOutboxBadge();
+  return true;
+  });
 }
-function outboxRemove(opId) {
+async function outboxRemove(opId) {
+  return _outboxLock("send", () => _outboxLock("store", () => {
   const o = _outboxLoad(true);
   if (o.ops[opId]) { delete o.ops[opId]; _outboxSave(o); updateOutboxBadge(); }
+  }));
 }
 function outboxPendingCount() {   // 자동 재전송 대상(진행 중 포함) — 배지·interval 기준. failed 제외(공회전 방지)
   return Object.values(_outboxLoad().ops).filter(x => x.status === 'pending' || x.status === 'sending').length;
@@ -1443,7 +1580,8 @@ function _outboxEvictForSpace(o) {
     window.__mciShowOutboxStatus('미전송 항목이 매우 많습니다 — 연결을 확인하세요', 'err');
   }
 }
-function outboxCleanup() {
+async function outboxCleanup() {
+  return _outboxLock("send", () => _outboxLock("store", () => {
   let o;
   try { o = _outboxLoad(true); } catch { return; }
   const now = Date.now();
@@ -1454,19 +1592,20 @@ function outboxCleanup() {
     // 24시간 강등은 '실제 전송을 시도했는데(tries>0) 오래 실패한' 것만. 한 번도 못 보낸 순수 오프라인 데이터는
     // 절대 강등하지 않음 → 재연결 시 자동 재전송 기회를 박탈하지 않음.
     else if (x.status === 'pending' && (x.tries || 0) > 0 && now - x.updatedAt > OUTBOX_STALE_MS) { x.status = 'failed'; x.lastError = '24시간 경과(재시도 실패)'; changed = true; }
-    // 앱 재시작 등으로 'sending'에 멈춘 항목 복구(15초 이상 경과분만 → 진행 중인 건 안 건드림)
-    else if (x.status === 'sending' && now - x.updatedAt > 15000) { x.status = 'pending'; changed = true; }
+    // 전송 잠금을 획득했으므로 살아 있는 다른 탭의 전송은 없다. 중단된 전송만 복구한다.
+    else if (x.status === 'sending') { x.status = 'pending'; changed = true; }
   }
   if (changed) { try { _outboxSave(o); } catch { /* 기존 기록 유지, 배지로 알림 */ } }
+  }));
 }
 
-// 단일 통로 — 모든 사상자 쓰기는 이 함수를 거친다.
-async function durableWrite({ kind, method, path, incidentId, payload }) {
+// 현장 입력은 기기 보관 후 저장 당시 계정으로 전송한다.
+async function durableWrite({ kind, method, path, incidentId, payload, expected }) {
   if (POPOUT_DISPLAY) return { ok: false, queued: false };
   if (!path) return { ok: false, queued: false };   // incPath null 방어(재난방 미선택)
   let opId;
   try {
-    opId = outboxEnqueue({ kind, method, path, incidentId, payload });
+    opId = await outboxEnqueue({ kind, method, path, incidentId, payload, expected });
   } catch (error) {
     updateOutboxBadge();
     window.__mciShowOutboxStatus?.(error.message, 'err');
@@ -1481,25 +1620,29 @@ async function durableWrite({ kind, method, path, incidentId, payload }) {
 }
 
 async function _outboxSendOne(opId) {
+  return _outboxLock("send", () => _outboxSendLocked(opId));
+}
+async function _outboxSendLocked(opId) {
   let op;
   try {
     op = _outboxLoad(true).ops[opId];
     if (!op) return false;
     if (op.status === 'sent') return true;
-    if (op.status === 'sending') return false;
-    outboxMark(opId, { status: 'sending' });
+    if (op.status !== 'pending') return false;
+    if (!navigator.onLine) return false;
+    if (!mayReplay(op, secureIdentity, firebaseConfig?.projectId)) {
+      await outboxMark(opId, {status:'failed',lastError:'이전 로그인 또는 다른 환경의 기록입니다. 자동 전송하지 않습니다.'});
+      return false;
+    }
+    // Earlier unsent edits on this record must finish before a newer edit.
+    const earlier = Object.values(_outboxLoad(true).ops).some(x =>
+      x.opId !== opId && x.path === op.path && x.seq < op.seq && !['sent','discarded'].includes(x.status));
+    if (earlier) return false;
+    await outboxMark(opId, { status: 'sending' });
   } catch { updateOutboxBadge(); return false; }
   try {
-    const r = ref(db, op.path);
-    const write = op.method === 'remove' ? remove(r)
-      : op.method === 'update' ? update(r, op.payload)
-      : set(r, op.payload);
-    // 오프라인/서버 미도달 시 set은 무한 대기 → 타임아웃으로 끊어 재전송 루프 보호(멱등이라 재전송 안전)
-    await Promise.race([
-      write,
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), OUTBOX_SEND_TIMEOUT_MS)),
-    ]);
-    outboxMark(opId, { status: 'sent', lastError: null });
+    await sendBoundOperation(op, {currentIdentity:()=>secureIdentity,currentUser:()=>auth.currentUser,projectId:firebaseConfig.projectId,databaseURL:firebaseConfig.databaseURL,beforeCreate:()=>outboxMark(opId,{creationAttempted:true})});
+    await outboxMark(opId, { status: 'sent', lastError: null });
     return true;
   } catch (e) {
     const msg = (e && (e.code || e.message)) ? (e.code || e.message) : String(e);
@@ -1509,12 +1652,12 @@ async function _outboxSendOne(opId) {
     if (!cur || cur.status !== 'sending') return false;
     const permDenied = /permission_denied/i.test(msg);
     const tries = (cur.tries || 0) + 1;
-    const failed = permDenied || tries >= (cur.maxTries || OUTBOX_DEFAULT_MAX_TRIES);
+    const failed = e.code==='write_conflict' || permDenied || tries >= (cur.maxTries || OUTBOX_DEFAULT_MAX_TRIES);
     const backoff = Math.min(60000, 1000 * Math.pow(2, tries));
     try {
-      outboxMark(opId, {
+      await outboxMark(opId, {
         status: failed ? 'failed' : 'pending',
-        tries, lastError: msg, nextAttemptAt: Date.now() + backoff,
+        tries, lastError: e.message || msg, errorCode:e.code || null, conflictCurrent:e.current || null, nextAttemptAt: Date.now() + backoff,
       });
     } catch { updateOutboxBadge(); }
     return false;
@@ -1532,13 +1675,16 @@ async function replayOutbox(opts) {
   try {
     try { await authReady; } catch {}   // 인증 후 전송(Rules가 auth!=null 요구)
     // 수동 재전송: failed/멈춘 sending도 되살려 한 번 더 시도
+    await outboxCleanup();
     if (manual) {
+      await _outboxLock("send", () => _outboxLock("store", () => {
       const o = _outboxLoad(true);
       let ch = false;
       Object.values(o.ops).forEach(x => {
-        if (x.status === 'failed' || x.status === 'sending') { x.status = 'pending'; x.tries = 0; x.nextAttemptAt = 0; x.lastError = null; ch = true; }
+        if (x.errorCode!=='write_conflict' && x.status === 'failed') { x.status = 'pending'; x.tries = 0; x.nextAttemptAt = 0; x.lastError = null; ch = true; }
       });
       if (ch) _outboxSave(o);
+      }));
     }
     const now = Date.now();
     const ops = Object.values(_outboxLoad(true).ops)
@@ -1551,7 +1697,7 @@ async function replayOutbox(opts) {
       if (ok) sentN++;
       else if (!navigator.onLine) break;   // 도중 끊기면 중단(나머지는 다음 트리거에)
     }
-    outboxCleanup();
+    await outboxCleanup();
     if (sentN > 0 && window.__mciShowOutboxStatus) window.__mciShowOutboxStatus(`미전송 ${sentN}건 전송 완료`, 'ok');
   } catch (error) {
     window.__mciShowOutboxStatus?.(error.message || '미전송함을 확인해주세요.', 'err');
@@ -1560,10 +1706,17 @@ async function replayOutbox(opts) {
     updateOutboxBadge();
   }
 }
+window.addEventListener?.('storage', event => {
+  if (event.key === OUTBOX_KEY || event.key === null) {
+    updateOutboxBadge();
+    document.getElementById('conflict-review')?.remove();
+  }
+});
 window.__mciReplayOutbox = replayOutbox;   // 디버그/IIFE용 노출
 
 // 미전송 배지(우하단) — pending>0일 때만. [지금 재전송] 버튼 포함. 비차단(alert 금지).
 function updateOutboxBadge() {
+  refreshWorkspaceConnection();
   if (POPOUT_DISPLAY) return;
   let el = document.getElementById('outbox-badge');
   const n = outboxPendingCount();
@@ -1577,7 +1730,7 @@ function updateOutboxBadge() {
     const btn = document.createElement('button'); btn.id = 'outbox-badge-btn'; btn.type = 'button';
     btn.style.cssText = 'background:#111827;color:#fff;border:none;border-radius:9999px;padding:3px 10px;font-weight:800;font-size:12px;cursor:pointer;flex:none;';
     btn.textContent = '지금 재전송';
-    btn.onclick = () => replayOutbox({ manual: true });
+    btn.onclick = () => currentConflicts().length ? showConflictReview() : replayOutbox({ manual: true });
     el.append(txt, btn);
     document.body.appendChild(el);
   }
@@ -1595,8 +1748,44 @@ function updateOutboxBadge() {
     : `${ntxt}${ftxt}${sending}`;
   el.title = _outboxStorageError;
   const btn = document.getElementById('outbox-badge-btn');
+  btn.textContent = currentConflicts().length ? '충돌 확인' : '지금 재전송';
   btn.disabled = _outboxReplaying;
   btn.style.opacity = _outboxReplaying ? '0.5' : '1';
+}
+
+function currentConflicts() {
+  return Object.values(_outboxLoad().ops).filter(op=>op.status==='failed' && op.errorCode==='write_conflict' && mayReplay(op,secureIdentity,firebaseConfig?.projectId));
+}
+function showConflictReview() {
+  document.getElementById('conflict-review')?.remove();
+  const op=currentConflicts()[0];if(!op)return;
+  const panel=document.createElement('section');panel.id='conflict-review';
+  panel.style.cssText='position:fixed;inset:5vh 4vw;z-index:12000;background:#0f172a;color:#fff;border:2px solid #f59e0b;border-radius:16px;padding:20px;overflow:auto;max-width:760px;margin:auto;box-shadow:0 10px 40px #000';
+  const labels={notes:'메모',hospital:'이송 병원',name:'이름',age:'연령',gender:'성별',triage:'중증도',symptom:'주증상',symptoms:'주증상',rr:'호흡수',pulse:'맥박',spo2:'산소포화도',cardPhoto:'분류표 사진',patientPhoto:'환자 사진',cardNo:'카드 번호',location:'발견 장소',departTime:'출발 시각',arriveTime:'도착 시각',notTransported:'미이송',notTransportedReason:'미이송 사유'};
+  const text=(tag,value)=>{const el=document.createElement(tag);el.textContent=value;return el;};
+  panel.append(text('h2','동시 수정 확인'),text('p',op.lastError),text('p',op.method==='remove'?'서버 값 유지: 삭제를 취소합니다. 최신 카드 삭제: 아래 서버 기록을 삭제합니다.':'서버 값 유지: 이번 기기의 수정 요청을 취소합니다. 내 입력 적용: 아래 입력을 다시 저장합니다.'));
+  const display=(key,value)=>/Photo$/.test(key)?(value?'사진 있음':'사진 없음'):value==null?'비어 있음':typeof value==='object'?JSON.stringify(value):String(value);
+  const table=document.createElement('table');table.style.cssText='width:100%;table-layout:fixed;border-collapse:collapse;margin:16px 0;overflow-wrap:anywhere';
+  const header=document.createElement('tr');for(const value of ['항목','서버 값','내 입력'])header.append(text('th',value));table.append(header);
+  for(const key of [...new Set([...Object.keys(op.payload || op.expected || {}),...Object.keys(op.conflictCurrent || {})])].filter(k=>!['updatedByUid','_updatedBy','_updatedTeamId','_updatedAt'].includes(k))){
+    const row=document.createElement('tr');for(const value of [labels[key]||key,op.conflictCurrent?display(key,op.conflictCurrent[key]):'최신 카드 확인 필요',op.method==='remove'?'삭제 예정':display(key,op.payload[key])]){const cell=text('td',value);cell.style.cssText='padding:8px;border-bottom:1px solid #475569;vertical-align:top';row.append(cell);}table.append(row);
+  }
+  panel.append(table);
+  const act=(label,run)=>{const button=text('button',label);button.style.cssText='padding:10px 14px;margin:4px;background:#334155;border-radius:8px';button.onclick=run;panel.append(button);};
+  async function resolve(keepMine){
+    try{
+      const current=_outboxLoad(true).ops[op.opId];
+      if(!current || current.updatedAt!==op.updatedAt || !mayReplay(current,secureIdentity,firebaseConfig?.projectId)){panel.remove();return;}
+      if(keepMine){
+        if(!op.conflictCurrent)return;
+        await outboxMark(op.opId,{expected:op.conflictCurrent,status:'pending',errorCode:null,conflictCurrent:null,lastError:null,tries:0,nextAttemptAt:0},op.updatedAt);
+      }else await outboxMark(op.opId,{status:'discarded',lastError:'사용자가 서버 값을 유지했습니다.'},op.updatedAt);
+      panel.remove();updateOutboxBadge();if(keepMine)replayOutbox();
+    }catch(error){window.__mciShowOutboxStatus?.(error.message,'err');}
+  }
+  act('서버 값 유지',()=>resolve(false));
+  if(op.conflictCurrent)act(op.method==='remove'?'최신 카드 삭제':'내 입력 적용',()=>resolve(true));
+  act('나중에 확인',()=>panel.remove());document.body.append(panel);
 }
 
 // 비차단 토스트(전송 완료/공간부족 등)
@@ -1626,9 +1815,14 @@ function handleSyncError(where) {
 }
 
 function bindRealtime() {
+  if (!isActiveGrant(secureIdentity)) return;
+  _globalUnsubFns.splice(0).forEach(fn => fn());
   // V2 — 인덱스: 진행 중 재난 목록 (로비/관찰자/관리자 모두 사용)
-  onValue(ref(db, rootPath('incidents')), snap => {
-    const v = snap.val() || {};
+  const incidentsRef = ref(db, rootPath('incidents'));
+  const scopedId=secureIdentity.incidentId;
+  const visibleIncidents = scopedId ? ref(db,rootPath('incidents')+'/'+scopedId) : ['admin','hq'].includes(secureIdentity.role) ? incidentsRef : query(incidentsRef,orderByChild('agencyId'),equalTo(secureIdentity.agencyId));
+  _globalUnsubFns.push(onValue(visibleIncidents, snap => {
+    const raw=snap.val(); const v = scopedId ? (raw ? {[scopedId]:raw} : {}) : (raw || {});
     state.incidents = Object.entries(v).map(([k, val]) => ({ ...val, _key: k }));
     // P0-2: 사용자가 보고 있던 재난이 강제 종료(closedAt)되면 자동 이탈 + 알림
     if (state.currentIncidentId) {
@@ -1654,125 +1848,33 @@ function bindRealtime() {
       }
     }
     render();
-  }, handleSyncError('재난 목록'));
+  }, handleSyncError('재난 목록')));
   // V2 — archives (글로벌, 종료된 재난 백업)
-  onValue(ref(db, rootPath('archives')), snap => {
+  if (secureIdentity.role === 'admin') _globalUnsubFns.push(onValue(ref(db, rootPath('archives')), snap => {
     const v = snap.val() || {};
     const list = Object.entries(v).map(([k, val]) => ({ ...val, _key: k }));
     list.sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0));
     state.archives = list;
     render();
-  }, handleSyncError('보관함'));
-  // V5 — 관서 코드: Firebase 동기화 + 비어있으면 SEED로 초기 1회 채움
-  onValue(ref(db, rootPath('config/agencyCodes')), snap => {
-    const v = snap.val();
-    if (!v || Object.keys(v).length === 0) {
-      // 첫 부팅 / 빈 상태 → SEED 푸시 (응답이 다시 와서 채워짐)
-      seedDefaultAgencyCodes();
-      return;
-    }
-    const list = Object.entries(v).map(([k, val]) => ({ ...val, _key: k }));
-    state.agencyCodesList = list;
-    // 코드(로그인 문자열) → 정보 맵 재구축 (기존 호출부 호환)
-    const map = {};
-    list.forEach(e => {
-      if (e && e.code) map[e.code] = { id: e.id, name: e.name, role: e.role };
-    });
-    AGENCY_CODES = map;
-    render();
-  }, handleSyncError('관서 코드'));
+  }, handleSyncError('보관함')));
   // 재난방별 구독은 rebindIncidentRealtime()에서 처리
   rebindIncidentRealtime();
 
   // Firebase 서버 실제 연결 상태 — 연결되면 오프라인 큐 자동 재전송(OS online보다 정확)
   if (!POPOUT_DISPLAY) {
-    onValue(ref(db, '.info/connected'), (s) => {
+    _globalUnsubFns.push(onValue(ref(db, '.info/connected'), (s) => {
+      state.firebaseConnected = s.val() === true;
+      refreshWorkspaceConnection();
       if (s.val() === true) replayOutbox();
       updateOutboxBadge();   // 연결 상태에 따라 배지 색 갱신
-    });
+    }));
   }
 }
 
-// V5 — Firebase /config/agencyCodes 가 비었을 때만 SEED 푸시 (멱등)
-async function seedDefaultAgencyCodes() {
-  try {
-    const r = await get(ref(db, rootPath('config/agencyCodes')));
-    if (r.exists() && Object.keys(r.val() || {}).length > 0) return; // 이미 채워짐
-    const updates = {};
-    DEFAULT_AGENCY_CODES_SEED.forEach(e => {
-      const k = push(ref(db, rootPath('config/agencyCodes'))).key;
-      updates[k] = e;
-    });
-    await set(ref(db, rootPath('config/agencyCodes')), updates);
-  } catch (e) {
-    console.error('seedDefaultAgencyCodes', e);
-  }
-}
-
-// V5 — 관서 코드 추가/수정
-// data: { code, id, name, role }, key가 있으면 수정 (id는 immutable)
-async function saveAgencyCode(key, data) {
-  try {
-    const code = (data.code || '').trim();
-    const name = (data.name || '').trim();
-    const role = data.role;
-    if (!code) throw new Error('진입 코드를 입력하세요');
-    if (code.length > 30) throw new Error('진입 코드는 30자 이하로 입력하세요');
-    if (!name) throw new Error('표시명을 입력하세요');
-    if (!['normal', 'observer', 'display', 'admin'].includes(role)) throw new Error('역할이 잘못되었습니다');
-
-    // 코드 중복 체크 (다른 entry에 이미 같은 code가 있으면 차단)
-    const dupCode = state.agencyCodesList.find(e => e.code === code && e._key !== key);
-    if (dupCode) throw new Error(`이미 사용 중인 진입 코드입니다: ${code}`);
-
-    if (key) {
-      // 수정: id는 변경 불가
-      const existing = state.agencyCodesList.find(e => e._key === key);
-      if (!existing) throw new Error('대상 코드를 찾을 수 없습니다');
-      // 마지막 admin을 다른 역할로 강등 차단
-      if (existing.role === 'admin' && role !== 'admin') {
-        const adminCount = state.agencyCodesList.filter(e => e.role === 'admin').length;
-        if (adminCount <= 1) throw new Error('마지막 admin 코드의 역할은 변경할 수 없습니다');
-      }
-      await update(ref(db, rootPath(`config/agencyCodes/${key}`)), {
-        code, id: existing.id, name, role,
-      });
-    } else {
-      // 추가: id 검증/자동 생성
-      let id = (data.id || '').trim();
-      if (!id) {
-        id = 'auto_' + Math.random().toString(36).slice(2, 10);
-      }
-      if (!/^[a-zA-Z0-9_]+$/.test(id)) throw new Error('id는 영문·숫자·언더스코어만 사용 가능합니다');
-      const dupId = state.agencyCodesList.find(e => e.id === id);
-      if (dupId) throw new Error(`이미 사용 중인 id입니다: ${id}`);
-      const newRef = push(ref(db, rootPath('config/agencyCodes')));
-      await set(newRef, { code, id, name, role });
-    }
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, reason: e.message };
-  }
-}
-
-// V5 — 관서 코드 삭제 (마지막 admin은 차단)
-async function deleteAgencyCode(key) {
-  try {
-    const target = state.agencyCodesList.find(e => e._key === key);
-    if (!target) throw new Error('대상 코드를 찾을 수 없습니다');
-    if (target.role === 'admin') {
-      const adminCount = state.agencyCodesList.filter(e => e.role === 'admin').length;
-      if (adminCount <= 1) throw new Error('마지막 admin 코드는 삭제할 수 없습니다');
-    }
-    await remove(ref(db, rootPath(`config/agencyCodes/${key}`)));
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, reason: e.message };
-  }
-}
 
 // V2 — 재난방 변경 시 재구독 (currentIncidentId 기준)
 function rebindIncidentRealtime() {
+  if (!isActiveGrant(secureIdentity)) return;
   // 이전 재난방 구독 해제
   _incidentUnsubFns.forEach(fn => { try { fn(); } catch {} });
   _incidentUnsubFns = [];
@@ -1813,7 +1915,7 @@ function rebindIncidentRealtime() {
   // 사상자 (일반)
   _incidentUnsubFns.push(onValue(ref(db, `${base}/casualties`), snap => {
     const v = snap.val() || {};
-    const list = Object.entries(v).map(([k, val]) => ({ ...val, _key: k, ...(val.hospital && String(val.hospital).trim() ? { notTransported: false } : {}) }));
+    const list = Object.entries(v).map(([k, val]) => Object.defineProperty({ ...val, _key: k, ...(val.hospital && String(val.hospital).trim() ? { notTransported: false } : {}) },'_serverRecord',{value:val}));
     list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
     state.casualties = list;
     render();
@@ -1822,86 +1924,50 @@ function rebindIncidentRealtime() {
   _incidentUnsubFns.push(onValue(ref(db, `${base}/mciCasualties`), snap => {
     const v = snap.val() || {};
     // 정규화: 병원이 입력된 카드는 미이송이 아님(통계 정합) — 기존 모순 데이터도 즉시 교정
-    const list = Object.entries(v).map(([k, val]) => ({ ...val, _key: k, ...(val.hospital && String(val.hospital).trim() ? { notTransported: false } : {}) }));
+    const list = Object.entries(v).map(([k, val]) => Object.defineProperty({ ...val, _key: k, ...(val.hospital && String(val.hospital).trim() ? { notTransported: false } : {}) },'_serverRecord',{value:val}));
     list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
     state.mciCasualties = list;
     render();
   }, handleSyncError('MCI 사상자')));
 }
 
+async function saveFieldRecord(formKey, path, payload, method = 'set') {
+  setSaveStatus(formKey, { saving: true });
+  try {
+    const result = await durableWrite({kind: formKey, method, path,
+      incidentId: state.currentIncidentId, payload});
+    if (!result.ok && !result.queued) throw Error(result.error || '기기에 저장하지 못했습니다. 입력 내용을 유지합니다.');
+    setSaveStatus(formKey, {saving: false, savedAt: new Date(), queued: !!result.queued});
+    setTimeout(() => clearSaveStatus(formKey), 2500);
+    return true;
+  } catch (error) {
+    setSaveStatus(formKey, {saving: false, error: error.message});
+    return false;
+  }
+}
 async function saveIncident(data) {
   if (!assertCanWrite('사고개요 저장')) return false;
-  const formKey = 'incident';
-  setSaveStatus(formKey, { saving: true });
-  try {
-    await set(ref(db, incPath('incident')), { ...data, _at: Date.now() });
-    setSaveStatus(formKey, { saving: false, savedAt: new Date() });
-    setTimeout(() => clearSaveStatus(formKey), 2500);
-    return true;
-  } catch (e) {
-    setSaveStatus(formKey, { saving: false, error: e.message });
-    return false;
-  }
+  return saveFieldRecord('incident', incPath('incident'), {...data, _at: Date.now()});
 }
-
 async function saveDamage(teamId, data, author) {
   if (!assertCanWrite('피해 저장')) return false;
-  const formKey = 'damage';
-  setSaveStatus(formKey, { saving: true });
-  try {
-    await set(ref(db, incPath(`damages/${teamId}`)), { ...data, _author: author, _at: Date.now() });
-    setSaveStatus(formKey, { saving: false, savedAt: new Date() });
-    setTimeout(() => clearSaveStatus(formKey), 2500);
-    return true;
-  } catch (e) {
-    setSaveStatus(formKey, { saving: false, error: e.message });
-    return false;
-  }
+  return saveFieldRecord('damage', incPath('damages/'+teamId), {...data, _author: author, _at: Date.now()});
 }
-
 async function saveMobil(teamId, agencies, vehicles, author) {
   if (!assertCanWrite('동원 저장')) return false;
-  const formKey = 'mobil';
-  setSaveStatus(formKey, { saving: true });
-  try {
-    await set(ref(db, incPath(`mobilizations/${teamId}`)), { agencies, vehicles, _author: author, _at: Date.now() });
-    setSaveStatus(formKey, { saving: false, savedAt: new Date() });
-    setTimeout(() => clearSaveStatus(formKey), 2500);
-    return true;
-  } catch (e) {
-    setSaveStatus(formKey, { saving: false, error: e.message });
-    return false;
-  }
+  return saveFieldRecord('mobil', incPath('mobilizations/'+teamId), {agencies, vehicles, _author: author, _at: Date.now()});
 }
-
 async function addAction(content, teamId, author) {
   if (!assertCanWrite('조치사항 저장')) return false;
-  const formKey = 'action';
-  setSaveStatus(formKey, { saving: true });
-  try {
-    const newRef = push(ref(db, incPath('actions')));
-    await set(newRef, {
-      timestamp: Date.now(),
-      content,
-      teamId,
-      author,
-    });
-    setSaveStatus(formKey, { saving: false, savedAt: new Date() });
-    setTimeout(() => clearSaveStatus(formKey), 2500);
-    return true;
-  } catch (e) {
-    setSaveStatus(formKey, { saving: false, error: e.message });
-    return false;
-  }
+  const key = push(ref(db, incPath('actions'))).key;
+  return saveFieldRecord('action', incPath('actions/'+key), {timestamp: Date.now(), content, teamId, author});
 }
-
 async function deleteAction(key) {
   if (!assertCanWrite('조치사항 삭제')) return false;
-  try { await remove(ref(db, incPath(`actions/${key}`))); return true; }
-  catch (e) { alert('삭제 실패: ' + e.message); return false; }
+  return saveFieldRecord('action', incPath('actions/'+key), undefined, 'remove');
 }
 
-async function saveCasualty(data, teamId, author, editKey, basePayload) {
+async function saveCasualty(data, teamId, author, editKey, basePayload, baseRecord) {
   if (!assertCanWrite('사상자 카드 저장')) return false;
   const formKey = 'casualty';
   setSaveStatus(formKey, { saving: true });
@@ -1929,7 +1995,8 @@ async function saveCasualty(data, teamId, author, editKey, basePayload) {
         kind: 'casualty', method: 'update',
         path: incPath(`casualties/${editKey}`),
         incidentId: state.currentIncidentId,
-        payload: { ...changedCardFields(data, basePayload), _updatedBy: author, _updatedTeamId: teamId, _updatedAt: Date.now() },
+        expected: baseRecord ? Object.fromEntries(Object.keys(changedCardFields(data, basePayload)).map(k=>[k,baseRecord[k]??null])) : undefined,
+        payload: { ...changedCardFields(data, basePayload), updatedByUid: secureIdentity.uid, _updatedBy: author, _updatedTeamId: teamId, _updatedAt: Date.now() },
       });
     } else {
       // 신규: push 키를 미리 확정(오프라인에서도 생성) → 멱등 set (재전송돼도 중복 카드 없음)
@@ -1938,7 +2005,7 @@ async function saveCasualty(data, teamId, author, editKey, basePayload) {
         kind: 'casualty', method: 'set',
         path: incPath(`casualties/${newKey}`),
         incidentId: state.currentIncidentId,
-        payload: { timestamp: Date.now(), ...data, teamId, author },
+        payload: { timestamp: Date.now(), ...data, teamId, author, createdByUid: secureIdentity.uid, updatedByUid: secureIdentity.uid },
       });
     }
     // 서버 미확정(오프라인/실패)이면 '전송 대기'로 정직하게 표시 — 데이터는 큐에 보존됨
@@ -1952,11 +2019,12 @@ async function saveCasualty(data, teamId, author, editKey, basePayload) {
   }
 }
 
-async function deleteCasualty(key) {
+async function deleteCasualty(key, expected) {
   if (!assertCanWrite('사상자 카드 삭제')) return false;
   // 오프라인 안전 큐 경유 — 끊겨도 큐에 보관 후 재연결 시 자동 반영(차단성 alert 제거)
   const res = await durableWrite({
     kind: 'casualty', method: 'remove',
+    expected: expected || state.casualties.find(c=>c._key===key)?._serverRecord,
     path: incPath(`casualties/${key}`),
     incidentId: state.currentIncidentId,
   });
@@ -1969,7 +2037,7 @@ async function deleteCasualty(key) {
 }
 
 // MCI 사상자
-async function saveMciCasualty(data, teamId, author, editKey, basePayload) {
+async function saveMciCasualty(data, teamId, author, editKey, basePayload, baseRecord) {
   if (!assertCanWrite('MCI 사상자 카드 저장')) return false;
   const formKey = 'mciCasualty';
   setSaveStatus(formKey, { saving: true });
@@ -1997,7 +2065,8 @@ async function saveMciCasualty(data, teamId, author, editKey, basePayload) {
         kind: 'mci', method: 'update',
         path: incPath(`mciCasualties/${editKey}`),
         incidentId: state.currentIncidentId,
-        payload: { ...changedCardFields(data, basePayload), _updatedBy: author, _updatedTeamId: teamId, _updatedAt: Date.now() },
+        expected: baseRecord ? Object.fromEntries(Object.keys(changedCardFields(data, basePayload)).map(k=>[k,baseRecord[k]??null])) : undefined,
+        payload: { ...changedCardFields(data, basePayload), updatedByUid: secureIdentity.uid, _updatedBy: author, _updatedTeamId: teamId, _updatedAt: Date.now() },
       });
     } else {
       // 신규: push 키를 미리 확정 → 멱등 set (재전송돼도 중복 카드 없음)
@@ -2006,7 +2075,7 @@ async function saveMciCasualty(data, teamId, author, editKey, basePayload) {
         kind: 'mci', method: 'set',
         path: incPath(`mciCasualties/${newKey}`),
         incidentId: state.currentIncidentId,
-        payload: { timestamp: Date.now(), ...data, teamId, author },
+        payload: { timestamp: Date.now(), ...data, teamId, author, createdByUid: secureIdentity.uid, updatedByUid: secureIdentity.uid },
       });
     }
     // 서버 미확정(오프라인/실패)이면 '전송 대기'로 정직하게 표시 — 데이터는 큐에 보존됨
@@ -2020,11 +2089,12 @@ async function saveMciCasualty(data, teamId, author, editKey, basePayload) {
   }
 }
 
-async function deleteMciCasualty(key) {
+async function deleteMciCasualty(key, expected) {
   if (!assertCanWrite('MCI 사상자 카드 삭제')) return false;
   // 오프라인 안전 큐 경유 — 끊겨도 큐에 보관 후 재연결 시 자동 반영(차단성 alert 제거)
   const res = await durableWrite({
     kind: 'mci', method: 'remove',
+    expected: expected || state.mciCasualties.find(c=>c._key===key)?._serverRecord,
     path: incPath(`mciCasualties/${key}`),
     incidentId: state.currentIncidentId,
   });
@@ -2220,36 +2290,7 @@ function downloadJson() {
 
 // ==================== 초기화 ====================
 async function archiveAndReset(label) {
-  if (!assertCanWrite('재난 종료/초기화')) return { ok: false, reason: '권한 없음' };
-  const snap = buildSnapshot();
-  // 데이터가 비어있으면 백업 안 함
-  const hasData = snap.incident || Object.keys(snap.damages).length || Object.keys(snap.mobilizations).length
-    || snap.actions.length || snap.casualties.length || snap.mciCasualties.length;
-
-  try {
-    if (hasData) {
-      // 1. archives에 백업
-      const archiveRef = push(ref(db, rootPath('archives')));
-      await set(archiveRef, {
-        label: label || (snap.incident?.location || '미상 재난'),
-        archivedAt: Date.now(),
-        archivedBy: snap.exportedBy,
-        data: snap,
-      });
-    }
-    // 2. 현재 데이터 모두 삭제
-    await Promise.all([
-      remove(ref(db, incPath('incident'))),
-      remove(ref(db, incPath('damages'))),
-      remove(ref(db, incPath('mobilizations'))),
-      remove(ref(db, incPath('actions'))),
-      remove(ref(db, incPath('casualties'))),
-      remove(ref(db, incPath('mciCasualties'))),
-    ]);
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, reason: e.message };
-  }
+  return adminForceCloseIncident(state.currentIncidentId, {label});
 }
 
 async function deleteArchive(key) {
@@ -2258,87 +2299,15 @@ async function deleteArchive(key) {
   catch (e) { alert('삭제 실패: ' + e.message); return false; }
 }
 
-// ==================== 관리자 전용: 임의 재난 강제 종료 ====================
-// archiveAndReset이 state.currentIncidentId 기준으로 동작하는 것과 달리,
-// admin이 콘솔에서 어떤 재난방에든 들어가지 않고 직접 closedAt 마킹 + 데이터 백업·삭제까지 처리.
+// 종료는 서버에서 수정 잠금 → 백업 → 종료 확정 순서로 처리한다.
 async function adminForceCloseIncident(incidentId, opts = {}) {
+  if (secureIdentity?.role !== 'admin') return {ok:false,reason:'관리자 권한이 필요합니다.'};
+  if (!navigator.onLine) return {ok:false,reason:'재난 종료는 인터넷 연결 후 실행하세요.'};
   try {
-    const inc = state.incidents.find(i => i._key === incidentId);
-    if (!inc) throw new Error('재난을 찾을 수 없습니다');
-
-    const base = rootPath(`incidents/${incidentId}`);
-    // 1. 재난방 데이터 일괄 fetch
-    const [incData, damages, mobilizations, actions, casualties, mciCasualties] = await Promise.all([
-      get(ref(db, `${base}/incident`)),
-      get(ref(db, `${base}/damages`)),
-      get(ref(db, `${base}/mobilizations`)),
-      get(ref(db, `${base}/actions`)),
-      get(ref(db, `${base}/casualties`)),
-      get(ref(db, `${base}/mciCasualties`)),
-    ]);
-
-    const actionsObj       = actions.val() || {};
-    const casualtiesObj    = casualties.val() || {};
-    const mciCasualtiesObj = mciCasualties.val() || {};
-
-    const adminName = state.session?.agency?.name || 'admin';
-    const snap = {
-      incident: incData.val(),
-      damages: damages.val() || {},
-      mobilizations: mobilizations.val() || {},
-      actions:        Object.entries(actionsObj).map(([k,v])       => ({ ...v, _key: k })),
-      casualties:     Object.entries(casualtiesObj).map(([k,v])    => ({ ...v, _key: k })),
-      mciCasualties:  Object.entries(mciCasualtiesObj).map(([k,v]) => ({ ...v, _key: k })),
-      exportedAt: Date.now(),
-      exportedBy: `관리자 강제 종료 (${adminName})`,
-      // 인덱스 메타 정보 — 단독 archive에서도 재난 식별이 가능하도록
-      _incidentMeta: {
-        title: inc.title,
-        type: inc.type,
-        agencyId: inc.agencyId,
-        startedAt: inc.startedAt,
-      },
-    };
-
-    const hasData = snap.incident
-      || Object.keys(snap.damages).length
-      || Object.keys(snap.mobilizations).length
-      || snap.actions.length
-      || snap.casualties.length
-      || snap.mciCasualties.length;
-
-    // 2. 데이터 있으면 archives에 백업
-    if (hasData) {
-      const archiveRef = push(ref(db, rootPath('archives')));
-      await set(archiveRef, {
-        label: `${inc.title || '제목 없음'} · 관리자 강제 종료${opts.note ? ' · ' + opts.note : ''}`,
-        archivedAt: Date.now(),
-        archivedBy: snap.exportedBy,
-        data: snap,
-        sourceIncidentId: incidentId,
-      });
-    }
-
-    // 3. 인덱스에 closedAt 마킹 (로비/콘솔 목록에서 제외됨)
-    await update(ref(db, base), {
-      closedAt: Date.now(),
-      closedBy: adminName,
-    });
-    // 4. 서브데이터 일괄 삭제 (저장공간 정리)
-    await Promise.all([
-      remove(ref(db, `${base}/incident`)),
-      remove(ref(db, `${base}/damages`)),
-      remove(ref(db, `${base}/mobilizations`)),
-      remove(ref(db, `${base}/actions`)),
-      remove(ref(db, `${base}/casualties`)),
-      remove(ref(db, `${base}/mciCasualties`)),
-    ]);
-
-    return { ok: true, archived: hasData };
-  } catch (e) {
-    console.error('adminForceCloseIncident', e);
-    return { ok: false, reason: e.message };
-  }
+    const pending=Object.values(_outboxLoad(true).ops).some(x=>x.incidentId===incidentId && !['sent','discarded'].includes(x.status));
+    if(pending)return {ok:false,reason:'이 기기에 미전송 기록이 있습니다. 미전송함을 먼저 확인하세요.'};
+    return await serverAccess('/api/admin/close',{incidentId,...(opts.label?{label:opts.label}:{})});
+  } catch(error) { return {ok:false,reason:error.message}; }
 }
 
 function downloadArchiveExcel(archive) {
@@ -2436,6 +2405,7 @@ function render() {
 
   // 현재 view2를 body에 노출 → CSS에서 view별 처리 가능 (예: 표출 모드에서 설치 배너 숨김)
   document.body.dataset.view = state.view2 || 'auth';
+  document.body.classList.toggle('mci-workspace', state.view2 === 'incident' && state.mode === 'mci');
 
   // 미인증 → 로그인
   if (!state.session) {
@@ -2487,6 +2457,7 @@ function render() {
 }
 
 function renderAuth() {
+  if(POPOUT_DISPLAY)return `<div class="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center"><h1 class="text-2xl font-bold">표출 창 연결</h1><p>${escapeHtml(startupError || "입력 창의 승인을 기다리고 있습니다. 연결이 끊기거나 새로고침했다면 입력 창에서 표출 버튼을 다시 눌러주세요.")}</p><button id="display-wait-close" class="bg-slate-700 rounded px-4 py-2">창 닫기</button></div>`;
   return `
     <div class="min-h-screen flex items-center justify-center px-4">
       <div class="w-full max-w-md">
@@ -2499,8 +2470,11 @@ function renderAuth() {
           <p class="text-sm text-slate-500 mt-1">관서 코드를 입력하세요</p>
         </div>
         <div class="bg-slate-900 rounded-2xl border border-slate-800 p-5">
-          <input id="auth-input" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="관서명 + 119 (예시: 동두천119)"
-            class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-red-500 mb-3" />
+          <div class="flex gap-2 mb-3">
+            <input id="auth-input" type="password" aria-label="관서 진입 코드" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="발급받은 테스트 진입 코드"
+              class="flex-1 min-w-0 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-red-500" />
+            <button id="auth-code-toggle" type="button" aria-label="진입 코드 보기" aria-controls="auth-input" aria-pressed="false" class="shrink-0 min-h-[44px] px-3 rounded-lg bg-slate-800 text-sm text-slate-200">보기</button>
+          </div>
           <button id="auth-btn" class="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 font-bold text-sm tracking-wide transition-all">
             진입
           </button>
@@ -2519,33 +2493,25 @@ function renderAuth() {
 }
 
 function bindAuthEvents() {
-  const input = document.getElementById('auth-input');
-  const btn = document.getElementById('auth-btn');
-  const err = document.getElementById('auth-error');
-  const submit = () => {
-    const raw = (input.value || '').trim();
-    // 보안: 진입 코드는 절대 로그에 남기지 않음 (디버그용 console.log 제거)
-    const agency = findAgencyByCode(raw);
-    if (agency) {
-      state.session = { agencyId: agency.id, agency: agency, role: agency.role };
-      state.authed = true;
-      // 진입 후 기본 뷰 결정
-      if      (agency.role === 'admin')    state.view2 = 'admin';
-      else if (agency.role === 'observer') state.view2 = 'observer';
-      else if (agency.role === 'display')  state.view2 = 'display';
-      else                                 state.view2 = 'lobby';
-      localStorage.setItem('disaster_session', JSON.stringify(state.session));
-      localStorage.setItem('disaster_view2',   state.view2);
-      localStorage.setItem('disaster_authed', '1');
-      render();
-    } else {
-      err.textContent = '관서 코드가 올바르지 않습니다 (예시: 동두천119)';
-      err.classList.remove('hidden');
-    }
+  if(POPOUT_DISPLAY){const close=document.getElementById('display-wait-close');if(close)close.onclick=()=>window.close();return;}
+  const input=document.getElementById('auth-input'), btn=document.getElementById('auth-btn'), err=document.getElementById('auth-error');
+  const visibility=document.getElementById('auth-code-toggle');
+  const hideCode=()=>{input.type='password';if(visibility){visibility.textContent='보기';visibility.setAttribute('aria-label','진입 코드 보기');visibility.setAttribute('aria-pressed','false');}};
+  if(visibility)visibility.onclick=()=>{const show=input.type==='password';input.type=show?'text':'password';visibility.textContent=show?'가리기':'보기';visibility.setAttribute('aria-label',show?'진입 코드 가리기':'진입 코드 보기');visibility.setAttribute('aria-pressed',String(show));};
+  if (startupError) { err.textContent=startupError; err.classList.remove('hidden'); }
+  let pending=false;
+  const submit=async()=>{
+    if(pending)return;hideCode();pending=true;btn.disabled=true;
+    try { await authReady; if(!secureSession)throw Error(startupError || '인증 설정이 필요합니다.'); await secureSession.login(input.value.trim()); }
+    catch(error){err.textContent=error.message;err.classList.remove('hidden');}
+    finally{pending=false;btn.disabled=false;}
   };
-  btn.onclick = submit;
-  input.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
-  input.focus();
+  btn.onclick=submit;input.onkeydown=e=>{if(e.key==='Enter')submit();};input.focus();
+  if (secureDraftBackup) {
+    const download=document.createElement('button');download.type='button';download.textContent='작성 중이던 카드 입력 내려받기';download.className='w-full text-sm text-amber-300 py-2';
+    download.onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(secureDraftBackup,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='mci2-draft-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+    err.parentNode.append(download);
+  }
 }
 
 function renderUserSetup() {
@@ -2635,7 +2601,7 @@ function renderV2Header(title, subtitle, opts = {}) {
   const sess = state.session;
   const agencyName = sess?.agency?.name || '';
   const roleBadge = sess?.role === 'admin'    ? '<span class="px-2 py-0.5 rounded bg-purple-900/40 text-purple-300 text-[10px] mono">ADMIN</span>'
-                  : sess?.role === 'observer' ? '<span class="px-2 py-0.5 rounded bg-sky-900/40 text-sky-300 text-[10px] mono">OBSERVER</span>'
+                  : ['observer','hq'].includes(sess?.role) ? '<span class="px-2 py-0.5 rounded bg-sky-900/40 text-sky-300 text-[10px] mono">OBSERVER</span>'
                   : sess?.role === 'display'  ? '<span class="px-2 py-0.5 rounded bg-rose-900/40 text-rose-300 text-[10px] mono">DISPLAY</span>'
                   :                              '<span class="px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300 text-[10px] mono">' + agencyName + '</span>';
   return `
@@ -2656,7 +2622,8 @@ function renderV2Header(title, subtitle, opts = {}) {
 
 function bindV2HeaderEvents() {
   const lo = document.getElementById('v2-logout-btn');
-  if (lo) lo.onclick = () => {
+  if (lo) lo.onclick = async () => {
+    await secureSession?.logout();
     localStorage.removeItem('disaster_session');
     localStorage.removeItem('disaster_view2');
     localStorage.removeItem('disaster_currentIncidentId');
@@ -2741,7 +2708,7 @@ function renderObserverLobby() {
     `;
   }).join('');
   return `
-    ${renderV2Header('본부 통합 모니터링', '모든 관서의 진행 중 재난을 읽기 전용으로 봅니다')}
+    ${renderV2Header(secureIdentity?.role==='hq'?'본부 통합 모니터링':'관서 모니터링',secureIdentity?.role==='hq'?'모든 관서의 진행 중 재난을 읽기 전용으로 봅니다':'승인된 관서의 재난을 읽기 전용으로 봅니다')}
     <div class="max-w-5xl mx-auto px-4 py-6">
       <div class="text-sm font-bold text-slate-400 mb-4">전체 진행 중 재난 (${all.length})</div>
       ${all.length === 0 ? '<div class="text-center text-sm text-slate-500 py-12">현재 진행 중인 재난이 없습니다.</div>' : groups}
@@ -2828,6 +2795,10 @@ function floorOfLocation(loc) {
   return '미분류';
 }
 
+function renderDisplayIncidentInfo(detail={}) {
+  const fields=[['발생일시',detail.datetime],['장소',detail.location],['대상',detail.target]];
+  return `<section class="display-incident-info" aria-label="재난 정보"><dl class="display-incident-facts">${fields.map(([label,value])=>`<div><dt>${label}</dt><dd>${escapeHtml(value || '미입력')}</dd></div>`).join('')}</dl>${detail.structure || detail.cause?`<p class="display-incident-extra">${detail.structure?`<span class="display-incident-label">건물구조</span>${escapeHtml(detail.structure)}`:''}${detail.structure&&detail.cause?' · ':''}${detail.cause?`<span class="display-incident-label">원인</span>${escapeHtml(detail.cause)}`:''}</p>`:''}<p class="display-incident-overview"><span class="display-incident-label">사고개요</span>${escapeHtml(detail.summary || '현장 정보에서 사고개요를 입력하면 여기에 표시됩니다.')}</p></section>`;
+}
 function renderDisplayMain() {
   // 인덱스(state.incidents)에서 재난 메타(title, type, agencyId, startedAt)를 우선 사용.
   // state.incident는 "사고 개요" 폼이 입력된 경우에만 값이 있어 보조로만 활용.
@@ -3078,6 +3049,8 @@ function renderDisplayMain() {
 
       ${tvSettingsPanel}
 
+      ${renderDisplayIncidentInfo(incDetail)}
+
       <!-- 본문: 모드에 따라 [좌 요약 | 우 명단] 2단(list) 또는 [요약만 전체폭](summary) -->
       <div class="flex-1 min-h-0 ${isList ? 'flex flex-row gap-6' : 'flex flex-col'}">
 
@@ -3157,7 +3130,7 @@ function renderDisplayMain() {
             <div class="${txNum} font-black mono leading-none text-amber-400">${pending.length}</div>
           </button>
           <button data-display-transport="in-transit" class="display-card rounded-2xl px-4 ${txPad} text-center bg-slate-900 flex flex-col items-center justify-center border-2 border-blue-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
-            <div class="${txLabel} font-bold tracking-wider text-blue-300">이송중</div>
+            <div class="${txLabel} font-bold tracking-wider text-blue-300">배정·이송 중</div>
             <div class="${txNum} font-black mono leading-none text-blue-400">${inTransit}</div>
           </button>
           <button data-display-transport="arrived" class="display-card rounded-2xl px-4 ${txPad} text-center bg-slate-900 flex flex-col items-center justify-center border-2 border-emerald-700/60 cursor-pointer hover:bg-slate-800 transition-colors">
@@ -3257,7 +3230,7 @@ function renderDisplayModal() {
       title = '미배정'; color = '#f59e0b';
       patients = state.mciCasualties.filter(c => !c.hospital && !c.notTransported && c.triage !== 'dead');
     } else if (m.value === 'in-transit') {
-      title = '이송중'; color = '#60a5fa';
+      title = '병원 배정·이송 중'; color = '#60a5fa';
       patients = state.mciCasualties.filter(c => c.hospital && !c.arriveTime && !c.notTransported);
     } else if (m.value === 'arrived') {
       title = '병원 도착'; color = '#34d399';
@@ -3615,8 +3588,9 @@ function bindDisplayEvents() {
   // 로그아웃 (picker · main 공통) — 팝아웃에서는 localStorage(본 창 세션)를 건드리지 않고 창만 닫음
   ['display-logout', 'display-logout-picker'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.onclick = () => {
+    if (el) el.onclick = async () => {
       if (POPOUT_DISPLAY) { window.close(); return; }
+      await secureSession?.logout();
       localStorage.removeItem('disaster_session');
       localStorage.removeItem('disaster_view2');
       localStorage.removeItem('disaster_currentIncidentId');
@@ -3833,7 +3807,7 @@ function renderAdminArchivesPanel() {
                       백업자: ${escapeHtml(ar.archivedBy || '-')}${agencyName ? ` · 관서: ${escapeHtml(agencyName)}` : ''}
                     </div>
                   </div>
-                  <button data-del-archive="${ar._key}" class="del-archive text-slate-600 hover:text-red-400 p-1 flex-shrink-0" title="백업 삭제" aria-label="백업 삭제">
+                  <button ${ar.closureId ? 'hidden disabled' : ''} data-del-archive="${ar._key}" class="del-archive text-slate-600 hover:text-red-400 p-1 flex-shrink-0" title="백업 삭제" aria-label="백업 삭제">
                     <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                   </button>
                 </div>
@@ -3907,7 +3881,7 @@ function renderAdminConsole() {
                   <div class="text-xs text-slate-500 mt-1">${escapeHtml(agencyName)} · ${escapeHtml(inc.type || '재난')} · 시작 ${fmtTime(new Date(inc.startedAt))}</div>
                 </button>
                 <button class="admin-force-close px-3 rounded-lg bg-red-950/50 hover:bg-red-900/60 border border-red-800/60 text-xs text-red-200 font-bold flex items-center gap-1 transition" data-id="${inc._key}" data-title="${escapeHtml(inc.title || '제목 없음')}" title="이 재난을 백업하고 강제 종료합니다">
-                  <i data-lucide="square-x" class="w-3.5 h-3.5"></i>종료
+                  <i data-lucide="square-x" class="w-3.5 h-3.5"></i>${inc.closure ? '종료 재시도' : '종료'}
                 </button>
               </div>`;
             }).join('')}
@@ -3925,125 +3899,25 @@ function renderAdminConsole() {
 
 // ----- 관리자 콘솔 — 관서 코드 관리 패널 (CRUD) -----
 function renderAdminAgencyCodesPanel() {
-  const list = [...state.agencyCodesList].sort((a, b) => {
-    // admin → observer → display → normal 순 + 가나다순
-    const order = { admin: 0, observer: 1, display: 2, normal: 3 };
-    const oa = order[a.role] ?? 9, ob = order[b.role] ?? 9;
-    if (oa !== ob) return oa - ob;
-    return (a.name || '').localeCompare(b.name || '', 'ko');
-  });
-  const adminCount = list.filter(e => e.role === 'admin').length;
-  const isAddOpen  = !!state.adminCodeAddOpen;
-
-  return `
-    <div class="bg-slate-900 border border-purple-800/50 rounded-xl p-4">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-sm font-bold text-purple-300 flex items-center gap-2">
-          <i data-lucide="key-round" class="w-4 h-4"></i>관서 코드 관리 (${list.length})
-        </h2>
-        <button id="admin-code-add-toggle" class="text-[11px] px-2.5 py-1 rounded font-bold ${
-          isAddOpen ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-purple-600 hover:bg-purple-700 text-white'
-        }">
-          ${isAddOpen ? '✕ 취소' : '+ 코드 추가'}
-        </button>
-      </div>
-
-      ${isAddOpen ? `
-        <div class="bg-slate-950 border border-purple-700/50 rounded-lg p-3 mb-3">
-          <div class="text-[10px] tracking-wider uppercase text-purple-300 mb-2">새 관서 코드 추가</div>
-          <div class="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_130px] gap-2 mb-2">
-            <input id="admin-code-add-code" type="text" placeholder="진입 코드 (예: 강남119)"
-              class="bg-slate-900 border border-slate-800 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-purple-500" />
-            <input id="admin-code-add-name" type="text" placeholder="표시명 (예: 강남)"
-              class="bg-slate-900 border border-slate-800 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-purple-500" />
-            <input id="admin-code-add-id" type="text" placeholder="id (선택, 영문/숫자)"
-              class="bg-slate-900 border border-slate-800 rounded-md px-2.5 py-1.5 text-xs mono focus:outline-none focus:border-purple-500" />
-            <select id="admin-code-add-role" class="bg-slate-900 border border-slate-800 rounded-md px-2 py-1.5 text-xs">
-              <option value="normal">normal · 일반관서</option>
-              <option value="observer">observer · 읽기전용</option>
-              <option value="display">display · TV 표출</option>
-              <option value="admin">admin · 전권</option>
-            </select>
-          </div>
-          <div class="flex items-center justify-between">
-            <div class="text-[10px] text-slate-500 leading-relaxed">
-              id를 비우면 <span class="mono text-slate-400">auto_xxxxxx</span> 형식으로 자동 생성됩니다. id는 생성 후 변경 불가.
-            </div>
-            <button id="admin-code-add-save" class="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-xs font-bold flex items-center gap-1">
-              <i data-lucide="plus" class="w-3.5 h-3.5"></i>저장
-            </button>
-          </div>
-          <div id="admin-code-add-result" class="text-[11px] mt-2 min-h-[14px]"></div>
-        </div>
-      ` : ''}
-
-      <div class="space-y-1.5">
-        ${list.length === 0 ? `
-          <div class="text-xs text-slate-500 py-4 text-center">관서 코드가 없습니다. 위 "+ 코드 추가"로 추가하세요.</div>
-        ` : list.map(e => {
-          const isEditing   = state.adminCodeEditKey === e._key;
-          const isLastAdmin = e.role === 'admin' && adminCount <= 1;
-          const roleColor =
-              e.role === 'admin'    ? 'bg-purple-900/40 text-purple-200 border-purple-700/50'
-            : e.role === 'observer' ? 'bg-sky-900/40 text-sky-200 border-sky-700/50'
-            : e.role === 'display'  ? 'bg-rose-900/40 text-rose-200 border-rose-700/50'
-            :                          'bg-emerald-900/40 text-emerald-200 border-emerald-700/50';
-
-          return isEditing ? `
-            <div class="bg-slate-950 border border-amber-700/50 rounded-lg p-2.5">
-              <div class="text-[10px] tracking-wider uppercase text-amber-400 mb-2">코드 수정 중</div>
-              <div class="grid grid-cols-1 sm:grid-cols-[1fr_1fr_130px_auto] gap-2 mb-2">
-                <input data-edit-code class="bg-slate-900 border border-slate-800 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-amber-500" value="${escapeHtml(e.code || '')}" placeholder="진입 코드" />
-                <input data-edit-name class="bg-slate-900 border border-slate-800 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-amber-500" value="${escapeHtml(e.name || '')}" placeholder="표시명" />
-                <select data-edit-role class="bg-slate-900 border border-slate-800 rounded-md px-2 py-1 text-xs">
-                  <option value="normal"   ${e.role === 'normal'   ? 'selected' : ''}>normal</option>
-                  <option value="observer" ${e.role === 'observer' ? 'selected' : ''}>observer</option>
-                  <option value="display"  ${e.role === 'display'  ? 'selected' : ''}>display</option>
-                  <option value="admin"    ${e.role === 'admin'    ? 'selected' : ''}>admin</option>
-                </select>
-                <div class="flex gap-1">
-                  <button data-code-save="${e._key}" class="code-save-btn px-3 py-1 rounded-md bg-emerald-700 hover:bg-emerald-600 text-xs font-bold">저장</button>
-                  <button class="code-cancel-btn px-3 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-xs">취소</button>
-                </div>
-              </div>
-              <div class="flex items-center gap-3 text-[10px] text-slate-500">
-                <span>id: <span class="mono text-slate-400">${escapeHtml(e.id || '')}</span> <span class="text-slate-600">(고정)</span></span>
-                ${isLastAdmin ? '<span class="text-amber-400">마지막 admin — 역할 변경 불가</span>' : ''}
-              </div>
-              <div data-edit-result="${e._key}" class="text-[11px] mt-1.5 min-h-[14px]"></div>
-            </div>
-          ` : `
-            <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-2.5">
-              <span class="mono text-sm text-slate-100 font-bold flex-shrink-0">${escapeHtml(e.code || '')}</span>
-              <span class="text-slate-700">·</span>
-              <span class="text-sm text-slate-300 truncate">${escapeHtml(e.name || '')}</span>
-              <span class="text-[10px] px-1.5 py-0.5 rounded mono border font-bold ${roleColor}">${e.role}</span>
-              <span class="text-[10px] text-slate-600 mono ml-1 truncate">id:${escapeHtml(e.id || '')}</span>
-              <button data-code-edit="${e._key}" class="code-edit-btn ml-auto text-slate-500 hover:text-amber-400 p-1 flex-shrink-0" title="수정" aria-label="코드 수정">
-                <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-              </button>
-              ${isLastAdmin ? `
-                <span class="text-slate-700 p-1 flex-shrink-0" title="마지막 admin 코드는 삭제할 수 없습니다">
-                  <i data-lucide="lock" class="w-3.5 h-3.5"></i>
-                </span>
-              ` : `
-                <button data-code-del="${e._key}" data-code-label="${escapeHtml(e.code || '')}" class="code-del-btn text-slate-600 hover:text-red-400 p-1 flex-shrink-0" title="삭제" aria-label="코드 삭제">
-                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                </button>
-              `}
-            </div>
-          `;
-        }).join('')}
-      </div>
-      <div id="admin-code-result" class="text-[11px] mt-2 min-h-[14px]"></div>
-
-      <div class="text-[10px] text-slate-500 mt-3 pt-2 border-t border-slate-800 leading-relaxed">
-        <i data-lucide="info" class="w-3 h-3 inline mr-0.5 text-slate-600"></i>
-        진입 코드를 변경하면 해당 관서의 신규 로그인부터 적용됩니다. 이미 로그인된 세션은 영향받지 않습니다.<br>
-        id를 변경하지 않는 한, 기존 재난 데이터(소속 관서)는 안전하게 유지됩니다.
-      </div>
+  const draft=state.managedCodeDraft||{},busy=!!state.managedCodeBusy;
+  const replacing=state.agencyCodesList.find(r=>r.id===state.managedReplaceId);
+  const roles={normal:'일반 관서',observer:'관서 관찰자',display:'표출 전용',admin:'관리자',hq:'본부 통합 관찰'};
+  return `<section id="managed-codes-panel" class="bg-slate-900 border border-purple-800 rounded-xl p-4">
+    <h2 class="font-bold text-purple-300 mb-3">관서 진입 코드 관리</h2>
+    <p class="text-xs text-slate-400 mb-3">원하는 코드를 직접 지정할 수 있습니다. 기존 코드 원문은 저장하지 않아 다시 표시할 수 없습니다. 코드 교체는 새 코드 발급 → 새 코드로 접속 확인 → 이전 코드 폐기 순서입니다.</p>
+    ${replacing?`<p class="text-sm text-blue-300 my-3">${escapeHtml(replacing.agencyName)} · ${escapeHtml(roles[replacing.role])} 코드 교체 — 관서와 권한은 유지됩니다.</p>`:''}
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+      <input ${replacing?'disabled':''} aria-label="관서 ID" id="managed-agency-id" value="${escapeHtml(draft.agencyId||'')}" maxlength="50" placeholder="관서 ID (영문·숫자·_·-)" class="bg-slate-950 border border-slate-700 rounded p-2 text-sm">
+      <input ${replacing?'disabled':''} aria-label="관서 표시명" id="managed-agency-name" value="${escapeHtml(draft.agencyName||'')}" maxlength="50" placeholder="관서 표시명" class="bg-slate-950 border border-slate-700 rounded p-2 text-sm">
+      <select ${replacing?'disabled':''} aria-label="권한" id="managed-role" class="bg-slate-950 border border-slate-700 rounded p-2 text-sm">${Object.entries(roles).map(([k,v])=>`<option value="${k}" ${(draft.role||'normal')===k?'selected':''}>${v}</option>`).join('')}</select>
+      <label class="text-xs">유효기간(일)<input id="managed-days" type="number" min="1" max="30" value="${escapeHtml(String(draft.days??7))}" class="bg-slate-950 border border-slate-700 rounded p-2 w-full"></label>
     </div>
-  `;
+    <label class="block text-sm mt-3">${replacing?'새 진입 코드':'진입 코드 직접 지정 (선택)'}<input id="managed-code" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" minlength="8" maxlength="128" value="${escapeHtml(draft.code||'')}" placeholder="공백 없이 8~128자 · 비우면 자동 생성" class="block w-full bg-slate-950 border border-slate-700 rounded p-3 mt-1"></label>
+    <div class="flex flex-wrap gap-2 my-3"><button id="managed-create" ${busy?'disabled':''} class="bg-purple-700 rounded px-4 py-2 text-sm">${replacing?'교체용 새 코드 발급':'새 코드 발급'}</button>${replacing?'<button id="managed-cancel-replace" class="bg-slate-700 rounded px-4 py-2">교체 취소</button>':''}<button id="managed-refresh" class="bg-slate-700 rounded px-4 py-2 text-sm">목록 새로고침</button></div>
+    ${state.issuedCode?`<div class="border border-emerald-700 p-3 rounded mb-3"><p class="text-sm mb-2">새 진입 코드 — 복사해서 보관하세요. 교체 중이면 새 코드로 접속을 확인한 다음 목록에서 이전 코드를 폐기하세요.</p><code class="break-all select-all">${escapeHtml(state.issuedCode.code)}</code><p class="text-xs mt-2">만료: ${escapeHtml(new Date(state.issuedCode.expiresAt).toLocaleString('ko-KR'))}</p><button id="managed-copy" class="bg-emerald-800 rounded px-3 py-1 mt-2">복사</button><button id="managed-dismiss" class="ml-2 px-3 py-1">표시 닫기</button></div>`:''}
+    <p class="text-sm text-amber-300 my-2" role="status">${escapeHtml(state.managedCodeMessage||'')}</p>
+    <div class="space-y-2">${state.agencyCodesList.map(r=>`<div class="border border-slate-800 rounded p-2 flex flex-wrap items-center gap-2 text-sm"><strong>${escapeHtml(r.agencyName)}</strong><span>${escapeHtml(r.agencyId)}</span><span>${escapeHtml(roles[r.role]||r.role)}</span><span class="text-xs text-slate-400">${r.active && r.expiresAt>Date.now()?'사용 가능':'폐기/만료'} · ${escapeHtml(new Date(r.expiresAt).toLocaleString('ko-KR'))}</span><button data-managed-replace="${escapeHtml(r.id)}" class="bg-blue-700 rounded px-3 py-2" ${busy?'disabled':''}>코드 변경</button>${r.replaces && r.active && r.expiresAt>Date.now() && state.agencyCodesList.some(old=>old.id===r.replaces&&old.active)?`<span class="text-blue-300">교체 진행 중</span><button data-managed-finish="${escapeHtml(r.id)}" class="bg-amber-800 rounded px-3 py-2" ${r.replaces===secureIdentity?.codeId?'disabled':''}>${r.replaces===secureIdentity?.codeId?'새 관리자 코드로 로그인 후 완료':'이전 코드 폐기'}</button>${state.pendingCodeFinish===r.id?`<span>새 코드 접속을 확인했나요? 이전 코드의 로그인 단말도 차단됩니다.</span><button data-managed-finish-confirm="${escapeHtml(r.id)}" class="bg-red-700 rounded px-3 py-2">교체 완료 확인</button><button id="managed-finish-cancel">취소</button>`:''}`:''}${r.active?`<button data-managed-revoke="${escapeHtml(r.id)}" class="ml-auto bg-red-950 rounded px-3 py-1" ${r.id===secureIdentity?.codeId?'disabled':''}>${r.id===secureIdentity?.codeId?'현재 관리자 코드':'폐기'}</button>${state.pendingCodeRevoke===r.id?`<span class="text-xs text-red-300">로그인 단말도 차단합니다.</span><button data-managed-confirm="${escapeHtml(r.id)}" class="bg-red-700 rounded px-3 py-1">폐기 확인</button><button id="managed-cancel-revoke" class="px-3 py-1">취소</button>`:''}`:''}</div>`).join('')||'<p class="text-sm text-slate-500">발급된 코드가 없습니다.</p>'}</div>
+  </section>`;
 }
 
 function bindAdminConsoleEvents() {
@@ -4116,7 +3990,7 @@ function bindAdminConsoleEvents() {
       const id    = btn.dataset.id;
       const title = btn.dataset.title || '제목 없음';
       const resultEl = document.getElementById('admin-close-result');
-      if (!confirm(`"${title}" 재난을 강제 종료하시겠습니까?\n\n· 현재 데이터(사고개요·피해·동원·사상자·조치사항)는 자동으로 archives에 백업됩니다.\n· 종료 후 일반 사용자에게는 더 이상 보이지 않습니다.\n· 이 작업은 되돌릴 수 없습니다.`)) return;
+      if (!confirm(`"${title}" 재난을 강제 종료하시겠습니까?\n\n· 서버에 도착한 기록을 잠근 뒤 백업합니다. 각 기기의 미전송 기록을 먼저 확인하세요.\n· 종료 후 일반 사용자에게는 더 이상 보이지 않습니다.\n· 이 작업은 되돌릴 수 없습니다.`)) return;
       btn.disabled = true;
       btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>종료 중...';
       if (window.lucide) window.lucide.createIcons();
@@ -4140,110 +4014,55 @@ function bindAdminConsoleEvents() {
 }
 
 // ----- 관리자 콘솔 — 관서 코드 관리 이벤트 바인딩 -----
-function bindAdminAgencyCodesEvents() {
-  // 코드 추가 폼 토글
-  const toggleBtn = document.getElementById('admin-code-add-toggle');
-  if (toggleBtn) {
-    toggleBtn.onclick = () => {
-      state.adminCodeAddOpen = !state.adminCodeAddOpen;
-      // 추가 폼이 열릴 때 다른 인라인 수정도 중단
-      if (state.adminCodeAddOpen) state.adminCodeEditKey = null;
-      render();
-    };
-  }
-
-  // 코드 추가 — 저장
-  const addSave = document.getElementById('admin-code-add-save');
-  if (addSave) {
-    addSave.onclick = async () => {
-      const codeEl = document.getElementById('admin-code-add-code');
-      const nameEl = document.getElementById('admin-code-add-name');
-      const idEl   = document.getElementById('admin-code-add-id');
-      const roleEl = document.getElementById('admin-code-add-role');
-      const result = document.getElementById('admin-code-add-result');
-      const payload = {
-        code: codeEl?.value || '',
-        name: nameEl?.value || '',
-        id:   idEl?.value || '',
-        role: roleEl?.value || 'normal',
-      };
-      if (result) result.innerHTML = '<span class="text-amber-400">저장 중...</span>';
-      const r = await saveAgencyCode(null, payload);
-      if (r.ok) {
-        if (result) result.innerHTML = `<span class="text-emerald-400">✓ "${escapeHtml(payload.code)}" 추가 완료</span>`;
-        // 입력값 비우기 + 폼 닫기는 사용자 선택 — 일단 입력만 비움
-        if (codeEl) codeEl.value = '';
-        if (nameEl) nameEl.value = '';
-        if (idEl)   idEl.value = '';
-        setTimeout(() => { if (result) result.innerHTML = ''; }, 3000);
-      } else {
-        if (result) result.innerHTML = `<span class="text-red-400">실패: ${escapeHtml(r.reason || '알 수 없는 오류')}</span>`;
-      }
-    };
-  }
-
-  // 코드 수정 — 진입
-  document.querySelectorAll('.code-edit-btn').forEach(btn => {
-    btn.onclick = () => {
-      state.adminCodeEditKey = btn.dataset.codeEdit;
-      state.adminCodeAddOpen = false;
-      render();
-    };
-  });
-
-  // 코드 수정 — 취소
-  document.querySelectorAll('.code-cancel-btn').forEach(btn => {
-    btn.onclick = () => {
-      state.adminCodeEditKey = null;
-      render();
-    };
-  });
-
-  // 코드 수정 — 저장
-  document.querySelectorAll('.code-save-btn').forEach(btn => {
-    btn.onclick = async () => {
-      const key = btn.dataset.codeSave;
-      const row = btn.closest('.bg-slate-950');
-      if (!row) return;
-      const codeEl = row.querySelector('[data-edit-code]');
-      const nameEl = row.querySelector('[data-edit-name]');
-      const roleEl = row.querySelector('[data-edit-role]');
-      const result = row.querySelector(`[data-edit-result="${key}"]`);
-      const payload = {
-        code: codeEl?.value || '',
-        name: nameEl?.value || '',
-        role: roleEl?.value || 'normal',
-      };
-      if (result) result.innerHTML = '<span class="text-amber-400">저장 중...</span>';
-      const r = await saveAgencyCode(key, payload);
-      if (r.ok) {
-        // 수정 완료 → 인라인 폼 닫기 (Firebase 구독으로 자동 갱신됨)
-        state.adminCodeEditKey = null;
-        render();
-      } else {
-        if (result) result.innerHTML = `<span class="text-red-400">실패: ${escapeHtml(r.reason || '알 수 없는 오류')}</span>`;
-      }
-    };
-  });
-
-  // 코드 삭제
-  document.querySelectorAll('.code-del-btn').forEach(btn => {
-    btn.onclick = async () => {
-      const key   = btn.dataset.codeDel;
-      const label = btn.dataset.codeLabel || '';
-      const result = document.getElementById('admin-code-result');
-      if (!confirm(`관서 코드 "${label}" 을(를) 삭제하시겠습니까?\n\n· 해당 코드로는 더 이상 로그인할 수 없습니다.\n· 이미 진행 중인 재난(소속 관서 id 참조)은 안전하게 유지됩니다.\n· 이 작업은 되돌릴 수 없습니다.`)) return;
-      if (result) result.innerHTML = '<span class="text-amber-400">삭제 중...</span>';
-      const r = await deleteAgencyCode(key);
-      if (r.ok) {
-        if (result) result.innerHTML = `<span class="text-emerald-400">✓ "${escapeHtml(label)}" 삭제 완료</span>`;
-        setTimeout(() => { if (result) result.innerHTML = ''; }, 3000);
-      } else {
-        if (result) result.innerHTML = `<span class="text-red-400">실패: ${escapeHtml(r.reason || '알 수 없는 오류')}</span>`;
-      }
-    };
-  });
+async function serverAccess(path,body) {
+  const user=auth.currentUser,uid=secureIdentity?.uid;
+  if(!user || user.uid!==uid)throw Error('다시 로그인해주세요.');
+  const token=await user.getIdToken();
+  if(auth.currentUser?.uid!==uid || secureIdentity?.uid!==uid)throw Error('로그인이 변경되었습니다.');
+  const r=await fetch(path,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(45000)});
+  const result=await r.json();if(!r.ok)throw Error(result.error||'서버 연결에 실패했습니다.');
+  if(secureIdentity?.uid!==uid)throw Error('로그인이 변경되었습니다.');
+  return result;
 }
+async function refreshManagedCodes() {
+  if(secureIdentity?.role!=='admin')return;
+  try{
+    const result=await serverAccess('/api/admin/codes');
+    state.agencyCodesList=result.codes;AGENCY_CODES={};
+    result.codes.filter(r=>r.active && r.expiresAt>Date.now()).forEach(r=>{AGENCY_CODES[r.agencyId+':'+r.role]={id:r.agencyId,name:r.agencyName,role:r.role};});
+  }catch(e){state.managedCodeMessage=e.message;}
+  render();
+}
+function bindAdminAgencyCodesEvents() {
+  for(const [id,key] of [['managed-agency-id','agencyId'],['managed-agency-name','agencyName'],['managed-role','role'],['managed-days','days'],['managed-code','code']]){const el=document.getElementById(id);if(el)el.oninput=()=>{state.managedCodeDraft={...(state.managedCodeDraft||{}),[key]:el.value};};}
+  const refresh=document.getElementById('managed-refresh');if(refresh)refresh.onclick=()=>void refreshManagedCodes();
+  const create=document.getElementById('managed-create');if(create)create.onclick=async()=>{
+    const body=state.managedReplaceId?{action:'replace',id:state.managedReplaceId,code:document.getElementById('managed-code').value,days:Number(document.getElementById('managed-days').value)}:{action:'create',code:document.getElementById('managed-code').value,agencyId:document.getElementById('managed-agency-id').value.trim(),agencyName:document.getElementById('managed-agency-name').value.trim(),role:document.getElementById('managed-role').value,days:Number(document.getElementById('managed-days').value)};
+    if(state.managedCodeBusy)return;state.managedCodeBusy=true;create.disabled=true;create.textContent='발급 중...';state.managedCodeMessage='발급 중...';
+    try{state.issuedCode=await serverAccess('/api/admin/codes',body);state.managedCodeMessage=state.managedReplaceId?'새 코드로 접속을 확인한 뒤 이전 코드 폐기를 눌러 교체를 완료하세요.':'코드를 발급했습니다.';state.managedReplaceId=null;state.managedCodeDraft={};await refreshManagedCodes();}catch(e){state.managedCodeMessage=e.message;}finally{state.managedCodeBusy=false;render();}
+  };
+  document.querySelectorAll('[data-managed-replace]').forEach(btn=>btn.onclick=()=>{
+    if(state.managedCodeBusy)return;
+    const record=state.agencyCodesList.find(r=>r.id===btn.dataset.managedReplace);if(!record)return;
+    state.managedReplaceId=record.id;state.managedCodeDraft={agencyId:record.agencyId,agencyName:record.agencyName,role:record.role,days:7,code:''};state.managedCodeMessage='새 코드를 입력하세요. 발급만으로 기존 코드가 폐기되지는 않습니다.';render();document.getElementById('managed-code')?.focus();
+  });
+  const cancelReplace=document.getElementById('managed-cancel-replace');if(cancelReplace)cancelReplace.onclick=()=>{if(state.managedCodeBusy)return;state.managedReplaceId=null;state.managedCodeDraft={};render();};
+  document.querySelectorAll('[data-managed-finish]').forEach(btn=>btn.onclick=()=>{state.pendingCodeFinish=btn.dataset.managedFinish;render();});
+  const finishCancel=document.getElementById('managed-finish-cancel');if(finishCancel)finishCancel.onclick=()=>{state.pendingCodeFinish=null;render();};
+  document.querySelectorAll('[data-managed-finish-confirm]').forEach(btn=>btn.onclick=async()=>{
+    if(state.managedCodeBusy)return;state.managedCodeBusy=true;btn.disabled=true;
+    try{await serverAccess('/api/admin/codes',{action:'finish-replace',id:btn.dataset.managedFinishConfirm});state.pendingCodeFinish=null;state.managedCodeMessage='코드 교체를 완료했습니다. 이전 코드는 사용할 수 없습니다.';await refreshManagedCodes();}catch(e){state.managedCodeMessage=e.message;}finally{state.managedCodeBusy=false;render();}
+  });
+  document.querySelectorAll('[data-managed-revoke]').forEach(btn=>{btn.onclick=()=>{state.pendingCodeRevoke=btn.dataset.managedRevoke;render();};});
+  const cancel=document.getElementById('managed-cancel-revoke');if(cancel)cancel.onclick=()=>{state.pendingCodeRevoke=null;render();};
+  document.querySelectorAll('[data-managed-confirm]').forEach(btn=>{btn.onclick=async()=>{
+    btn.disabled=true;
+    try{await serverAccess('/api/admin/codes',{action:'revoke',id:btn.dataset.managedConfirm});state.pendingCodeRevoke=null;state.managedCodeMessage='코드를 폐기했습니다.';await refreshManagedCodes();}catch(e){state.managedCodeMessage=e.message;render();}
+  };});
+  const close=document.getElementById('managed-dismiss');if(close)close.onclick=()=>{state.issuedCode=null;render();};
+  const copy=document.getElementById('managed-copy');if(copy)copy.onclick=async()=>{try{await navigator.clipboard.writeText(state.issuedCode.code);copy.textContent='복사됨';}catch{state.managedCodeMessage='코드를 직접 선택해 복사해주세요.';render();}};
+}
+
 
 // ==================== V2 — 재난 생성/합류/이탈 ====================
 
@@ -4266,6 +4085,7 @@ async function createIncident(title, type, opts = {}) {
     const incidentId = newRef.key;
     const data = {
       agencyId: opts.agencyId || state.session.agencyId,
+      createdByUid: secureIdentity.uid,
       title: title,
       type: type,
       startedAt: Date.now(),
@@ -4299,9 +4119,10 @@ function joinIncident(incidentId) {
 function leaveIncident() {
   state.currentIncidentId = null;
   state.user = null;
+  state.transportDraft=null; state.transportFeedback=''; state.patientEditor=false;
   // 진입 시점의 view2로 복원
   state.view2 = state.session.role === 'admin' ? 'admin'
-              : state.session.role === 'observer' ? 'observer'
+              : ['observer','hq'].includes(state.session.role) ? 'observer'
               : 'lobby';
   localStorage.removeItem('disaster_currentIncidentId');
   localStorage.removeItem('disaster_user');
@@ -4314,6 +4135,146 @@ function leaveIncident() {
 
 // ==================== /V2 ====================
 
+// MCI task-oriented workspace. Transport edits update the existing patient card.
+function mciTransportStatus(card) {
+  if (card.notTransported) return 'not-transported';
+  if (card.arriveTime) return 'arrived';
+  if (card.departTime) return 'in-transit';
+  if (card.hospital) return 'assigned';
+  return 'pending';
+}
+function hasPatientDraft() { return !!mciDraft._editKey || Object.entries(mciDraft).some(([k,v])=>!k.startsWith('_') && (Array.isArray(v)?v.length>0:typeof v==='boolean'?v:!!v)); }
+const MCI_TRANSPORT_LABELS = {pending:'병원 미배정',assigned:'병원 배정 · 출발 전','in-transit':'이송 중',arrived:'병원 도착','not-transported':'미이송'};
+function buildTransportChange(draft, baseline) {
+  const data = {hospital:draft.hospital.trim(),departTime:draft.departTime.trim(),arriveTime:draft.arriveTime.trim()};
+  for (const key of ['departTime','arriveTime']) {
+    if (data[key] && !/^(?:[01]\d|2[0-3]):?[0-5]\d$/.test(data[key])) throw Error('시각은 HHMM 또는 HH:MM 형식으로 입력하세요.');
+    if (/^\d{4}$/.test(data[key])) data[key]=data[key].slice(0,2)+':'+data[key].slice(2);
+  }
+  if ((data.departTime || data.arriveTime) && !data.hospital) throw Error('출발·도착을 기록하려면 이송 병원을 입력하세요.');
+  if (data.arriveTime && !data.departTime) throw Error('도착을 기록하려면 출발 시각도 입력하세요.');
+  if (data.hospital) { data.notTransported=false; data.notTransportedReason=null; }
+  const payload=Object.fromEntries(Object.entries(data).filter(([k,v])=>JSON.stringify(v??null)!==JSON.stringify(baseline[k]??null)));
+  // All transport fields form one decision: a concurrent change must be reviewed.
+  const expected=Object.fromEntries(['hospital','departTime','arriveTime','notTransported','notTransportedReason'].map(k=>[k,baseline[k]??null]));
+  // Sender compares payload keys. Include unchanged transport fields in this scoped operation.
+  return {payload:Object.keys(payload).length?{...Object.fromEntries(Object.entries(expected)),...data}:{},expected};
+}
+function workspaceConnectionText() {
+  if (!navigator.onLine || state.firebaseConnected === false) return '연결 끊김 · 기기 보관';
+  if (!state.firebaseConnected) return '연결 확인 중';
+  const count=outboxPendingCount()+outboxFailedCount();
+  return count ? `미전송·확인 ${count}건` : '서버 연결됨';
+}
+function refreshWorkspaceConnection() {
+  document.querySelectorAll('[data-connection-status]').forEach(el=>{el.textContent=workspaceConnectionText();});
+}
+function renderMciWorkspaceHeader(team, observerMode) {
+  const incident=state.incidents.find(i=>i._key===state.currentIncidentId);
+  const tabs=observerMode?[['situation','상황판','layout-dashboard'],['field','현장 정보','clipboard-list'],['more','더보기','menu']]:[['situation','상황판','layout-dashboard'],['casualty','환자 관리','users'],['transport','이송 관리','ambulance'],['field','현장 정보','clipboard-list'],['more','더보기','menu']];
+  return `<header class="workspace-header"><div class="workspace-heading"><div class="min-w-0"><div class="workspace-eyebrow">MCI · 테스트 환경</div><h1 class="text-lg font-bold truncate">${escapeHtml(incident?.title || '재난 상황판')}</h1><p class="text-xs text-slate-400">${escapeHtml(team.name)} · ${escapeHtml(state.user.name)}</p></div><span class="workspace-connection" data-connection-status role="status">${workspaceConnectionText()}</span></div>
+  <nav class="workspace-nav" aria-label="MCI 주 메뉴">${tabs.map(([id,label,icon])=>`<button data-mci-tab="${id}" class="mci-tab-btn ${state.mciTab===id?'is-current':''}" ${state.mciTab===id?'aria-current="page"':''}><i data-lucide="${icon}" class="w-5 h-5"></i>${label}</button>`).join('')}</nav></header>`;
+}
+function renderMciMore(observerMode) {
+  return `<section class="workspace-page"><h2 class="text-xl font-bold">더보기</h2><p class="text-slate-400">보기 설정과 재난 관리</p><div class="workspace-actions">
+    ${secureIdentity?.role==='admin'?'<button id="manage-codes-btn">관서 진입 코드 관리</button>':''}${!observerMode?'<button id="open-display-btn">전광판 열기</button><button id="admin-btn">내보내기 · 재난 관리</button>':''}
+    <button id="briefing-toggle">${state.briefingMode?'개인정보 가림 켜짐':'개인정보 가림 꺼짐'}</button>
+    <button data-field-open="legacy">기존 일반재난 환자 기록 (${state.casualties.length}건)</button>
+    <button id="logout-btn">재난 목록으로</button>
+    <button id="workspace-outdoor" aria-pressed="${!!state.outdoorMode}">야외 모드 ${state.outdoorMode?'켜짐':'꺼짐'}</button>
+    <button id="workspace-help">도움말 · 사용법</button>
+  </div></section>`;
+}
+// Shared incident information uses the original paths; patient collections stay separate.
+function renderFieldSummary() {
+  const inc=state.incident || {};
+  return `<section class="workspace-page field-summary"><div class="workspace-patient"><div class="flex items-center justify-between gap-2"><h2 class="text-lg font-bold">재난 정보</h2><button class="workspace-button" data-field-open="incident">상세 보기</button></div><dl class="field-facts">${[['발생일시',inc.datetime],['장소',inc.location],['대상',inc.target]].map(([label,value])=>`<div><dt>${label}</dt><dd>${escapeHtml(value || '미입력')}</dd></div>`).join('')}</dl>${inc.summary?`<p class="field-summary-text">${escapeHtml(inc.summary)}</p>`:''}</div>${state.casualties.length?`<p class="text-sm text-amber-300">기존 일반재난 환자 ${state.casualties.length}건은 아래 MCI 환자 수에 포함되지 않습니다. <button class="workspace-button" data-field-open="legacy">기록 확인</button></p>`:''}</section>`;
+}
+function renderFieldTimeline(limit=0) {
+  const actions=[...state.actions].sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
+  const list=limit?actions.slice(0,limit):actions;
+  return `<ol class="field-timeline">${list.map(a=>`<li><div class="text-sm text-slate-400">${escapeHtml(a.timestamp?new Date(a.timestamp).toLocaleString('ko-KR'):'시각 미입력')} · ${escapeHtml(TEAMS.find(t=>t.id===a.teamId)?.name || a.teamId || '')} · ${escapeHtml(a.author || '')}</div><p>${escapeHtml(a.content || '')}</p></li>`).join('')||'<li class="text-slate-400">아직 등록된 조치사항이 없습니다.</li>'}</ol>`;
+}
+function renderFieldActivitySummary() {
+  const totals=getTotals();
+  return `<section class="workspace-page"><div class="workspace-patient"><div class="flex items-center justify-between gap-2"><h2 class="text-lg font-bold">동원 보고 요약</h2><button class="workspace-button" data-field-open="mobilization">동원 보기</button></div><p class="text-lg mt-3">인력 ${totals.totalP}명 · 장비 ${totals.totalV}대</p><p class="text-sm text-slate-400 mt-2">${Object.keys(state.mobilizations).length}개 직책 보고 합계 · 같은 인력·장비를 중복 보고하지 마세요.</p></div><div class="workspace-patient"><div class="flex items-center justify-between gap-2"><h2 class="text-lg font-bold">최근 조치사항</h2><button class="workspace-button" data-field-open="action">전체 보기</button></div>${renderFieldTimeline(3)}</div></section>`;
+}
+function renderFieldReports(kind) {
+  const records=kind==='mobilization'?state.mobilizations:state.damages;
+  return `<div class="workspace-patients">${Object.entries(records).map(([teamId,record])=>`<article class="workspace-patient"><h3 class="font-bold">${escapeHtml(TEAMS.find(t=>t.id===teamId)?.name || teamId)} 보고</h3><p class="text-sm text-slate-400">${escapeHtml(record._author || '')}</p>${kind==='mobilization'?`<dl class="field-facts">${AGENCIES.map(a=>`<div><dt>${escapeHtml(a.name)}</dt><dd>${Number(record.agencies?.[a.id]?.p)||0}명 / ${Number(record.agencies?.[a.id]?.v)||0}대</dd></div>`).join('')}</dl><p class="text-sm text-slate-400 mt-3">소방차량 종류별 내역 (위 장비 수에 추가 합산하지 않음)</p><dl class="field-facts">${VEHICLES.map(v=>`<div><dt>${escapeHtml(v.name)}</dt><dd>${Number(record.vehicles?.[v.id])||0}대</dd></div>`).join('')}</dl>`:`<dl class="field-facts">${[['dead','사망'],['severe','중상'],['mild','경상'],['etc','기타']].map(([key,label])=>`<div><dt>${label} 보고</dt><dd>${Number(record[key])||0}명</dd></div>`).join('')}${[['propRe','부동산'],['propMov','동산'],['propEtc','기타 재산']].map(([key,label])=>`<div><dt>${label}</dt><dd>${(Number(record[key])||0).toLocaleString()}천원</dd></div>`).join('')}</dl>`}</article>`).join('')||'<p class="text-slate-400">아직 등록된 보고가 없습니다.</p>'}</div>`;
+}
+function renderLegacyPatients() {
+  return `<p class="text-sm text-amber-300">기존 일반재난 환자 기록 ${state.casualties.length}건 · 읽기 전용입니다. MCI 환자 수에 합산하거나 자동 복사하지 않습니다. 같은 환자를 다시 등록하기 전에 기존 기록과 대조하세요.</p><div class="workspace-patients">${state.casualties.map(c=>`<article class="workspace-patient"><h3 class="font-bold">#${escapeHtml(String(c.cardNo || '?'))} · ${escapeHtml(state.briefingMode?maskName(c.name || ''):c.name || '미상')}</h3><dl class="field-facts">${[['분류',MCI_TRIAGE.find(t=>t.id===c.triage)?.name || c.triage],['발견장소',c.location],['증상',c.symptom],['병원',c.hospital],['출발',c.departTime || c.depart],['도착',c.arriveTime],['작성자',c.author]].map(([label,value])=>`<div><dt>${label}</dt><dd>${escapeHtml(value || '미입력')}</dd></div>`).join('')}</dl></article>`).join('')||'<p class="text-slate-400">기존 일반재난 환자 기록이 없습니다.</p>'}</div>`;
+}
+function renderFieldWorkspace(readOnly=false) {
+  const tabs=[['incident','재난 정보'],['mobilization','동원'],['action','조치사항'],['damage','피해 보고'],['legacy','기존 환자']];
+  const selected=tabs.some(([id])=>id===state.fieldTab)?state.fieldTab:'incident';
+  const inc=state.incident||{};
+  let content='';
+  if(selected==='incident')content=readOnly?`<div class="workspace-patient"><dl class="field-facts">${[['발생일시',inc.datetime],['장소',inc.location],['대상',inc.target],['건물구조',inc.structure],['원인',inc.cause],['사고개요',inc.summary]].map(([label,value])=>`<div><dt>${label}</dt><dd>${escapeHtml(value || '미입력')}</dd></div>`).join('')}</dl></div>`:renderIncidentForm();
+  if(selected==='mobilization')content=`<p class="text-sm text-slate-400">직책별 보고를 함께 봅니다. 입력 시 해당 직책의 값이 갱신됩니다. 다른 직책이 보고한 동일 인력·장비는 중복 입력하지 마세요.</p>${renderFieldReports('mobilization')}${!readOnly?`<h3 class="text-lg font-bold">내 직책 동원 입력</h3>${renderMobilForm()}`:''}`;
+  if(selected==='action')content=`${!readOnly?renderActionForm():''}<div class="workspace-patient"><h3 class="text-lg font-bold">전체 조치사항</h3>${renderFieldTimeline()}</div>`;
+  if(selected==='damage')content=`<p class="text-sm text-amber-300">직책별 수기 피해 보고입니다. 인명피해 보고는 환자 카드와 중복될 수 있어 MCI 환자 합계에 더하지 않습니다. 중상·경상 보고와 트리아지 등급은 자동 변환하지 않습니다.</p>${renderFieldReports('damage')}${!readOnly?`<h3 class="text-lg font-bold">내 직책 피해 보고 입력</h3>${renderDamageForm()}`:''}`;
+  if(selected==='legacy')content=renderLegacyPatients();
+  return `<section class="workspace-page field-workspace"><h2 class="text-xl font-bold">현장 정보</h2><p class="text-sm text-slate-400">같은 재난의 개요·동원·조치사항·피해 보고${readOnly?' · 읽기 전용':''}</p><nav class="field-tabs" aria-label="현장 정보 항목">${tabs.map(([id,label])=>`<button data-field-tab="${id}" class="workspace-button ${selected===id?'is-current':''}" ${selected===id?'aria-current="page"':''}>${label}</button>`).join('')}</nav>${content}</section>`;
+}
+function bindFieldWorkspace() {
+  document.querySelectorAll('[data-field-tab]').forEach(button=>{button.onclick=()=>{state.fieldTab=button.dataset.fieldTab;render();window.scrollTo({top:0});};});
+  if(isObserver())return;
+  if(state.fieldTab==='incident')bindIncidentEvents();
+  if(state.fieldTab==='mobilization')bindMobilEvents();
+  if(state.fieldTab==='action')bindActionEvents();
+  if(state.fieldTab==='damage')bindDamageEvents();
+}
+function renderPatientWorkspace(transport=false) {
+  if(!transport && state.patientEditor) return `<div class="workspace-page mci-editor-return"><button id="patient-list-back" class="workspace-button">← 환자 목록</button><p class="text-slate-400">목록으로 이동해도 작성 중인 입력은 유지됩니다.</p></div>${renderMciCasualtyForm()}`;
+  const cards=state.mciCasualties.filter(c=>!isFieldOnly(state.user.teamId)||c.author===state.user.name);
+  const filter=transport?state.transportFilter:state.patientFilter;
+  const q=(transport?state.transportSearch:state.patientSearch).trim().toLowerCase();
+  const list=cards.filter(c=>(!filter||filter==='all'||(transport?mciTransportStatus(c)===filter:c.triage===filter))&&[c.cardNo,c.name,c.location,c.hospital].some(v=>String(v??'').toLowerCase().includes(q))).sort((a,b)=>(a.cardNo||0)-(b.cardNo||0));
+  const options=transport?Object.entries(MCI_TRANSPORT_LABELS):MCI_TRIAGE.map(t=>[t.id,t.name]);
+  return `<section class="workspace-page"><div class="flex items-center justify-between gap-3"><div><h2 class="text-xl font-bold">${transport?'이송 관리':'환자 관리'}</h2><p class="text-sm text-slate-400">${transport?'기존 환자 카드의 이송 정보를 수정합니다.':`${cards.length}명 등록 · 번호나 장소로 찾으세요.`}</p></div>${!transport?`<button id="patient-register" class="workspace-primary">${hasPatientDraft()?'작성 중 입력 계속':'＋ 환자 등록'}</button>`:''}</div>
+    <div class="workspace-filters"><label>환자 검색<input id="workspace-search" value="${escapeHtml(transport?state.transportSearch:state.patientSearch)}" placeholder="번호 · 이름 · 장소 · 병원" /></label><label>${transport?'이송 상태':'중증도'}<select id="workspace-filter"><option value="all">전체</option>${options.map(([id,label])=>`<option value="${id}" ${filter===id?'selected':''}>${label}</option>`).join('')}</select></label></div>
+    ${transport&&state.transportDraft?renderTransportEditor():''}
+    <p class="text-sm text-slate-400" role="status">검색 결과 ${list.length}명</p><div class="workspace-patients">${list.map(c=>{const tr=MCI_TRIAGE.find(t=>t.id===c.triage);return `<article class="workspace-patient"><div class="flex flex-wrap items-center gap-2"><strong class="text-lg">#${String(c.cardNo||'?').padStart(3,'0')}</strong><span class="rounded px-2 py-1 text-sm font-bold" style="${triageBadgeStyle(c.triage)}">${escapeHtml(tr?.name||'미분류')}</span><span class="text-sm text-slate-300">${escapeHtml(mciTransportStatus(c)==='pending'?'병원 미배정':MCI_TRANSPORT_LABELS[mciTransportStatus(c)])}</span></div><div class="mt-2 font-medium">${escapeHtml(state.briefingMode?maskName(c.name||''):c.name||'미상')}</div><p class="text-sm text-slate-400 mt-1">${escapeHtml(c.location||'발견 장소 미입력')} · ${escapeHtml(c.hospital||'병원 미배정')}</p>${transport?`<p class="text-sm mt-2">출발 ${escapeHtml(c.departTime||'—')} · 도착 ${escapeHtml(c.arriveTime||'—')}</p>`:''}<div class="flex gap-2 mt-3"><button data-patient-detail="${escapeHtml(c._key)}" class="workspace-button">상세 보기</button>${transport&&canEditCard(state.user,c)?`<button data-transport-edit="${escapeHtml(c._key)}" class="workspace-primary">이송 정보 수정</button>`:''}</div></article>`;}).join('')||'<p class="workspace-patient text-slate-400">조건에 맞는 환자가 없습니다.</p>'}</div></section>`;
+}
+function renderTransportEditor() {
+  const d=state.transportDraft;
+  return `<section class="workspace-patient transport-editor" aria-label="이송 정보 입력"><h3 class="font-bold text-lg">#${escapeHtml(String(d.cardNo))} 이송 정보</h3><p class="text-sm text-slate-400">기존 환자 카드에 반영됩니다. 미이송 사유 변경은 카드 상세 입력을 이용하세요.</p><div class="workspace-filters">${[['hospital','이송 병원'],['departTime','출발 시각'],['arriveTime','도착 시각']].map(([key,label])=>`<label>${label}<input data-transport-field="${key}" ${state.transportSaving?'disabled':''} value="${escapeHtml(d[key])}" ${key==='hospital'?'list="hospital-suggestions" maxlength="100"':'inputmode="numeric" maxlength="5" placeholder="HH:MM"'} /></label>`).join('')}</div><p id="transport-feedback" role="status" class="text-sm text-amber-300">${escapeHtml(state.transportFeedback||'')}</p><div class="flex gap-2"><button id="transport-save" class="workspace-primary" ${state.transportSaving?'disabled':''}>${state.transportSaving?'저장 중…':'이송 정보 저장'}</button><button id="transport-cancel" class="workspace-button" ${state.transportSaving?'disabled':''}>입력 취소</button></div></section>`;
+}
+function bindPatientWorkspace() {
+  const transport=state.mciTab==='transport';
+  const search=document.getElementById('workspace-search');
+  if(search){ const applySearch=event=>{if(event?.isComposing)return;const position=search.selectionStart;state[transport?'transportSearch':'patientSearch']=search.value;render();const next=document.getElementById('workspace-search');next?.focus();next?.setSelectionRange(position,position);}; search.oninput=applySearch;search.oncompositionend=applySearch; }
+  const filter=document.getElementById('workspace-filter');
+  if(filter)filter.onchange=()=>{state[transport?'transportFilter':'patientFilter']=filter.value;render();};
+  const register=document.getElementById('patient-register');if(register)register.onclick=()=>{state.patientEditor=true;state.inspectCardKey=null;render();};
+  const back=document.getElementById('patient-list-back');if(back)back.onclick=()=>{state.patientEditor=false;render();};
+  document.querySelectorAll('[data-patient-detail]').forEach(b=>b.onclick=()=>{state.viewMciCardKey=b.dataset.patientDetail;render();});
+  document.querySelectorAll('[data-transport-edit]').forEach(b=>b.onclick=()=>{
+    if(state.transportSaving)return;
+    if(state.transportDraft && state.transportDraft.key!==b.dataset.transportEdit){window.__mciShowOutboxStatus?.('작성 중인 이송 정보를 저장하거나 닫은 뒤 다른 환자를 선택하세요.','err');return;}
+    const c=state.mciCasualties.find(c=>c._key===b.dataset.transportEdit);if(!c||!canEditCard(state.user,c))return;
+    if(!state.transportDraft)state.transportDraft={key:c._key,cardNo:c.cardNo,incidentId:state.currentIncidentId,uid:secureIdentity.uid,hospital:c.hospital||'',departTime:c.departTime||'',arriveTime:c.arriveTime||'',baseline:JSON.parse(JSON.stringify(c._serverRecord||c))};
+    state.transportFeedback='';render();document.querySelector('[data-transport-field]')?.focus();
+  });
+  document.querySelectorAll('[data-transport-field]').forEach(input=>input.oninput=()=>{state.transportDraft[input.dataset.transportField]=input.value;});
+  const cancel=document.getElementById('transport-cancel');if(cancel)cancel.onclick=()=>{state.transportDraft=null;state.transportFeedback='';render();};
+  const save=document.getElementById('transport-save');if(save)save.onclick=async()=>{
+    if(state.transportSaving)return;
+    const d=state.transportDraft,c=state.mciCasualties.find(c=>c._key===d.key);
+    try {
+      if(d.incidentId!==state.currentIncidentId||d.uid!==secureIdentity?.uid||!c||!canEditCard(state.user,c)||!assertCanWrite('이송 정보 저장'))throw Error('재난방 또는 로그인 상태가 바뀌었습니다. 최신 환자 카드를 확인하세요.');
+      const {payload,expected}=buildTransportChange(d,d.baseline);if(!Object.keys(payload).length){state.transportDraft=null;render();return;}
+      state.transportSaving=true;state.transportFeedback='';render();
+      const result=await durableWrite({kind:'mci',method:'update',path:incPath('mciCasualties/'+d.key),incidentId:d.incidentId,expected,payload:{...payload,updatedByUid:secureIdentity.uid,_updatedBy:state.user.name,_updatedTeamId:state.user.teamId,_updatedAt:Date.now()}});
+      if(!result.ok&&!result.queued)throw Error(result.error||'저장하지 못했습니다. 입력은 유지됩니다.');
+      if(state.transportDraft===d)state.transportDraft=null;
+      window.__mciShowOutboxStatus?.(result.queued?'기기에 보관했습니다. 미전송함에서 전송 상태를 확인하세요.':'이송 정보를 저장했습니다.',result.queued?'err':'ok');
+    } catch(error){state.transportFeedback=error.message;} finally{state.transportSaving=false;render();}
+  };
+}
+
 function renderMain() {
   const team = TEAMS.find(t => t.id === state.user.teamId)
     || { id: state.user.teamId, name: '미상', color: '#64748b' };
@@ -4321,7 +4282,7 @@ function renderMain() {
   // observer가 어쩌다 입력 탭에 들어가 있으면 강제로 조회 탭으로
   if (observerMode) {
     if (state.view === 'input') state.view = 'dashboard';
-    if (state.mciTab === 'casualty') state.mciTab = 'situation';
+    if (['casualty','transport'].includes(state.mciTab)) state.mciTab = 'situation';
   }
   return `
     <div class="min-h-screen text-slate-100">
@@ -4333,7 +4294,7 @@ function renderMain() {
       ` : ''}
       <!-- PC 와이드 화면: 배경 띠는 전체 폭, 내용물은 max-w-5xl(1024px)로 중앙 정렬
            — 로비/관리자 화면과 동일한 폭 기준 (휴대폰에서는 변화 없음) -->
-      <header class="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800">
+      ${state.mode === 'mci' ? renderMciWorkspaceHeader(team,observerMode) : `<header class="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-800">
         <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <div class="w-9 h-9 rounded-lg bg-gradient-to-br ${state.mode === 'mci' ? 'from-rose-600 to-pink-700' : 'from-red-600 to-red-700'} flex items-center justify-center shadow-lg shadow-red-900/50">
@@ -4350,11 +4311,11 @@ function renderMain() {
               <i data-lucide="monitor" class="w-3 h-3"></i>표출
             </button>
             ${!observerMode ? `
-              <button id="admin-btn" class="text-[11px] text-slate-300 px-3 py-1.5 rounded bg-slate-800/50 hover:bg-slate-700 flex items-center gap-1">
+              <button id="admin-btn" class="shrink-0 whitespace-nowrap text-[11px] text-slate-300 px-3 py-1.5 rounded bg-slate-800/50 hover:bg-slate-700 flex items-center gap-1">
                 <i data-lucide="settings" class="w-3 h-3"></i>관리
               </button>
             ` : ''}
-            <button id="logout-btn" class="text-[11px] text-slate-500 px-3 py-1.5 rounded bg-slate-800/50">
+            <button id="logout-btn" class="shrink-0 whitespace-nowrap text-[11px] text-slate-500 px-3 py-1.5 rounded bg-slate-800/50">
               ${observerMode ? '로비로' : '반 변경'}
             </button>
           </div>
@@ -4438,12 +4399,12 @@ function renderMain() {
             </div>
           </div>
         `}
-      </header>
+      </header>`}
 
       <main class="max-w-5xl mx-auto pb-20">
         ${state.mode === 'general'
           ? (state.view === 'dashboard' ? renderDashboard() : renderInput())
-          : (state.mciTab === 'situation' ? renderMciSituation() : renderMciCasualtyForm())}
+          : (state.mciTab === 'situation' ? renderFieldSummary()+renderMciSituation()+renderFieldActivitySummary() : state.mciTab === 'field' ? renderFieldWorkspace(observerMode) : state.mciTab === 'more' ? renderMciMore(observerMode) : renderPatientWorkspace(state.mciTab === 'transport'))}
         <footer class="px-4 py-6 mt-4 text-center">
           <div class="inline-flex items-center gap-2 text-[11px] text-slate-600 tracking-wider flex-wrap justify-center">
             <span class="w-8 h-px bg-slate-800"></span>
@@ -4592,7 +4553,7 @@ function renderArchivesPanel() {
                 <div class="text-[11px] text-slate-500 mono">${date.toLocaleString('ko-KR')}</div>
                 <div class="text-[10px] text-slate-600 mt-0.5">백업자: ${escapeHtml(ar.archivedBy || '-')}</div>
               </div>
-              <button data-del-archive="${ar._key}" class="del-archive text-slate-600 hover:text-red-400 p-1" title="백업 삭제" aria-label="백업 삭제">
+              <button ${ar.closureId ? 'hidden disabled' : ''} data-del-archive="${ar._key}" class="del-archive text-slate-600 hover:text-red-400 p-1" title="백업 삭제" aria-label="백업 삭제">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
               </button>
             </div>
@@ -4641,11 +4602,11 @@ function renderResetPanel() {
         <label class="text-[11px] text-slate-400 block mb-1">확인을 위해 <span class="text-red-400 font-bold">초기화</span> 를 정확히 입력하세요</label>
         <input id="reset-confirm" type="text" placeholder="초기화"
           class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
-        <p class="text-[10px] text-slate-600 mt-1">⚠ 실행하면 현재 재난 데이터가 백업되고 초기화됩니다. 되돌릴 수 없음.</p>
+        <p class="text-[10px] text-slate-600 mt-1">⚠ 실행하면 현재 재난을 백업하고 종료합니다. 원본은 보존되며 새 재난은 로비에서 생성합니다.</p>
       </div>
 
       <button id="execute-reset" class="w-full py-3 rounded-xl bg-red-700 hover:bg-red-600 font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2">
-        <i data-lucide="refresh-cw" class="w-4 h-4"></i>백업 후 새 재난 시작
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>현재 재난 백업 후 종료
       </button>
       <div id="reset-result" class="text-xs text-center min-h-[20px]"></div>
     </div>
@@ -4653,7 +4614,14 @@ function renderResetPanel() {
 }
 
 function bindMainEvents() {
-  document.getElementById('logout-btn').onclick = () => {
+  document.querySelectorAll('[data-field-open]').forEach(button=>{button.onclick=()=>{state.mciTab='field';state.fieldTab=button.dataset.fieldOpen;render();window.scrollTo({top:0});};});
+  const outdoorButton=document.getElementById('workspace-outdoor');
+  if(outdoorButton)outdoorButton.onclick=()=>{document.getElementById('outdoor-toggle')?.click();outdoorButton.textContent=`야외 모드 ${state.outdoorMode?'켜짐':'꺼짐'}`;outdoorButton.setAttribute('aria-pressed',String(!!state.outdoorMode));};
+  const helpButton=document.getElementById('workspace-help');
+  if(helpButton)helpButton.onclick=()=>document.getElementById('help-btn')?.click();
+  const codesButton=document.getElementById('manage-codes-btn');if(codesButton)codesButton.onclick=()=>{leaveIncident();document.getElementById('managed-codes-panel')?.scrollIntoView({block:'start'});};
+  const leaveButton=document.getElementById('logout-btn');
+  if(leaveButton)leaveButton.onclick = () => {
     // V2: 재난방 나가기 → 로비로 (세션은 유지)
     formDrafts = { incident: null, damage: null, mobil: { agencies: null, vehicles: null }, action: '' };
     leaveIncident();
@@ -4662,10 +4630,14 @@ function bindMainEvents() {
   const openDisplayBtn = document.getElementById('open-display-btn');
   if (openDisplayBtn) {
     openDisplayBtn.onclick = () => {
-      const url = `${location.pathname}?popout=display&incident=${encodeURIComponent(state.currentIncidentId || '')}`;
-      // 같은 이름 재사용 → 이미 떠 있으면 새로 안 만들고 그 창을 다시 가리킴
-      window.open(url, 'mciDisplayPopout', 'popup=yes,width=1600,height=900');
+      const incidentId=state.currentIncidentId,nonce=crypto.randomUUID();
+      const url=`${location.pathname}?popout=display&nonce=${encodeURIComponent(nonce)}`;
+      const popup=window.open(url,'mciDisplay-'+nonce,'popup=yes,width=1600,height=900');
+      if(!popup){alert('표출 창을 열려면 팝업을 허용해주세요.');return;}
+      connectDisplayParent({popup,nonce,issueToken:()=>serverAccess('/api/auth/display',{incidentId}),
+        onError:message=>{popup.close();window.__mciToast?.(message,'warn');}});
     };
+
   }
 
   // 관리 버튼은 observer에게는 숨겨져 있음 → null 체크
@@ -4695,7 +4667,7 @@ function bindMainEvents() {
     };
   });
   document.querySelectorAll('.mci-tab-btn').forEach(btn => {
-    btn.onclick = () => { state.mciTab = btn.dataset.mciTab; render(); };
+    btn.onclick = () => { state.mciTab = btn.dataset.mciTab; render(); window.scrollTo({top:0}); };
   });
   const bt = document.getElementById('briefing-toggle');
   if (bt) {
@@ -4712,7 +4684,11 @@ function bindMainEvents() {
   if (state.adminModal) bindAdminModalEvents();
 
   if (state.mode === 'general' && state.view === 'input') bindInputEvents();
-  if (state.mode === 'mci' && state.mciTab === 'casualty') bindMciCasualtyEvents();
+  if (state.mode === 'mci' && state.mciTab === 'field') bindFieldWorkspace();
+  if (state.mode === 'mci' && ['casualty','transport'].includes(state.mciTab)) {
+    bindPatientWorkspace();
+    if(state.mciTab === 'casualty' && state.patientEditor)bindMciCasualtyEvents();
+  }
   if (state.mode === 'mci' && state.mciTab === 'situation') bindMciSituationEvents();
   if (state.viewMciCardKey) bindMciCardDetailModalEvents();
 }
@@ -4772,12 +4748,12 @@ function bindAdminModalEvents() {
         resultEl.innerHTML = '<span class="text-red-400">"초기화" 를 정확히 입력해주세요</span>';
         return;
       }
-      if (!confirm(`정말로 현재 재난 데이터를 백업하고 초기화하시겠습니까?\n\n라벨: ${label || '(빈 값)'}\n\n이 작업은 되돌릴 수 없습니다.`)) return;
+      if (!confirm(`현재 재난을 백업하고 종료하시겠습니까?\n\n라벨: ${label || '(빈 값)'}\n\n이 작업은 되돌릴 수 없습니다.`)) return;
 
       resultEl.innerHTML = '<span class="text-amber-400">처리 중...</span>';
       const r = await archiveAndReset(label);
       if (r.ok) {
-        resultEl.innerHTML = '<span class="text-emerald-400">✓ 백업 완료, 초기화되었습니다</span>';
+        resultEl.innerHTML = '<span class="text-emerald-400">✓ 백업 및 종료 완료. 새 재난은 로비에서 생성하세요.</span>';
         // 폼 임시 데이터도 초기화
         formDrafts = { incident: null, damage: null, mobil: { agencies: null, vehicles: null }, action: '' };
         casualtyDraft = { name: '', age: '', gender: '', triage: '', symptom: '', hospital: '', depart: '', _editKey: null };
@@ -4785,7 +4761,8 @@ function bindAdminModalEvents() {
         resetCsDraft();
         setTimeout(() => {
           state.adminModal = false;
-          state.view = 'dashboard';
+          state.currentIncidentId = null;
+          state.view2 = 'lobby';
           render();
         }, 1500);
       } else {
@@ -5174,7 +5151,7 @@ function renderDamageForm() {
       </div>
       <button id="save-damage" class="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:bg-slate-700 font-bold text-sm tracking-wide transition-all">${teamName} 입력 저장</button>
       <div class="text-xs text-center min-h-[20px]">${saveStatusBar('damage')}</div>
-      <p class="text-[11px] text-slate-500 text-center">다른 반 입력과 자동 합산됩니다</p>
+      <p class="text-[11px] text-slate-500 text-center">${state.mode==='mci'?'내 직책의 수기 보고를 저장합니다. MCI 환자 합계에는 더하지 않습니다.':'다른 반 입력과 자동 합산됩니다'}</p>
     </div>
   `;
 }
@@ -5490,8 +5467,9 @@ function bindCasualtyEvents() {
   // 삭제 버튼
   document.querySelectorAll('.del-casualty').forEach(btn => {
     btn.onclick = async () => {
+      const expected = state.casualties.find(c=>c._key===btn.dataset.delCs)?._serverRecord;
       if (!confirm('이 사상자 정보를 삭제하시겠습니까?')) return;
-      await deleteCasualty(btn.dataset.delCs);
+      await deleteCasualty(btn.dataset.delCs,expected);
     };
   });
 }
@@ -5726,7 +5704,7 @@ function changedCardFields(data, baseline) {
 function currentCasualtyDraft() { return state.mode === 'general' ? csDraft : mciDraft; }
 function currentCasualtyList()  { return state.mode === 'general' ? state.casualties : state.mciCasualties; }
 function saveSelectedCasualty(...args) { return state.mode === 'general' ? saveCasualty(...args) : saveMciCasualty(...args); }
-function deleteSelectedCasualty(key)   { return state.mode === 'general' ? deleteCasualty(key)   : deleteMciCasualty(key); }
+function deleteSelectedCasualty(key, expected) { return state.mode === 'general' ? deleteCasualty(key,expected) : deleteMciCasualty(key,expected); }
 function resetCurrentDraft() { if (state.mode === 'general') resetCsDraft(); else resetMciDraft(); }
 
 // MCI 사상자 카드 입력 폼
@@ -5777,7 +5755,7 @@ function renderMciCasualtyForm() {
   }
 
   return `
-    <div class="px-4 py-4">
+    <div class="mci-input-form px-4 py-3">
       <!-- 2단 레이아웃: PC(lg+)는 좌측에 등록 카드 목록(누적·스크롤), 우측에 입력 폼.
            모바일은 기존처럼 폼 위 / 목록 아래 (order로 순서만 교체) -->
       <div class="flex flex-col lg:flex-row lg:items-start lg:gap-4">
@@ -5786,7 +5764,7 @@ function renderMciCasualtyForm() {
       <div class="order-1 lg:order-2 flex-1 min-w-0 space-y-4">
 
       <!-- 직책 + 모드 안내 -->
-      <div class="bg-slate-900 rounded-xl border border-slate-800 p-3 flex items-center justify-between gap-2">
+      <div class="mci-mode-heading bg-slate-900 rounded-xl border border-slate-800 p-3 flex items-center justify-between gap-2">
         <div class="flex items-center gap-2 min-w-0 flex-1">
           <i data-lucide="${TEAMS.find(t=>t.id===state.user.teamId)?.icon || 'user'}" class="w-4 h-4 flex-shrink-0" style="color:${TEAMS.find(t=>t.id===state.user.teamId)?.color}"></i>
           <span class="text-xs text-slate-300 truncate">
@@ -5796,7 +5774,7 @@ function renderMciCasualtyForm() {
         <!-- 모드 전환 토글 (현장대원은 disable) -->
         <div class="flex bg-slate-950 rounded-md p-0.5 border border-slate-800 flex-shrink-0">
           <button id="mci-mode-simple" class="px-2 py-1 text-[11px] font-bold rounded ${inputMode === 'simple' ? 'bg-pink-600 text-white' : 'text-slate-400'}">간이</button>
-          <button id="mci-mode-full" class="px-2 py-1 text-[11px] font-bold rounded ${inputMode === 'full' ? 'bg-pink-600 text-white' : 'text-slate-400'}">풀 카드</button>
+          <button id="mci-mode-full" class="px-2 py-1 text-[11px] font-bold rounded ${inputMode === 'full' ? 'bg-pink-600 text-white' : 'text-slate-400'}">상세 입력</button>
         </div>
       </div>
 
@@ -5870,7 +5848,7 @@ function renderMciCasualtyForm() {
 
       <!-- 입력 폼 -->
       <div class="bg-slate-900 rounded-2xl border ${isEditing ? 'border-amber-500' : 'border-slate-800'} ${inspected ? 'hidden' : ''}">
-        <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+        <div class="mci-input-heading px-4 py-3 border-b border-slate-800 flex items-center justify-between">
           <h3 class="text-sm font-bold flex items-center gap-2">
             <i data-lucide="${isEditing ? 'pencil' : 'user-round-plus'}" class="w-4 h-4 ${isEditing ? 'text-amber-400' : 'text-pink-400'}"></i>
             ${isEditing ? '카드 수정 중' : (inputMode === 'simple' ? '빠른 카드 추가' : '사상자 카드 추가')}
@@ -6130,7 +6108,7 @@ function renderMciCasualtyForm() {
             <div class="text-[11px] text-slate-500 text-center py-2 border-t border-slate-800">
               <i data-lucide="info" class="w-3 h-3 inline mr-0.5"></i>
               간이 모드: 트리아지·기본정보·주증상만 입력합니다.<br>
-              생체징후·처치·이송은 구급팀이 풀 카드 모드에서 추가합니다.
+              생체징후·처치·이송은 구급팀이 상세 입력 모드에서 추가합니다.
             </div>
           `}
 
@@ -6170,12 +6148,12 @@ function renderMciCasualtyForm() {
           <div class="text-xs text-center min-h-[20px]">${saveStatusBar(state.mode === 'general' ? 'casualty' : 'mciCasualty')}</div>
 
           <!-- 플로팅 저장(빠른 수정용): 화면을 따라다님. 하단 저장과 동일 동작. 상세보기(hidden) 시 자동 숨김 -->
-          <button id="mci-save-fab" type="button"
+          <div class="mci-save-dock"><button id="mci-save-fab" type="button"
             class="fixed right-4 flex items-center gap-1.5 px-5 py-3 rounded-full font-bold text-sm text-white ${isEditing ? 'bg-amber-600 hover:bg-amber-700' : 'bg-pink-600 hover:bg-pink-700'} transition-colors"
             style="bottom:84px;z-index:30;box-shadow:0 6px 20px rgba(0,0,0,.5)"
             title="${isEditing ? '카드 수정 저장' : '사상자 카드 저장'}" aria-label="${isEditing ? '카드 수정 저장' : '사상자 카드 저장'}">
             <i data-lucide="${isEditing ? 'save' : 'check'}" class="w-4 h-4"></i>${isEditing ? '수정 저장' : '저장'}
-          </button>
+          </button></div>
         </div>
       </div>
 
@@ -6264,10 +6242,35 @@ let _cameraStream = null;
 let _cameraCapturedBlob = null;
 let _cameraMode = 'ocr';            // 'ocr'(카드 인식) | 'photo'(사진 첨부)
 let _cameraPhotoTarget = 'patientPhoto';   // photo 모드일 때 넣을 슬롯('cardPhoto'|'patientPhoto')
+let _cameraEpoch=0, _cameraContext=null, _cameraDraft=null, _cameraBusy=false, _cameraReview=null, _cameraAbort=null;
+let _cameraPreviewUrl='', _cameraReviewUrl='';
+const cameraContext=()=>({uid:secureIdentity?.uid,incidentId:state.currentIncidentId,mode:state.mode,editKey:currentCasualtyDraft()._editKey || null,epoch:_cameraEpoch});
+const cameraContextValid=()=>isActiveGrant(secureIdentity)&&ocrContextMatches(_cameraContext,cameraContext())&&_cameraDraft===currentCasualtyDraft();
+function setCameraBusy(busy){_cameraBusy=busy;['camera-analyze','camera-local','camera-rotate','camera-retake','camera-apply'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=busy;});}
+function setCameraBlob(blob){
+  _cameraCapturedBlob=blob;_cameraReview=null;
+  if(_cameraPreviewUrl)URL.revokeObjectURL(_cameraPreviewUrl);
+  _cameraPreviewUrl=URL.createObjectURL(blob);document.getElementById('camera-preview-img').src=_cameraPreviewUrl;
+  document.getElementById('camera-local').classList.add('hidden');
+  document.querySelectorAll('[data-crop]').forEach(el=>el.value='0');updateCameraCrop();showCameraPreview();
+}
+function updateCameraCrop(){const values={};document.querySelectorAll('[data-crop]').forEach(el=>values[el.dataset.crop]=Number(el.value));document.getElementById('camera-crop-outline').style.inset=`${values.top}% ${values.right}% ${values.bottom}% ${values.left}%`;}
+async function transformCameraBlob(blob,{rotate=false,crop=null}={}){
+  const bitmap=await createImageBitmap(blob);
+  try{
+    const x=crop?Math.round(bitmap.width*crop.left/100):0,y=crop?Math.round(bitmap.height*crop.top/100):0;
+    const w=crop?Math.max(1,Math.round(bitmap.width*(100-crop.left-crop.right)/100)):bitmap.width,h=crop?Math.max(1,Math.round(bitmap.height*(100-crop.top-crop.bottom)/100)):bitmap.height;
+    const canvas=document.createElement('canvas');canvas.width=rotate?h:w;canvas.height=rotate?w:h;
+    const ctx=canvas.getContext('2d');if(rotate){ctx.translate(canvas.width,0);ctx.rotate(Math.PI/2);}ctx.drawImage(bitmap,x,y,w,h,0,0,w,h);
+    return await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('사진 변환 실패')),'image/jpeg',.94));
+  }finally{bitmap.close();}
+}
 
 function openCameraModal(mode = 'ocr', target = 'patientPhoto') {
   const modal = document.getElementById('camera-modal');
   if (!modal) return;
+  closeCameraModal();
+  _cameraContext=cameraContext();_cameraDraft=currentCasualtyDraft();
   _cameraMode = mode;
   _cameraPhotoTarget = target;
   // 모드별 제목·분석버튼 라벨 (open마다 설정 → close가 몰라도 됨)
@@ -6285,18 +6288,25 @@ function openCameraModal(mode = 'ocr', target = 'patientPhoto') {
   if (window.lucide) window.lucide.createIcons();
 
   // 후면 카메라 우선
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+  if(!navigator.mediaDevices?.getUserMedia){showCameraMessage('카메라를 사용할 수 없습니다. 사진 선택으로 불러오세요.');return;}
+  const epoch=_cameraEpoch;
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' },width:{ideal:1920},height:{ideal:1080} }, audio: false })
     .then(stream => {
+      if(epoch!==_cameraEpoch){stream.getTracks().forEach(t=>t.stop());return;}
       _cameraStream = stream;
       const video = document.getElementById('camera-video');
       if (video) { video.srcObject = stream; }
     })
     .catch(err => {
-      showCameraMessage('카메라 접근이 거부되었습니다. 브라우저 권한을 확인해주세요. (' + (err.name || err.message) + ')');
+      if(epoch===_cameraEpoch)showCameraMessage('카메라를 사용할 수 없습니다. 사진 선택으로 불러오거나 카메라 권한을 확인하세요.');
     });
 }
 
 function closeCameraModal() {
+  _cameraEpoch++;_cameraAbort?.abort();_cameraAbort=null;_cameraReview=null;_cameraContext=null;_cameraDraft=null;setCameraBusy(false);
+  for(const url of [_cameraPreviewUrl,_cameraReviewUrl])if(url)URL.revokeObjectURL(url);
+  _cameraPreviewUrl='';_cameraReviewUrl='';
+  document.getElementById('camera-review-fields').innerHTML='';document.getElementById('camera-review-img').removeAttribute('src');document.getElementById('camera-original-link').removeAttribute('href');
   const modal = document.getElementById('camera-modal');
   if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
   // 카메라 스트림 해제
@@ -6311,6 +6321,8 @@ function closeCameraModal() {
 }
 
 function showCameraLive() {
+  ['camera-review','camera-review-actions','camera-crop-controls','camera-local'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
+  document.getElementById('camera-review-actions').classList.remove('flex');
   document.getElementById('camera-live')?.classList.remove('hidden');
   document.getElementById('camera-preview')?.classList.add('hidden');
   document.getElementById('camera-analyzing')?.classList.add('hidden');
@@ -6321,6 +6333,8 @@ function showCameraLive() {
 }
 
 function showCameraPreview() {
+  document.getElementById('camera-review').classList.add('hidden');document.getElementById('camera-review-actions').classList.add('hidden');document.getElementById('camera-review-actions').classList.remove('flex');
+  document.getElementById('camera-crop-controls').classList.toggle('hidden',_cameraMode!=='ocr');document.getElementById('camera-crop-outline').classList.toggle('hidden',_cameraMode!=='ocr');
   document.getElementById('camera-live')?.classList.add('hidden');
   document.getElementById('camera-preview')?.classList.remove('hidden');
   document.getElementById('camera-analyzing')?.classList.add('hidden');
@@ -6348,6 +6362,8 @@ function captureCameraFrame() {
   const video = document.getElementById('camera-video');
   const canvas = document.getElementById('camera-canvas');
   if (!video || !canvas) return;
+  if(!video.videoWidth){showCameraMessage('카메라 영상이 준비되지 않았습니다. 사진 선택을 이용할 수 있습니다.');return;}
+  const epoch=_cameraEpoch;
   const w = video.videoWidth || 1280;
   const h = video.videoHeight || 720;
   canvas.width = w;
@@ -6355,10 +6371,7 @@ function captureCameraFrame() {
   const ctx = canvas.getContext('2d');
   ctx.drawImage(video, 0, 0, w, h);
   canvas.toBlob(blob => {
-    _cameraCapturedBlob = blob;
-    const img = document.getElementById('camera-preview-img');
-    if (img) img.src = URL.createObjectURL(blob);
-    showCameraPreview();
+    if(epoch===_cameraEpoch && blob)setCameraBlob(blob);
   }, 'image/jpeg', 0.92);
 }
 
@@ -6385,153 +6398,12 @@ async function runOcr(blob) {
 
 // OCR 결과 텍스트에서 필드 추출 → mciDraft 부분 업데이트
 // 표준 카드 양식 (활력징후·환자정보) 지원
-function extractFieldsFromOcr(text) {
-  const flags = {};
-  const draft = mciDraft;
-  const norm = text.replace(/\s+/g, ' ').replace(/[•●◆■]/g, '');
-
-  // 1) 트리아지: I/II/III/IV 또는 긴급/응급/비응급/사망
-  const triageMap = {
-    'I': 'emergency', '긴급': 'emergency',
-    'II': 'urgent', '응급': 'urgent',
-    'III': 'nonurgent', '비응급': 'nonurgent', '경증': 'nonurgent',
-    'IV': 'dead', '사망': 'dead',
-  };
-  let triageMatch = null;
-  for (const key of ['긴급','응급','비응급','경증','사망']) {
-    if (norm.includes(key)) { triageMatch = triageMap[key]; break; }
-  }
-  if (!triageMatch) {
-    const m = /(?:^|[^A-Z])(IV|III|II|I)(?:[^A-Z]|$)/.exec(norm);
-    if (m) triageMatch = triageMap[m[1]];
-  }
-
-  // 2) 이름 (한글 2-4자) — "이름" 라벨 다음. 표 형식 (이름|성별|나이) 도 처리
-  const nameM = /이름[:\s|]*([가-힣]{2,4})/.exec(norm);
-  if (nameM && !draft.name) {
-    draft.name = nameM[1];
-    flags.name = true;
-  }
-
-  // 3) 연령 (40세, 8세, 40대, "나이/연령" 라벨, 표 형식 "나이|27")
-  const ageM = /(?:연령|나이)[:\s|]*([0-9]{1,3})\s*(세|대)?/.exec(norm)
-            || /([0-9]{1,3})\s*(세|대)/.exec(norm);
-  if (ageM && !draft.age) {
-    draft.age = ageM[1] + (ageM[2] || '세');
-    flags.age = true;
-  }
-
-  // 4) 성별
-  const genderM = /성별[:\s|]*([남여])/.exec(norm) || /\b([남여])\s*(자|성)?\b/.exec(norm);
-  if (genderM && !draft.gender) {
-    draft.gender = genderM[1];
-    flags.gender = true;
-  }
-
-  // 5) 발견장소
-  const locM = /(?:발견장소|장소)[:\s|]*([^\n]{2,40})/.exec(text);
-  if (locM && !draft.location) {
-    draft.location = locM[1].trim().slice(0, 200);
-    flags.location = true;
-  }
-
-  // 6) 주증상 — "증상", "주증상" + 진단명까지 통합
-  let symptomText = '';
-  const symM = /(?:주증상|증상)[:\s|]*([^\n]{2,80})/.exec(text);
-  if (symM) symptomText = symM[1].trim();
-  const dxM = /진단[명]?[:\s|]*([^\n]{2,40})/.exec(text);
-  if (dxM) {
-    // 진단명을 증상 앞에 통합 (예: "손가락 열상 — 손가락통증, 부종, 출혈")
-    const dx = dxM[1].trim();
-    symptomText = symptomText ? `${dx} — ${symptomText}` : dx;
-  }
-  if (symptomText && !draft.symptom) {
-    draft.symptom = symptomText.slice(0, 200);
-    flags.symptom = true;
-  }
-
-  // 7) 생체징후 — BP는 슬래시 양옆 공백 허용
-  const rrM    = /(?:호흡|RR)[:\s|]*(\d{1,2})/.exec(norm);
-  const pulseM = /(?:맥박|HR|P\b)[:\s|]*(\d{2,3})/.exec(norm);
-  const bpM    = /(?:혈압|BP)[:\s|]*(\d{2,3})\s*\/\s*(\d{2,3})/.exec(norm);
-  const spo2M  = /SpO[2₂]?[:\s|]*(\d{2,3})/.exec(norm);
-  // 체온 — 소수점 1자리 (예: 35.6, 36.5, 37.2). 일반 범위 30.0~45.0 만 허용
-  const tempM  = /(?:체온|BT|T(?:emp)?)[:\s|]*(\d{2}(?:\.\d)?)/i.exec(norm);
-  if (rrM && !draft.rr)         { draft.rr = rrM[1]; flags.rr = true; }
-  if (pulseM && !draft.pulse)   { draft.pulse = pulseM[1]; flags.pulse = true; }
-  if (bpM && !draft.bpSys)      { draft.bpSys = bpM[1]; draft.bpDia = bpM[2]; flags.bpSys = true; flags.bpDia = true; }
-  if (spo2M && !draft.spo2)     { draft.spo2 = spo2M[1]; flags.spo2 = true; }
-  if (tempM && !draft.temp) {
-    const t = parseFloat(tempM[1]);
-    if (t >= 30 && t <= 45) { draft.temp = tempM[1]; flags.temp = true; }
-  }
-
-  // 8) GCS → AVPU 자동 매핑
-  // 15 = A(Alert), 13-14 = V(Verbal), 9-12 = P(Pain), 3-8 = U(Unresponsive)
-  const gcsM = /GCS[\s\S]{0,30}?(\d{1,2})\s*(?:점|점수)?(?:\s|$)/.exec(norm)
-            || /(?:총|합|=)\s*([3-9]|1[0-5])(?:점)?\s*(?:GCS|점)/.exec(norm);
-  if (gcsM && !draft.consciousness) {
-    const gcs = parseInt(gcsM[1], 10);
-    if (gcs >= 3 && gcs <= 15) {
-      let avpu = 'A';
-      if (gcs >= 13) avpu = 'A';
-      else if (gcs >= 9) avpu = 'V';
-      else if (gcs >= 6) avpu = 'P';
-      else avpu = 'U';
-      draft.consciousness = avpu;
-      flags.consciousness = true;
-    }
-  }
-
-  // 9) 환자평가 (START 분류법) → 트리아지 자동 추정
-  // 걸음·호흡·맥박촉지·반응 4항목의 O/X 패턴 분석
-  // 트리아지가 이미 위에서 인식된 경우는 덮어쓰지 않음
-  if (!triageMatch) {
-    const evalCheck = (label) => {
-      const re = new RegExp(label + '[\\s\\S]{0,15}?([Oo0OoㅇOＯxX×ＸX])(?:\\s|$|,|\\n)', 'i');
-      const m = re.exec(norm);
-      if (!m) return null;
-      const v = m[1];
-      // O/o/0/ㅇ → true (양성), X/× → false (음성)
-      if (/[Oo0ㅇＯO]/.test(v)) return true;
-      if (/[xX×Ｘ]/.test(v))   return false;
-      return null;
-    };
-    const walks   = evalCheck('걸음');
-    const breath  = evalCheck('호흡');
-    const pulseOk = evalCheck('맥박촉지') ?? evalCheck('맥박');
-    const respond = evalCheck('반응');
-    // START 알고리즘 단순화:
-    // - 걸음 O → III 비응급
-    // - 호흡 X (확실히 X) → IV 사망 (기도 확보 후 그래도 X면)
-    // - 호흡 O + 맥박 O + 반응 O → II 응급
-    // - 그 외 (호흡/맥박/반응 중 하나라도 X) → I 긴급
-    if (walks === true) {
-      triageMatch = 'nonurgent';
-    } else if (breath === false) {
-      triageMatch = 'dead';
-    } else if (breath === true && pulseOk === true && respond === true) {
-      triageMatch = 'urgent';
-    } else if (breath === true || pulseOk === true || respond === true) {
-      triageMatch = 'emergency';
-    }
-  }
-
-  if (triageMatch && !draft.triage) {
-    draft.triage = triageMatch;
-    flags.triage = true;
-  }
-
-  return flags;
-}
-
 // ==================== Claude AI 카드 분석 (서버 중계) ====================
 // 사진을 /api/ocr(Cloudflare Worker)로 보내면 서버가 Claude Vision으로 분석.
 // 손글씨·체크표시·동그라미까지 판독되어 Tesseract보다 인식률이 크게 높음.
-// 오프라인이거나 서버/키 미설정 등으로 실패하면 기존 Tesseract OCR로 자동 폴백.
+// 실패 원인을 표시하고 사용자가 일반 문자 인식을 선택하면 Tesseract를 사용한다.
 
-// 이미지 축소(긴 변 1568px) + JPEG 재압축 — Anthropic Vision이 내부적으로 ~1568로 다운스케일하므로
-// 이보다 키워도 이득 없고 전송 용량만 커져 호출 실패 위험(2048 시도 후 1568로 복구). 품질 0.85.
+// 현재 Sonnet 입력의 전송 크기 제한. 작은 글씨는 축소 전 원본의 부분 확대본도 함께 보낸다.
 function downscaleImageBlob(blob, maxDim = 1568, quality = 0.85) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
@@ -6625,11 +6497,22 @@ async function runClaudeOcr(blob) {
   const idToken = await user.getIdToken();
   const resized = await downscaleImageBlob(blob);
   const b64 = await blobToBase64(resized);
-  const res = await fetch('/api/ocr', {
+  const details=[];
+  if(document.getElementById('camera-detail').checked){
+    for(const crop of [{top:0,bottom:40,left:0,right:0},{top:40,bottom:0,left:0,right:0}])details.push(await blobToBase64(await downscaleImageBlob(await transformCameraBlob(blob,{crop}))));
+  }
+  if(!cameraContextValid())throw Error('재난 또는 로그인 정보가 변경되었습니다. 다시 촬영하세요.');
+  _cameraAbort=new AbortController();
+  const timeout=setTimeout(()=>_cameraAbort?.abort(),65000);
+  let res;
+  try {
+  res = await fetch('/api/ocr', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
-    body: JSON.stringify({ image: b64, mediaType: 'image/jpeg' }),
+    body: JSON.stringify({ image: b64, details, mediaType: 'image/jpeg' }),
+    signal:_cameraAbort.signal,
   });
+  } finally {clearTimeout(timeout);}
   if (!res.ok) {
     let msg = 'AI 분석 서버 오류 (' + res.status + ')';
     try { const e = await res.json(); if (e && e.error) msg = e.error; } catch {}
@@ -6639,131 +6522,73 @@ async function runClaudeOcr(blob) {
   if (!data || typeof data.fields !== 'object' || data.fields === null) {
     throw new Error('AI 응답 형식 오류');
   }
-  return data.fields;
+  return {fields:normalizeOcrCandidates(data.fields),engine:'Claude AI',model:data.model || ''};
 }
 
 // Claude 추출 결과 → mciDraft 반영. 빈 필드만 채움(사용자가 이미 적은 값은 보존),
 // 채운 필드는 flags로 표시되어 노란색 강조(저장 전 확인 유도).
-function applyClaudeOcrFields(f) {
-  const flags = {};
-  const draft = mciDraft;
-  const fillStr = (k, v) => {
-    if (v == null) return;
-    const s = String(v).trim();
-    if (s && !draft[k]) { draft[k] = s; flags[k] = true; }
-  };
-  const fillNum = (k, v) => {
-    if (v == null) return;
-    const s = String(v).trim();
-    if (s && Number.isFinite(Number(s)) && !draft[k]) { draft[k] = s; flags[k] = true; }
-  };
-
-  if (['emergency', 'urgent', 'nonurgent', 'dead'].includes(f.triage) && !draft.triage) {
-    draft.triage = f.triage; flags.triage = true;
-  }
-  fillStr('name', f.name);
-  fillNum('age', f.age);
-  if ((f.gender === '남' || f.gender === '여') && !draft.gender) {
-    draft.gender = f.gender; flags.gender = true;
-  }
-  if (f.isPediatric === true && !draft.isPediatric) {
-    draft.isPediatric = true; flags.isPediatric = true;
-  }
-  fillStr('location', f.location);
-  fillStr('symptom', f.symptom);
-  if (['A', 'V', 'P', 'U'].includes(f.consciousness) && !draft.consciousness) {
-    draft.consciousness = f.consciousness; flags.consciousness = true;
-  }
-  fillNum('rr', f.rr);
-  fillNum('pulse', f.pulse);
-  fillNum('bpSys', f.bpSys);
-  fillNum('bpDia', f.bpDia);
-  fillNum('spo2', f.spo2);
-  fillNum('temp', f.temp);
-  if (typeof f.mechanism === 'string' && MECHANISM.includes(f.mechanism)) {
-    if (!Array.isArray(draft.mechanism)) draft.mechanism = mechList(draft.mechanism);
-    if (!draft.mechanism.includes(f.mechanism)) { draft.mechanism.push(f.mechanism); flags.mechanism = true; }
-  }
-  fillStr('hospital', f.hospital);
-  fillStr('departTime', f.departTime);
-  fillStr('notes', f.notes);
-  return flags;
+function renderOcrReview(result,blob) {
+  _cameraReview={...result,blob};
+  if(_cameraReviewUrl)URL.revokeObjectURL(_cameraReviewUrl);
+  _cameraReviewUrl=URL.createObjectURL(blob);document.getElementById('camera-review-img').src=_cameraReviewUrl;document.getElementById('camera-original-link').href=_cameraReviewUrl;
+  document.getElementById('camera-engine').textContent=`인식 방식: ${result.engine}${result.model?' · '+result.model:''} · 확인 전에는 입력되지 않습니다.`;
+  const enumOptions={triage:[['emergency','긴급'],['urgent','응급'],['nonurgent','비응급'],['dead','사망']],gender:[['남','남'],['여','여']],consciousness:['A','V','P','U'].map(v=>[v,v]),isPediatric:[['true','소아 표시 있음'],['false','소아 아님 표시']]};
+  document.getElementById('camera-review-fields').innerHTML=Object.entries(OCR_LABELS).map(([key,label])=>{
+    const value=result.fields[key]??'',old=_cameraDraft[key];
+    const occupied=old!==undefined&&old!==null&&old!==''&&old!==false&&!(Array.isArray(old)&&old.length===0);
+    const options=enumOptions[key];
+    const control=options?`<select data-ocr-value="${key}" id="ocr-value-${key}" ${occupied?'disabled':''}><option value="">판독 불가 / 미기재</option>${options.map(([id,name])=>`<option value="${id}" ${String(value)===id?'selected':''}>${name}</option>`).join('')}</select>`:`<input data-ocr-value="${key}" id="ocr-value-${key}" value="${escapeHtml(String(value))}" maxlength="1000" placeholder="판독 불가 / 미기재" ${occupied?'disabled':''} />`;
+    return `<div class="ocr-review-row"><input type="checkbox" data-ocr-select="${key}" aria-label="${label} 확인 후 반영" ${occupied?'disabled':''} /><div><label for="ocr-value-${key}">${label}</label>${control}${occupied?'<small>기존 입력값 유지</small>':'<small>원본 대조 후 체크</small>'}</div></div>`;
+  }).join('');
+  ['camera-live','camera-preview','camera-analyzing','camera-preview-actions','camera-crop-controls','camera-live-actions'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  document.getElementById('camera-review').classList.remove('hidden');document.getElementById('camera-review-actions').classList.remove('hidden');document.getElementById('camera-review-actions').classList.add('flex');hideCameraMessage();
 }
-
-async function analyzeCapturedImage() {
-  if (!_cameraCapturedBlob) {
-    showCameraMessage('캡처된 이미지가 없습니다');
-    return;
-  }
-
-  // 사진 첨부 모드 — OCR 없이 썸네일만 만들어 슬롯에 저장
-  if (_cameraMode === 'photo') {
-    const blob = _cameraCapturedBlob, target = _cameraPhotoTarget;
-    showCameraAnalyzing('사진 처리 중...');
-    await commitPhotoToDraft(blob, target);
-    closeCameraModal();
-    render();
-    return;
-  }
-
-  let flags = null;
-
-  // 1차: Claude AI 분석 (온라인일 때) — 손글씨·체크표시까지 판독
-  if (navigator.onLine) {
-    showCameraAnalyzing('AI 분석 중... (보통 5~15초)');
-    try {
-      const fields = await runClaudeOcr(_cameraCapturedBlob);
-      flags = applyClaudeOcrFields(fields);
-    } catch (err) {
-      console.error('[OCR] AI 분석 실패 — 로컬 문자인식으로 전환:', err);
-      flags = null;
+async function analyzeCapturedImage(local=false) {
+  if(_cameraBusy || !_cameraCapturedBlob)return;
+  if(!cameraContextValid()){showCameraMessage('재난 또는 로그인 정보가 변경되었습니다. 닫고 다시 촬영하세요.');return;}
+  const epoch=_cameraEpoch;setCameraBusy(true);
+  try{
+    if(_cameraMode==='photo'){
+      const spec=_photoSpec(_cameraPhotoTarget),thumb=await makeThumbBase64(_cameraCapturedBlob,spec.dim,.8,spec.cap);
+      if(epoch!==_cameraEpoch || !cameraContextValid())return;
+      if(!thumb)throw Error('사진 용량이 큽니다. 다시 촬영하세요.');
+      _cameraDraft[_cameraPhotoTarget]=thumb;closeCameraModal();render();return;
     }
-  }
-
-  // 2차: 로컬 Tesseract 폴백 (오프라인이거나 AI 분석 실패 시)
-  if (flags === null) {
-    showCameraAnalyzing('로컬 문자인식 중... (한국어 모델 로딩)');
-    try {
-      const text = await runOcr(_cameraCapturedBlob);
-      flags = extractFieldsFromOcr(text);
-    } catch (err) {
-      console.error('[OCR] 분석 실패:', err);
-      showCameraMessage('분석 실패: ' + (err.message || err));
-      showCameraLive();
-      return;
-    }
-  }
-
-  const filledCount = Object.keys(flags).length;
-  if (filledCount === 0) {
-    showCameraAnalyzing('인식된 정보가 없습니다');
-    setTimeout(() => {
-      showCameraMessage('카드에서 필드를 인식하지 못했습니다. 더 선명하게 다시 촬영해주세요.');
-      showCameraLive();
-      // 카메라 라이브 재개
-      if (_cameraStream) {
-        const video = document.getElementById('camera-video');
-        if (video && !video.srcObject) video.srcObject = _cameraStream;
-      } else {
-        openCameraModal();
-      }
-    }, 1200);
-    return;
-  }
-
-  // 성공: mciDraft 갱신, OCR 플래그 병합, 모달 닫고 폼 다시 그림
-  Object.assign(mciOcrFlags, flags);
-  // 간이 모드인데 생체징후 등 풀 카드 항목이 채워졌으면 풀 카드로 전환 (노란 강조가 보이도록)
-  const _fullOnlyKeys = ['rr','pulse','bpSys','bpDia','spo2','temp','consciousness','mechanism','hospital','notes'];
-  if (state.mciInputMode === 'simple' && _fullOnlyKeys.some(k => flags[k])) {
-    state.mciInputMode = 'full';
-  }
-  // OCR에 쓴 카드 이미지를 카드 사진으로도 보관 (기존엔 폐기) — 첨부 실패는 무시(OCR 결과는 살림)
-  try { await commitPhotoToDraft(_cameraCapturedBlob, 'cardPhoto', { flag: true }); }
-  catch (e) { console.warn('[photo] cardPhoto 보관 실패', e); }
-  closeCameraModal();
-  render();
-  setTimeout(() => alert(`${filledCount}개 필드가 자동 입력되었습니다. 노란색으로 강조된 부분을 꼭 확인해주세요.`), 100);
+    const crop={};document.querySelectorAll('[data-crop]').forEach(el=>crop[el.dataset.crop]=Number(el.value));
+    const blob=await transformCameraBlob(_cameraCapturedBlob,{crop});
+    if(epoch!==_cameraEpoch || !cameraContextValid())return;
+    showCameraAnalyzing(local?'일반 문자 인식 중 — 체크표시·중증도는 직접 확인하세요.':'Claude AI 분석 중 — 전체 카드와 확대본을 확인합니다.');
+    const result=local?{fields:extractLocalOcrCandidates(await runOcr(blob)),engine:'일반 문자 인식 (Tesseract)'}:await runClaudeOcr(blob);
+    if(epoch!==_cameraEpoch || !cameraContextValid())return;
+    renderOcrReview(result,blob);
+  }catch(error){
+    if(epoch!==_cameraEpoch)return;
+    showCameraPreview();
+    document.getElementById('camera-local').classList.remove('hidden');
+    showCameraMessage((local?'일반 문자 인식 실패: ':'AI 분석 실패: ')+(error.name==='AbortError'?'시간 초과 또는 취소되었습니다.':error.message)+' 재시도하거나 일반 문자 인식을 선택할 수 있습니다.');
+  }finally{if(epoch===_cameraEpoch)setCameraBusy(false);}
+}
+async function applyOcrReview(){
+  if(_cameraBusy || !_cameraReview)return;
+  if(!cameraContextValid()){showCameraMessage('재난 또는 로그인 정보가 변경되어 반영하지 않았습니다. 다시 촬영하세요.');return;}
+  const fields={},selected=[...document.querySelectorAll('[data-ocr-select]:checked')].map(el=>el.dataset.ocrSelect);
+  document.querySelectorAll('[data-ocr-value]').forEach(el=>{fields[el.dataset.ocrValue]=el.dataset.ocrValue==='isPediatric'?(el.value===''?null:el.value==='true'):el.value;});
+  const normalized=normalizeOcrCandidates(fields);
+  const invalid=selected.filter(k=>!Object.hasOwn(normalized,k)||(k==='mechanism'&&!MECHANISM.includes(normalized[k])));
+  if(invalid.length){showCameraMessage('선택한 항목을 다시 확인하세요: '+invalid.map(k=>OCR_LABELS[k]).join(', '));return;}
+  if(!selected.length){showCameraMessage('원본을 확인한 항목을 한 개 이상 체크하세요.');return;}
+  const epoch=_cameraEpoch;setCameraBusy(true);
+  try{
+    let thumb=null;
+    if(document.getElementById('camera-attach-card').checked){const spec=_photoSpec('cardPhoto');thumb=await makeThumbBase64(_cameraReview.blob,spec.dim,.8,spec.cap);if(!thumb)throw Error('카드 사진을 줄이지 못했습니다. 사진 첨부를 해제하고 반영할 수 있습니다.');}
+    if(epoch!==_cameraEpoch || !cameraContextValid())return;
+    const patch=selectedOcrPatch(fields,selected,_cameraDraft);
+    for(const [key,value] of Object.entries(patch)){_cameraDraft[key]=key==='mechanism'?[value]:value;mciOcrFlags[key]=true;}
+    if(thumb&&!_cameraDraft.cardPhoto){_cameraDraft.cardPhoto=thumb;mciOcrFlags.cardPhoto=true;}
+    if(['rr','pulse','bpSys','bpDia','spo2','temp','consciousness','mechanism','hospital','notes'].some(k=>Object.hasOwn(patch,k)))state.mciInputMode='full';
+    closeCameraModal();render();window.__mciToast?.(`${Object.keys(patch).length}개 항목을 입력했습니다. 카드 저장 버튼으로 저장하세요.`,'info');
+  }catch(error){if(epoch===_cameraEpoch)showCameraMessage(error.message);}
+  finally{if(epoch===_cameraEpoch)setCameraBusy(false);}
 }
 
 // 카메라 모달의 영구 이벤트 (닫기·캡처·재촬영·분석) — boot()에서 1회만 호출
@@ -6776,7 +6601,21 @@ function initCameraModal() {
     _cameraCapturedBlob = null;
     showCameraLive();
   });
-  document.getElementById('camera-analyze')?.addEventListener('click', analyzeCapturedImage);
+  document.getElementById('camera-analyze')?.addEventListener('click', ()=>analyzeCapturedImage(false));
+  document.getElementById('camera-local')?.addEventListener('click', ()=>analyzeCapturedImage(true));
+  document.getElementById('camera-file')?.addEventListener('click',()=>document.getElementById('camera-file-input').click());
+  document.getElementById('camera-file-input')?.addEventListener('change',event=>{
+    const file=event.target.files?.[0];event.target.value='';if(!file)return;
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>20000000){showCameraMessage('20MB 이하 JPG·PNG·WebP 사진을 선택하세요.');return;}
+    setCameraBlob(file);
+  });
+  document.querySelectorAll('[data-crop]').forEach(el=>el.addEventListener('input',updateCameraCrop));
+  document.getElementById('camera-rotate')?.addEventListener('click',async()=>{
+    if(_cameraBusy||!_cameraCapturedBlob)return;const epoch=_cameraEpoch;setCameraBusy(true);
+    try{const blob=await transformCameraBlob(_cameraCapturedBlob,{rotate:true});if(epoch===_cameraEpoch)setCameraBlob(blob);}catch(error){if(epoch===_cameraEpoch)showCameraMessage(error.message);}finally{if(epoch===_cameraEpoch)setCameraBusy(false);}
+  });
+  document.getElementById('camera-review-back')?.addEventListener('click',showCameraPreview);
+  document.getElementById('camera-apply')?.addEventListener('click',applyOcrReview);
   // 배경 클릭 시 닫기 (모달 안 클릭은 무시)
   modal.addEventListener('click', (e) => {
     if (e.target === modal) closeCameraModal();
@@ -6844,7 +6683,7 @@ function initSwipeTabNav() {
     if (Math.abs(dx) < 70) return;                     // 최소 스와이프 거리
     if (Math.abs(dx) < Math.abs(dy) * 1.5) return;     // 세로 스크롤 우세면 무시
     const dir = dx < 0 ? 1 : -1;                       // 왼쪽으로 밀면 다음 탭
-    const tabs = state.mode === 'mci' ? ['situation', 'casualty'] : ['dashboard', 'input'];
+    const tabs = state.mode === 'mci' ? (isObserver()?['situation','field','more']:['situation', 'casualty', 'transport', 'field', 'more']) : ['dashboard', 'input'];
     const cur = state.mode === 'mci' ? state.mciTab : state.view;
     const ni = tabs.indexOf(cur) + dir;
     if (ni < 0 || ni >= tabs.length) return;           // 끝 탭에서는 그대로
@@ -7011,10 +6850,6 @@ function bindMciCasualtyEvents() {
   const ocrBtn = document.getElementById('mci-ocr-btn');
   if (ocrBtn) {
     ocrBtn.onclick = () => {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        alert('이 브라우저는 카메라 기능을 지원하지 않습니다.');
-        return;
-      }
       openCameraModal();
     };
   }
@@ -7269,7 +7104,7 @@ function bindMciCasualtyEvents() {
     }
     const payload = cardDraftPayload(_draft);
     payload.cardNo = _no;
-    const ok = await saveSelectedCasualty(payload, state.user.teamId, state.user.name, _draft._editKey, _draft._basePayload);
+    const ok = await saveSelectedCasualty(payload, state.user.teamId, state.user.name, _draft._editKey, _draft._basePayload, _draft._baseRecord);
 
     if (ok) {
       // 중복 번호였으면 저장은 하되 비차단 안내(목록에서도 빨갛게 표시됨)
@@ -7324,6 +7159,7 @@ function bindMciCasualtyEvents() {
         _editKey: btn.dataset.mciEdit,
       };
       editDraft._basePayload = JSON.parse(JSON.stringify(cardDraftPayload(editDraft)));
+      editDraft._baseRecord = JSON.parse(JSON.stringify(c._serverRecord || c));
       if (state.mode === 'general') csDraft = editDraft; else mciDraft = editDraft;
       state.mciInputMode = 'full';   // 수정은 풀 카드로 — 생체징후·이송 등 상세 보완 단계
       state.inspectCardKey = null;   // 상세보기 닫고 수정 폼 표시
@@ -7341,7 +7177,7 @@ function bindMciCasualtyEvents() {
         return;
       }
       if (!confirm('이 사상자 카드를 삭제하시겠습니까?')) return;
-      await deleteSelectedCasualty(btn.dataset.mciDel);
+      await deleteSelectedCasualty(btn.dataset.mciDel,c?._serverRecord);
     };
   });
 
@@ -7648,8 +7484,8 @@ function renderMciSituation() {
             <div class="text-xs font-bold tracking-wider text-amber-300">미배정</div>
             <div class="text-3xl font-black mono mt-1 leading-none text-amber-400">${pending.length}</div>
           </button>
-          <button data-transport-card="in-transit" class="transport-card-clickable bg-slate-950 rounded-lg px-2 py-3 border-2 ${state.expandedTransport === 'in-transit' ? 'border-blue-500' : 'border-slate-800'} cursor-pointer hover:bg-slate-900 transition-colors" title="${state.expandedTransport === 'in-transit' ? '접기' : '이송중 환자 목록 펼치기'}">
-            <div class="text-xs font-bold tracking-wider text-blue-300">이송중</div>
+          <button data-transport-card="in-transit" class="transport-card-clickable bg-slate-950 rounded-lg px-2 py-3 border-2 ${state.expandedTransport === 'in-transit' ? 'border-blue-500' : 'border-slate-800'} cursor-pointer hover:bg-slate-900 transition-colors" title="${state.expandedTransport === 'in-transit' ? '접기' : '병원 배정·이송 중 환자 목록 펼치기'}">
+            <div class="text-xs font-bold tracking-wider text-blue-300">배정·이송 중</div>
             <div class="text-3xl font-black mono mt-1 leading-none text-blue-400">${transported.length - arrived.length}</div>
           </button>
           <button data-transport-card="arrived" class="transport-card-clickable bg-slate-950 rounded-lg px-2 py-3 border-2 ${state.expandedTransport === 'arrived' ? 'border-emerald-500' : 'border-slate-800'} cursor-pointer hover:bg-slate-900 transition-colors" title="${state.expandedTransport === 'arrived' ? '접기' : '병원 도착 환자 목록 펼치기'}">
@@ -7670,7 +7506,7 @@ function renderMciSituation() {
             label = '미배정'; color = '#f59e0b';
             patients = state.mciCasualties.filter(c => !c.hospital && !c.notTransported && c.triage !== 'dead');
           } else if (state.expandedTransport === 'in-transit') {
-            label = '이송중'; color = '#60a5fa';
+            label = '병원 배정·이송 중'; color = '#60a5fa';
             patients = state.mciCasualties.filter(c => c.hospital && !c.arriveTime && !c.notTransported);
           } else if (state.expandedTransport === 'arrived') {
             label = '병원 도착'; color = '#34d399';
@@ -8330,8 +8166,10 @@ function bindMciCardDetailModalEvents() {
         _editKey: c._key,
       };
       editDraft._basePayload = JSON.parse(JSON.stringify(cardDraftPayload(editDraft)));
+      editDraft._baseRecord = JSON.parse(JSON.stringify(c._serverRecord || c));
       mciDraft = editDraft;
       state.viewMciCardKey = null;
+      state.patientEditor = true;
       state.mciTab = 'casualty';
       state.mciInputMode = 'full';   // 풀 카드 입력 모드로 진입
       render();
@@ -8371,7 +8209,7 @@ const HELP_CONTENT = {
         <ul class="space-y-1.5 text-slate-300">
           <li>📱 <strong>웹:</strong> <code class="text-cyan-300 bg-slate-800 px-2 py-0.5 rounded text-xs">https://mci2.visanu81.workers.dev</code></li>
           <li>🏠 <strong>휴대폰 홈에 설치:</strong> 첫 접속 시 하단에 "앱으로 설치하기" 핑크색 배너 → 탭하면 홈에 아이콘 생김</li>
-          <li>⚡ <strong>오프라인 가능:</strong> 한 번 설치하면 와이파이·LTE 끊겨도 화면 뜸 (동기화는 통신 복구 시)</li>
+          <li>⚡ <strong>통신 중단:</strong> 이미 열린 승인 세션의 카드 입력은 임시 보관 후 재전송합니다. 새 로그인과 앱 재시작에는 통신 연결이 필요합니다.</li>
         </ul>
       </section>
       <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
@@ -8380,10 +8218,10 @@ const HELP_CONTENT = {
           <table class="w-full text-xs">
             <thead><tr class="text-slate-500 border-b border-slate-800"><th class="text-left py-2 px-2">코드 종류</th><th class="text-left py-2 px-2">예시</th><th class="text-left py-2 px-2">권한</th></tr></thead>
             <tbody class="text-slate-300">
-              <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300 text-[10px] mono font-bold">NORMAL</span></td><td class="py-2 px-2 mono">동두천119, 양주119, 의정부119 등</td><td class="py-2 px-2">소속 관서 재난 입력·조회</td></tr>
-              <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-sky-900/40 text-sky-300 text-[10px] mono font-bold">OBSERVER</span></td><td class="py-2 px-2 mono">본부119</td><td class="py-2 px-2">모든 재난 읽기 전용</td></tr>
+              <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300 text-[10px] mono font-bold">NORMAL</span></td><td class="py-2 px-2 mono">관리자 발급 코드</td><td class="py-2 px-2">소속 관서 재난 입력·조회</td></tr>
+              <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-sky-900/40 text-sky-300 text-[10px] mono font-bold">OBSERVER</span></td><td class="py-2 px-2 mono">관리자 발급 코드</td><td class="py-2 px-2">소속 관서 읽기 전용</td></tr>
               <tr class="border-b border-slate-800/50"><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-300 text-[10px] mono font-bold">ADMIN</span></td><td class="py-2 px-2 mono">*** (관리자 별도 안내)</td><td class="py-2 px-2">시스템 전권 (관서코드·강제종료·백업)</td></tr>
-              <tr><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-violet-900/40 text-violet-300 text-[10px] mono font-bold">DISPLAY</span></td><td class="py-2 px-2 mono">상황판119</td><td class="py-2 px-2">TV/모니터용 표출 화면</td></tr>
+              <tr class="border-b border-slate-800/50"><td class="py-2 px-2">HQ</td><td class="py-2 px-2">관리자 발급 코드</td><td class="py-2 px-2">모든 관서 읽기 전용</td></tr><tr><td class="py-2 px-2"><span class="px-1.5 py-0.5 rounded bg-violet-900/40 text-violet-300 text-[10px] mono font-bold">DISPLAY</span></td><td class="py-2 px-2 mono">관리자 발급 / 입력 창에서 열기</td><td class="py-2 px-2">TV/모니터용 표출 화면</td></tr>
             </tbody>
           </table>
         </div>
@@ -8436,7 +8274,7 @@ const HELP_CONTENT = {
 
       <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
         <h4 class="font-bold text-base mb-2">④ MCI 사상자 카드 입력 (가장 중요)</h4>
-        <p class="text-slate-400 text-xs mb-2">"사상자 카드" 탭 → 빠른 카드 또는 풀 카드 모드</p>
+        <p class="text-slate-400 text-xs mb-2">"사상자 카드" 탭 → 빠른 카드 또는 상세 입력 모드</p>
         <ol class="list-decimal list-inside space-y-1.5 text-slate-300 marker:text-pink-400 marker:font-bold">
           <li><strong>트리아지 분류</strong> (가장 큰 버튼) — STAR/JumpSTART 30초 분류 후 즉시 입력. 나중 수정 가능.<br>
             <div class="flex gap-1.5 mt-1 ml-5 text-[11px]">
@@ -8449,7 +8287,7 @@ const HELP_CONTENT = {
           <li><strong>기본 정보</strong> — 이름·연령·성별. <em class="text-amber-300">이름 모르면 비워두기 (자동 부여)</em></li>
           <li><strong>발견장소</strong> — 가능한 한 동·호수까지 (예: 102동 1503호 안방)</li>
           <li><strong>주증상</strong> — 한 줄로 요약 (예: 호흡곤란, 가슴통증)</li>
-          <li><strong>풀 카드 모드 추가 항목</strong>: 의식(AVPU)·생체징후·손상기전·손상부위·처치내용·이송 정보</li>
+          <li><strong>상세 입력 모드 추가 항목</strong>: 의식(AVPU)·생체징후·손상기전·손상부위·처치내용·이송 정보</li>
           <li><strong>미이송</strong> 토글 — 자체귀가하는 사람들은 이걸 켜기</li>
           <li>아래 <span class="bg-pink-600 text-white px-2 py-0.5 rounded text-xs font-bold">사상자 카드 저장</span> 클릭</li>
         </ol>
@@ -8491,18 +8329,18 @@ const HELP_CONTENT = {
           <li><strong>새 재난 시작</strong> — 임의 관서 명의로 재난 생성 (관서 대행)</li>
           <li><strong>진행 중 재난</strong> — 모든 관서의 재난 목록, 클릭 진입 또는 [종료] 강제 종료</li>
           <li><strong>백업 이력</strong> — 종료된 재난의 자동 백업, 엑셀 다운로드·삭제</li>
-          <li><strong>관서 코드 관리</strong> — 코드 추가·수정·삭제 (CRUD)</li>
+          <li><strong>관서 코드 관리</strong> — 코드 발급·복사·폐기</li>
         </ol>
       </section>
 
       <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
         <h4 class="font-bold text-base mb-2">관서 코드 관리</h4>
-        <p class="text-slate-300 mb-2"><strong class="text-purple-300">+ 코드 추가</strong> 버튼:</p>
+        <p class="text-slate-300 mb-2"><strong class="text-purple-300">새 코드 발급</strong> 버튼:</p>
         <ul class="space-y-1.5 text-slate-300 ml-4 list-disc marker:text-purple-400">
-          <li><strong>진입 코드</strong> — 로그인할 때 입력하는 문자열 (예: 강남119)</li>
+          <li><strong>진입 코드</strong> — 직접 지정하거나 빈칸으로 두어 자동 생성합니다. 발급 직후 한 번 표시됩니다. 복사하여 대상자에게 전달하세요.</li>
           <li><strong>표시명</strong> — 화면에 보일 짧은 이름 (예: 강남)</li>
-          <li><strong>id</strong> — 영문·숫자 (비워두면 <code class="bg-slate-800 px-1.5 py-0.5 rounded text-xs">auto_xxxxxx</code> 자동 생성). <em class="text-amber-300">생성 후 변경 불가</em></li>
-          <li><strong>역할</strong> — normal · observer · admin · display 중 선택</li>
+          <li><strong>관서 ID</strong> — 영문·숫자·_·-로 입력합니다. 같은 관서에 추가 코드를 발급할 때는 같은 ID를 사용합니다.</li>
+          <li><strong>역할</strong> — 일반 관서 · 관서 관찰자 · 표출 전용 · 관리자 · 본부 통합 관찰 중 선택합니다.</li><li><strong>유효기간</strong> — 1~30일. 폐기하면 이미 로그인한 단말도 접근이 차단됩니다.</li>
         </ul>
         <p class="text-[11px] text-slate-500 mt-2">⚠ 마지막 admin 코드는 삭제 불가 (시스템 잠금 방지)</p>
       </section>
@@ -8512,11 +8350,11 @@ const HELP_CONTENT = {
         <p class="text-slate-300">진행 중 재난 옆 <span class="bg-red-950 text-red-200 px-2 py-0.5 rounded text-xs font-bold">종료</span> 버튼:</p>
         <ol class="list-decimal list-inside space-y-1 text-slate-300 marker:text-red-400 marker:font-bold mt-1">
           <li>확인 다이얼로그 → 진행</li>
-          <li>현재 데이터(사고·피해·동원·사상자·조치) 자동 백업</li>
-          <li>인덱스에 closedAt 마킹 → 일반 사용자에게 더는 안 보임</li>
-          <li>서브데이터 삭제 (저장공간 회수)</li>
+          <li>각 기기 미전송 확인 → 서버 기록 수정 잠금 → 자동 백업</li>
+          <li>백업 성공 후 종료 확정 → 진행 중 목록에서 제외</li>
+          <li>원본 데이터 보존</li>
         </ol>
-        <p class="text-[11px] text-red-300 mt-2">⚠ 되돌릴 수 없음. 백업은 archives에서 다운로드 가능.</p>
+        <p class="text-[11px] text-red-300 mt-2">중간 실패 시 같은 재난의 종료를 재시도하세요. 종료 백업은 백업 이력에서 다운로드할 수 있습니다.</p>
       </section>
 
       <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
@@ -8524,7 +8362,7 @@ const HELP_CONTENT = {
         <ul class="space-y-1.5 text-slate-300 ml-4 list-disc marker:text-emerald-400">
           <li>각 백업 항목: 라벨·시각·백업자·관서·데이터 요약 표시</li>
           <li><span class="bg-emerald-800 text-white px-2 py-0.5 rounded text-xs font-bold">엑셀로 다운로드</span> — 5개 시트 종합 보고서</li>
-          <li>🗑 — 영구 삭제 (확인 필요)</li>
+          <li>종료 백업은 보호되어 삭제할 수 없습니다. 구형 백업만 삭제할 수 있습니다.</li>
         </ul>
       </section>
 
@@ -8537,7 +8375,7 @@ const HELP_CONTENT = {
   `,
 
   observer: `
-    <h3 class="text-xl font-bold mb-3 text-sky-300">🔭 본부 — 관찰자 (본부119)</h3>
+    <h3 class="text-xl font-bold mb-3 text-sky-300">🔭 본부 통합 관찰 (HQ)</h3>
     <div class="space-y-4">
       <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
         <h4 class="font-bold text-base mb-2">권한 및 화면</h4>
@@ -8682,7 +8520,7 @@ const HELP_CONTENT = {
           재난 종료 후 데이터는 어디 있나요?
         </summary>
         <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
-          관리자가 강제 종료하거나 일반 사용자가 "관리 → 새 재난 시작"을 누르면 자동 백업됩니다. 관리자 콘솔의 <strong>백업 이력</strong> 패널에서 엑셀로 다운로드 가능.
+          관리자가 종료하면 서버에 도착한 기록을 잠근 뒤 자동 백업합니다. 원본도 보존합니다. 관리자 콘솔의 <strong>백업 이력</strong> 패널에서 엑셀로 다운로드 가능.
         </div>
       </details>
 
@@ -8692,7 +8530,7 @@ const HELP_CONTENT = {
           새 코드를 추가하고 싶어요
         </summary>
         <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
-          관리자에게 요청하세요. 관리자 콘솔 → "관서 코드 관리" → "+ 코드 추가"에서 즉시 추가 가능합니다. 추가 즉시 모든 사용자에게 반영됨.
+          관리자에게 발급을 요청하세요. 관리자 콘솔 → "관서 진입 코드 관리" → "새 코드 발급"에서 코드를 만들고 대상자에게 전달합니다.
         </div>
       </details>
 
@@ -8702,9 +8540,9 @@ const HELP_CONTENT = {
           📸 카메라로 카드 자동 입력은 어떻게 쓰나요?
         </summary>
         <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
-          MCI 사상자 카드 폼 우상단의 <strong>[📸 카메라로 입력]</strong> 버튼 → 후면 카메라 활성화 → 종이 카드를 프레임에 맞추고 셔터 → 분석 시작.<br>
-          AI(Claude)가 <strong>손글씨·체크표시·동그라미까지 판독</strong>하여 트리아지·이름·연령·성별·발견장소·주증상·생체징후·이송병원을 자동 추출 → 노란색으로 강조 표시. <strong>저장 전 반드시 노란 항목을 확인·수정</strong>하세요.<br>
-          <em class="text-amber-300">* 통신이 끊긴 경우 자동으로 기기 내 문자인식(인쇄체 위주)으로 전환됩니다.</em>
+          <strong>[카메라로 입력]</strong> → 촬영 또는 사진 선택 → 카드 여백 조정·90° 회전 → 분석 시작.<br>
+          원본과 인식 후보를 대조하고 <strong>확인한 항목만 체크 → 선택 항목 반영</strong>을 누르세요. 기존 입력값은 유지되며 카드 저장은 별도로 눌러야 합니다. 작은 글씨 확대 분석은 같은 카드의 전체·위·아래 사진을 함께 분석합니다.<br>
+          <em class="text-amber-300">* AI 실패 시 원인을 표시합니다. 일반 문자 인식을 선택할 수 있으며, 이 방식은 중증도·체크표시·의식을 자동 판정하지 않습니다.</em>
         </div>
       </details>
 
@@ -8799,34 +8637,8 @@ async function boot() {
   // 세션 복원 (P0: 새로고침 시 로비로 빠지지 않게)
   // session/view2/currentIncidentId 모두 복원하지 않으면 view2='auth'로 떨어져 로그인 다시 받음.
   // 명시적 "반 변경" / "로그아웃" 버튼으로만 세션 종료.
-  if (POPOUT_DISPLAY) {
-    // 표출 팝아웃: 세션 복원/저장 없이 메모리에서만 display 모드로 부팅 (읽기 전용)
-    state.session = { agencyId: 'display', agency: { id: 'display', name: '표출', role: 'display' }, role: 'display' };
-    state.authed = true;
-    state.view2 = 'display';
-    state.currentIncidentId = new URLSearchParams(location.search).get('incident') || null;
-    document.title = 'MCI 상황판 — 표출';
-  } else {
-  try {
-    const sessRaw = localStorage.getItem('disaster_session');
-    if (sessRaw) state.session = JSON.parse(sessRaw);
-  } catch {}
-  const v2 = localStorage.getItem('disaster_view2');
-  if (v2) state.view2 = v2;
-  const incId = localStorage.getItem('disaster_currentIncidentId');
-  if (incId) state.currentIncidentId = incId;
-
-  if (localStorage.getItem('disaster_authed') === '1') {
-    state.authed = true;
-  }
-  const u = localStorage.getItem('disaster_user');
-  if (u) {
-    try {
-      state.user = JSON.parse(u);
-      if (state.user) state.mciInputMode = defaultInputMode(state.user.teamId);
-    } catch {}
-  }
-  }
+  try { secureDraftBackup=JSON.parse(localStorage.getItem('mci2_secure_draft_backup') || 'null'); } catch {}
+  state.session=null;state.authed=false;state.view2='auth';
   initOutdoorToggle();
   initHelpModal();
   initCameraModal();
@@ -8838,12 +8650,17 @@ async function boot() {
   // 익명 인증 대기 — Firebase Rules가 auth!=null 요구하므로 인증 후 데이터 구독.
   // 오프라인이거나 5초 안에 응답 없으면 일단 진행 (캐시 화면 표시).
   await authReady;
-  bindRealtime();
+  secureSession?.start();
+  if(POPOUT_DISPLAY && window.opener){
+    connectDisplayChild({nonce:new URLSearchParams(location.search).get('nonce'),
+      signIn:token=>signInWithCustomToken(auth,token),
+      onError:message=>{startupError=message;render();}});
+  }
   render();
 
   // 오프라인 안전 큐: 부팅 시 미전송분 재전송 + 배지 + 온/오프라인 이벤트 + 주기 점검
   if (!POPOUT_DISPLAY) {
-    outboxCleanup();
+    outboxCleanup().catch(error => window.__mciShowOutboxStatus?.(error.message, "err"));
     updateOutboxBadge();
     if (navigator.onLine) replayOutbox();
     window.addEventListener('online', () => { updateOutboxBadge(); replayOutbox(); });

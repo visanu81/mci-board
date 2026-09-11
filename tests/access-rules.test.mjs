@@ -1,0 +1,177 @@
+import fs from 'node:fs';
+import { before, after, test } from 'node:test';
+import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
+import { ref, get, set, update, remove, query, orderByChild, equalTo } from 'firebase/database';
+
+// Safety: these tests must never target a live Firebase project.
+const endpoint = process.env.FIREBASE_DATABASE_EMULATOR_HOST;
+if (endpoint !== '127.0.0.1:19000') throw new Error('Use the loopback database emulator on port 19000');
+const projectId = 'demo-mci-access';
+let env;
+const now = Date.now();
+const card = (uid, name = '가상환자') => ({createdByUid:uid,updatedByUid:uid,timestamp:now-1000,name,triage:'urgent',rr:0,notes:'원본',cardPhoto:'PHOTO'});
+const record = (agencyId, uid) => ({agencyId,createdByUid:uid,title:'가상 재난',startedAt:now-10000,mciCasualties:{one:card(uid)},casualties:{one:card(uid)}});
+const session = (agencyId,role='normal',extra={}) => ({agencyId,role,codeId:'base-code',active:true,environment:'test',expiresAt:now+3600000,...extra});
+const db = (uid, claims = {mci_env:'test'}) => uid ? env.authenticatedContext(uid,claims).database() : env.unauthenticatedContext().database();
+const at = (uid,path) => ref(db(uid),path);
+before(async()=>{
+ env=await initializeTestEnvironment({projectId,database:{host:'127.0.0.1',port:19000,rules:fs.readFileSync('security/database.test.rules.json','utf8')}});
+ await env.withSecurityRulesDisabled(async ctx=>set(ref(ctx.database()),{serverCodes:{'base-code':{active:true,expiresAt:now+3600000}},access:{alice:session('a'),bob:session('b'),peer:session('a'),reader:session('a','observer'),display:session('a','display'),admin:session('hq','admin'),expired:session('a','normal',{expiresAt:now-1}),revoked:session('a','normal',{active:false}),wrongEnv:session('a','normal',{environment:'production'})},mci2:{incidents:{a:record('a','alice'),b:record('b','bob'),closed:{...record('a','alice'),closedAt:now-10}},archives:{sample:{data:'가상 보관함'}},config:{agencyCodes:{secret:'fixture-only'}}}}));
+});
+after(async()=>{if(env)await env.cleanup();});
+for(const uid of [null,'unapproved','expired','revoked','wrongEnv']) {
+ test(`${uid || 'unauthenticated'} cannot read patient data`,()=>assertFails(get(at(uid,'mci2/incidents/a'))));
+ test(`${uid || 'unauthenticated'} cannot write patient data`,()=>assertFails(update(at(uid,'mci2/incidents/a/mciCasualties/one'),{notes:'blocked',updatedByUid:uid||'x'})));
+}
+test('anonymous Firebase identity without environment claim cannot read',()=>assertFails(get(ref(db('alice',{}),'mci2/incidents/a'))));
+test('production environment token cannot read test data',()=>assertFails(get(ref(db('alice',{mci_env:'production'}),'mci2/incidents/a'))));
+test('member can read own agency incident',()=>assertSucceeds(get(at('alice','mci2/incidents/a'))));
+test('member cannot read another agency incident',()=>assertFails(get(at('alice','mci2/incidents/b'))));
+test('member cannot fetch unfiltered incident root',()=>assertFails(get(at('alice','mci2/incidents'))));
+test('agency-filtered query is permitted',()=>assertSucceeds(get(query(at('alice','mci2/incidents'),orderByChild('agencyId'),equalTo('a')))));
+test('query for another agency is rejected',()=>assertFails(get(query(at('alice','mci2/incidents'),orderByChild('agencyId'),equalTo('b')))));
+for(const uid of ['reader','display']) {
+ test(`${uid} can read assigned agency`,()=>assertSucceeds(get(at(uid,'mci2/incidents/a'))));
+ test(`${uid} cannot edit patient`,()=>assertFails(update(at(uid,'mci2/incidents/a/mciCasualties/one'),{notes:'blocked',updatedByUid:uid})));
+ test(`${uid} cannot delete patient`,()=>assertFails(remove(at(uid,'mci2/incidents/a/mciCasualties/one'))));
+ test(`${uid} cannot create incident`,()=>assertFails(set(at(uid,'mci2/incidents/read-only-created'),record('a',uid))));
+}
+test('forged admin token claim cannot override server grant',()=>assertFails(get(ref(db('bob',{mci_env:'test',role:'admin',agencyId:'a'}),'mci2/incidents/a'))));
+test('member cannot promote own grant',()=>assertFails(update(at('alice','access/alice'),{role:'admin'})));
+test('admin client cannot issue grants',()=>assertFails(set(at('admin','access/new'),session('a','admin'))));
+test('member can check own revocation state',()=>assertSucceeds(get(at('alice','access/alice'))));
+test('member cannot enumerate other grants',()=>assertFails(get(at('alice','access'))));
+test('member cannot read another grant',()=>assertFails(get(at('alice','access/bob'))));
+for(const uid of ['alice','admin']) {
+ test(`${uid} cannot download login codes`,()=>assertFails(get(at(uid,'mci2/config/agencyCodes'))));
+ test(`${uid} cannot replace login codes`,()=>assertFails(set(at(uid,'mci2/config/agencyCodes'),{code:'injected'})));
+}
+test('member can create own agency incident',()=>assertSucceeds(set(at('alice','mci2/incidents/new'),record('a','alice'))));
+test('member cannot create foreign agency incident',()=>assertFails(set(at('alice','mci2/incidents/foreign'),record('b','alice'))));
+test('member cannot change incident ownership',()=>assertFails(update(at('alice','mci2/incidents/a'),{agencyId:'b'})));
+test('member cannot remove incident ownership',()=>assertFails(remove(at('alice','mci2/incidents/a/agencyId'))));
+test('member cannot delete entire incident',()=>assertFails(remove(at('alice','mci2/incidents/a'))));
+test('member cannot edit a closed incident',()=>assertFails(update(at('alice','mci2/incidents/closed/mciCasualties/one'),{notes:'blocked',updatedByUid:'alice'})));
+test('member cannot reopen closed incident',()=>assertFails(remove(at('alice','mci2/incidents/closed/closedAt'))));
+for(const collection of ['casualties','mciCasualties']) {
+ test(`${collection}: colleague may update notes with verified editor UID`,()=>assertSucceeds(update(at('peer',`mci2/incidents/a/${collection}/one`),{notes:'동료 수정',updatedByUid:'peer'})));
+ test(`${collection}: cannot forge editor`,()=>assertFails(update(at('peer',`mci2/incidents/a/${collection}/one`),{notes:'spoof',updatedByUid:'alice'})));
+ test(`${collection}: cannot replace original author`,()=>assertFails(update(at('peer',`mci2/incidents/a/${collection}/one`),{createdByUid:'peer',updatedByUid:'peer'})));
+ test(`${collection}: cannot remove required author`,()=>assertFails(update(at('peer',`mci2/incidents/a/${collection}/one`),{createdByUid:null,updatedByUid:'peer'})));
+ test(`${collection}: colleague cannot delete someone else's card`,()=>assertFails(remove(at('peer',`mci2/incidents/a/${collection}/one`))));
+ test(`${collection}: foreign agency cannot update`,()=>assertFails(update(at('bob',`mci2/incidents/a/${collection}/one`),{notes:'blocked',updatedByUid:'bob'})));
+}
+test('atomic cross-agency update is rejected as a whole',async()=>{
+ await assertFails(update(ref(db('alice')),{ 'mci2/incidents/a/title':'should not commit','mci2/incidents/b/title':'forbidden' }));
+ const snap=await assertSucceeds(get(at('alice','mci2/incidents/a/title')));if(snap.val()!=='가상 재난')throw Error('Partial commit');
+});
+test('oversized notes rejected',()=>assertFails(update(at('alice','mci2/incidents/a/mciCasualties/one'),{notes:'x'.repeat(3001),updatedByUid:'alice'})));
+test('unknown card privilege field rejected',()=>assertFails(update(at('alice','mci2/incidents/a/mciCasualties/one'),{role:'admin',updatedByUid:'alice'})));
+test('admin can read all incidents',()=>assertSucceeds(get(at('admin','mci2/incidents'))));
+test('admin can access archive',()=>assertSucceeds(get(at('admin','mci2/archives'))));
+test('member cannot access archive',()=>assertFails(get(at('alice','mci2/archives'))));
+test('test grants cannot read legacy production paths',()=>assertFails(get(at('admin','incidents'))));
+test('revocation takes effect without changing token',async()=>{
+ const r=at('peer','mci2/incidents/a/title');await assertSucceeds(get(r));
+ await env.withSecurityRulesDisabled(ctx=>update(ref(ctx.database(),'access/peer'),{active:false}));
+ await assertFails(update(at('peer','mci2/incidents/a/mciCasualties/one'),{notes:'after revoke',updatedByUid:'peer'}));
+});
+// Managed-code and delegated display-session boundaries.
+test('clients including admins cannot read server code records',async()=>{await assertFails(get(at('alice','serverCodes')));await assertFails(get(at('admin','serverCodes')));});
+test('code revocation cancels both active access and data reads',async()=>{
+ await env.withSecurityRulesDisabled(ctx=>update(ref(ctx.database()),{'serverCodes/managed':{active:true,expiresAt:Date.now()+60000},'access/managed-user':session('a','normal',{codeId:'managed'})}));
+ await assertSucceeds(get(at('managed-user','mci2/incidents/a')));
+ await assertSucceeds(get(at('managed-user','access/managed-user')));
+ await env.withSecurityRulesDisabled(ctx=>update(ref(ctx.database(),'serverCodes/managed'),{active:false}));
+ await assertFails(get(at('managed-user','mci2/incidents/a')));
+ await assertFails(get(at('managed-user','access/managed-user')));
+});
+test('expired code denies an otherwise valid grant',async()=>{
+ await env.withSecurityRulesDisabled(ctx=>update(ref(ctx.database()),{'serverCodes/expired-code':{active:true,expiresAt:Date.now()-1000},'access/expired-code-user':session('a','normal',{codeId:'expired-code'})}));
+ await assertFails(get(at('expired-code-user','mci2/incidents/a')));
+});
+test('delegated display can read only one incident and cannot write',async()=>{
+ await env.withSecurityRulesDisabled(ctx=>set(ref(ctx.database(),'access/delegated'),session('a','display',{parentUid:'alice',incidentId:'a'})));
+ await assertSucceeds(get(at('delegated','mci2/incidents/a')));
+ await assertFails(get(at('delegated','mci2/incidents/closed')));
+ await assertFails(get(query(at('delegated','mci2/incidents'),orderByChild('agencyId'),equalTo('a'))));
+ await assertFails(update(at('delegated','mci2/incidents/a'),{title:'forbidden'}));
+});
+test('parent revocation prevents delegated display access',async()=>{
+ await env.withSecurityRulesDisabled(ctx=>update(ref(ctx.database()),{'access/display-parent':session('a'),'access/child-display':session('a','display',{parentUid:'display-parent',incidentId:'a'})}));
+ await assertSucceeds(get(at('child-display','access/child-display')));
+ await env.withSecurityRulesDisabled(ctx=>update(ref(ctx.database(),'access/display-parent'),{active:false}));
+ await assertFails(get(at('child-display','access/child-display')));
+ await assertFails(get(at('child-display','mci2/incidents/a')));
+});
+
+test('legacy grants without managed code cannot access data or own grant',async()=>{
+ const legacy=session('a');delete legacy.codeId;
+ await env.withSecurityRulesDisabled(ctx=>set(ref(ctx.database(),'access/legacy'),legacy));
+ await assertFails(get(at('legacy','access/legacy')));
+ await assertFails(get(at('legacy','mci2/incidents/a')));
+});
+test('HQ has cross-agency read-only access without archive or code administration',async()=>{
+ await env.withSecurityRulesDisabled(ctx=>set(ref(ctx.database(),'access/hq-reader'),session('hq','hq')));
+ await assertSucceeds(get(at('hq-reader','mci2/incidents')));
+ await assertSucceeds(get(at('hq-reader','mci2/incidents/b')));
+ await assertFails(update(at('hq-reader','mci2/incidents/b'),{title:'forbidden'}));
+ await assertFails(set(at('hq-reader','mci2/incidents/hq-new'),record('hq','hq-reader')));
+ await assertFails(get(at('hq-reader','mci2/archives')));
+ await assertFails(get(at('hq-reader','serverCodes')));
+});
+
+for(const field of ['incident','damages/medical','mobilizations/medical','actions/offline']) {
+ test(field+': member can replay own agency field record',()=>assertSucceeds(set(at('alice','mci2/incidents/a/'+field),{fixture:'offline'})));
+ test(field+': foreign agency replay denied',()=>assertFails(set(at('bob','mci2/incidents/a/'+field),{fixture:'blocked'})));
+ test(field+': read-only replay denied',()=>assertFails(set(at('reader','mci2/incidents/a/'+field),{fixture:'blocked'})));
+ test(field+': closed incident replay denied',()=>assertFails(set(at('alice','mci2/incidents/closed/'+field),{fixture:'blocked'})));
+}
+
+test('freeze blocks admin and normal writes including parent overwrites and deletion',async()=>{
+ await env.withSecurityRulesDisabled(ctx=>set(ref(ctx.database(),'mci2/incidents/frozen'),{...record('a','alice'),closure:{id:'fixture',at:now,by:'admin'}}));
+ for(const uid of ['alice','admin']){
+  await assertFails(update(at(uid,'mci2/incidents/frozen/mciCasualties/one'),{notes:'late',updatedByUid:uid}));
+  await assertFails(set(at(uid,'mci2/incidents/frozen/incident'),{location:'late'}));
+  await assertFails(remove(at(uid,'mci2/incidents/frozen/closure')));
+  await assertFails(remove(at(uid,'mci2/incidents/frozen')));
+  await assertFails(set(at(uid,'mci2/incidents/frozen'),record('a',uid)));
+ }
+});
+test('client admin cannot forge freeze or close markers',async()=>{
+ await assertFails(update(at('admin','mci2/incidents/a'),{closure:{id:'forged'}}));
+ await assertFails(update(at('admin','mci2/incidents/a'),{closedAt:now}));
+});
+test('client admin cannot edit or reopen completed incident',async()=>{
+ await assertFails(remove(at('admin','mci2/incidents/closed/closedAt')));
+ await assertFails(update(at('admin','mci2/incidents/closed/incident'),{location:'late'}));
+});
+test('closure archive cannot be overwritten or deleted by client admin',async()=>{
+ await env.withSecurityRulesDisabled(ctx=>set(ref(ctx.database(),'mci2/archives/close-fixture'),{closureId:'fixture',data:'original'}));
+ await assertFails(remove(at('admin','mci2/archives/close-fixture')));
+ await assertFails(set(at('admin','mci2/archives/close-fixture'),{data:'replacement'}));
+ await assertFails(remove(at('admin','mci2/archives')));
+});
+
+// Exercise the real REST ETag implementation and security rules together on loopback only.
+import {closeIncident} from '../security/incident-close.mjs';
+test('REST close retries concurrent entry and freezes writes before archive',async()=>{
+ const id='rest-close';
+ await env.withSecurityRulesDisabled(ctx=>set(ref(ctx.database(),'mci2/incidents/'+id),record('a','alice')));
+ let race=true,checkedFrozen=false;
+ const server=async(path,method='GET',body,headers={})=>{
+  if(method==='PUT' && path==='mci2/incidents/'+id && race){race=false;await assertSucceeds(update(at('alice',path+'/mciCasualties/one'),{notes:'arrived before freeze',updatedByUid:'alice'}));}
+  if(path.startsWith('mci2/archives/')){
+   await assertFails(update(at('alice','mci2/incidents/'+id+'/mciCasualties/one'),{notes:'too late',updatedByUid:'alice'}));checkedFrozen=true;
+  }
+  return fetch('http://127.0.0.1:19000/'+path+'.json?ns='+projectId,{method,headers:{Authorization:'Bearer owner','Content-Type':'application/json',...headers},body:body===undefined?undefined:JSON.stringify(body)});
+ };
+ const first=await closeIncident({incidentId:id},server,'admin',async()=>true);
+ if(first.status!==409)throw Error('Expected real ETag conflict: '+first.status+' '+await first.text());
+ const second=await closeIncident({incidentId:id},server,'admin',async()=>true);
+ if(second.status!==200)throw Error('Close failed: '+await second.text());
+ if(!checkedFrozen)throw Error('Freeze not checked');
+ const source=(await get(at('admin','mci2/incidents/'+id))).val();
+ const archived=(await get(at('admin','mci2/archives/close-'+source.closure.id))).val();
+ if(archived.data.mciCasualties[0].notes!=='arrived before freeze' || source.mciCasualties.one.notes!=='arrived before freeze')throw Error('Lost record');
+});

@@ -12,3 +12,16 @@ firebase-database-rules.json
 tests/
 docs/
 .assetsignore
+
+node_modules/
+security/
+firebase*.json
+package*.json
+*-debug.log
+*-debug.*.log
+security/
+.dev.vars*
+.env*
+credentials.json
+token.json
+*.key
