@@ -987,7 +987,7 @@ function onSecureIdentity(identity) {
     try { localStorage.setItem('mci2_secure_draft_backup', JSON.stringify(secureDraftBackup)); } catch {}
     startupError = '로그인이 종료됐습니다. 작성 중이던 카드 입력은 복구용으로 보관했습니다.';
   }
-  state.agencyCodesList=[]; state.issuedCode=null; state.managedCodeDraft={}; state.pendingCodeRevoke=null; AGENCY_CODES={};
+  state.agencyCodesList=[]; state.issuedCode=null; state.managedCodeDraft={}; state.pendingCodeRevoke=null;state.managedReplaceId=null;state.pendingCodeFinish=null; AGENCY_CODES={};
   state.incidents = []; state.archives = []; state.casualties = []; state.mciCasualties = [];
   state.actions = []; state.incident = null; state.damages = {}; state.mobilizations = {};
   if (!identity) {
@@ -3800,20 +3800,23 @@ function renderAdminConsole() {
 // ----- 관리자 콘솔 — 관서 코드 관리 패널 (CRUD) -----
 function renderAdminAgencyCodesPanel() {
   const draft=state.managedCodeDraft||{},busy=!!state.managedCodeBusy;
+  const replacing=state.agencyCodesList.find(r=>r.id===state.managedReplaceId);
   const roles={normal:'일반 관서',observer:'관서 관찰자',display:'표출 전용',admin:'관리자',hq:'본부 통합 관찰'};
-  return `<section class="bg-slate-900 border border-purple-800 rounded-xl p-4">
+  return `<section id="managed-codes-panel" class="bg-slate-900 border border-purple-800 rounded-xl p-4">
     <h2 class="font-bold text-purple-300 mb-3">관서 진입 코드 관리</h2>
-    <p class="text-xs text-slate-400 mb-3">코드는 서버가 발급하며 발급 직후 한 번 표시됩니다. 폐기하면 해당 코드로 로그인한 단말도 접근이 차단됩니다.</p>
+    <p class="text-xs text-slate-400 mb-3">원하는 코드를 직접 지정할 수 있습니다. 기존 코드 원문은 저장하지 않아 다시 표시할 수 없습니다. 코드 교체는 새 코드 발급 → 새 코드로 접속 확인 → 이전 코드 폐기 순서입니다.</p>
+    ${replacing?`<p class="text-sm text-blue-300 my-3">${escapeHtml(replacing.agencyName)} · ${escapeHtml(roles[replacing.role])} 코드 교체 — 관서와 권한은 유지됩니다.</p>`:''}
     <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
-      <input id="managed-agency-id" value="${escapeHtml(draft.agencyId||'')}" maxlength="50" placeholder="관서 ID (영문·숫자·_·-)" class="bg-slate-950 border border-slate-700 rounded p-2 text-sm">
-      <input id="managed-agency-name" value="${escapeHtml(draft.agencyName||'')}" maxlength="50" placeholder="관서 표시명" class="bg-slate-950 border border-slate-700 rounded p-2 text-sm">
-      <select id="managed-role" class="bg-slate-950 border border-slate-700 rounded p-2 text-sm">${Object.entries(roles).map(([k,v])=>`<option value="${k}" ${(draft.role||'normal')===k?'selected':''}>${v}</option>`).join('')}</select>
+      <input ${replacing?'disabled':''} aria-label="관서 ID" id="managed-agency-id" value="${escapeHtml(draft.agencyId||'')}" maxlength="50" placeholder="관서 ID (영문·숫자·_·-)" class="bg-slate-950 border border-slate-700 rounded p-2 text-sm">
+      <input ${replacing?'disabled':''} aria-label="관서 표시명" id="managed-agency-name" value="${escapeHtml(draft.agencyName||'')}" maxlength="50" placeholder="관서 표시명" class="bg-slate-950 border border-slate-700 rounded p-2 text-sm">
+      <select ${replacing?'disabled':''} aria-label="권한" id="managed-role" class="bg-slate-950 border border-slate-700 rounded p-2 text-sm">${Object.entries(roles).map(([k,v])=>`<option value="${k}" ${(draft.role||'normal')===k?'selected':''}>${v}</option>`).join('')}</select>
       <label class="text-xs">유효기간(일)<input id="managed-days" type="number" min="1" max="30" value="${escapeHtml(String(draft.days??7))}" class="bg-slate-950 border border-slate-700 rounded p-2 w-full"></label>
     </div>
-    <div class="flex gap-2 my-3"><button id="managed-create" ${busy?'disabled':''} class="bg-purple-700 rounded px-4 py-2 text-sm">새 코드 발급</button><button id="managed-refresh" class="bg-slate-700 rounded px-4 py-2 text-sm">목록 새로고침</button></div>
-    ${state.issuedCode?`<div class="border border-emerald-700 p-3 rounded mb-3"><p class="text-sm mb-2">새 진입 코드 — 전달 후 닫아주세요.</p><code class="break-all select-all">${escapeHtml(state.issuedCode.code)}</code><p class="text-xs mt-2">만료: ${escapeHtml(new Date(state.issuedCode.expiresAt).toLocaleString('ko-KR'))}</p><button id="managed-copy" class="bg-emerald-800 rounded px-3 py-1 mt-2">복사</button><button id="managed-dismiss" class="ml-2 px-3 py-1">표시 닫기</button></div>`:''}
+    <label class="block text-sm mt-3">${replacing?'새 진입 코드':'진입 코드 직접 지정 (선택)'}<input id="managed-code" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" minlength="8" maxlength="128" value="${escapeHtml(draft.code||'')}" placeholder="공백 없이 8~128자 · 비우면 자동 생성" class="block w-full bg-slate-950 border border-slate-700 rounded p-3 mt-1"></label>
+    <div class="flex flex-wrap gap-2 my-3"><button id="managed-create" ${busy?'disabled':''} class="bg-purple-700 rounded px-4 py-2 text-sm">${replacing?'교체용 새 코드 발급':'새 코드 발급'}</button>${replacing?'<button id="managed-cancel-replace" class="bg-slate-700 rounded px-4 py-2">교체 취소</button>':''}<button id="managed-refresh" class="bg-slate-700 rounded px-4 py-2 text-sm">목록 새로고침</button></div>
+    ${state.issuedCode?`<div class="border border-emerald-700 p-3 rounded mb-3"><p class="text-sm mb-2">새 진입 코드 — 복사해서 보관하세요. 교체 중이면 새 코드로 접속을 확인한 다음 목록에서 이전 코드를 폐기하세요.</p><code class="break-all select-all">${escapeHtml(state.issuedCode.code)}</code><p class="text-xs mt-2">만료: ${escapeHtml(new Date(state.issuedCode.expiresAt).toLocaleString('ko-KR'))}</p><button id="managed-copy" class="bg-emerald-800 rounded px-3 py-1 mt-2">복사</button><button id="managed-dismiss" class="ml-2 px-3 py-1">표시 닫기</button></div>`:''}
     <p class="text-sm text-amber-300 my-2" role="status">${escapeHtml(state.managedCodeMessage||'')}</p>
-    <div class="space-y-2">${state.agencyCodesList.map(r=>`<div class="border border-slate-800 rounded p-2 flex flex-wrap items-center gap-2 text-sm"><strong>${escapeHtml(r.agencyName)}</strong><span>${escapeHtml(r.agencyId)}</span><span>${escapeHtml(roles[r.role]||r.role)}</span><span class="text-xs text-slate-400">${r.active && r.expiresAt>Date.now()?'사용 가능':'폐기/만료'} · ${escapeHtml(new Date(r.expiresAt).toLocaleString('ko-KR'))}</span>${r.active?`<button data-managed-revoke="${escapeHtml(r.id)}" class="ml-auto bg-red-950 rounded px-3 py-1" ${r.id===secureIdentity?.codeId?'disabled':''}>${r.id===secureIdentity?.codeId?'현재 관리자 코드':'폐기'}</button>${state.pendingCodeRevoke===r.id?`<span class="text-xs text-red-300">로그인 단말도 차단합니다.</span><button data-managed-confirm="${escapeHtml(r.id)}" class="bg-red-700 rounded px-3 py-1">폐기 확인</button><button id="managed-cancel-revoke" class="px-3 py-1">취소</button>`:''}`:''}</div>`).join('')||'<p class="text-sm text-slate-500">발급된 코드가 없습니다.</p>'}</div>
+    <div class="space-y-2">${state.agencyCodesList.map(r=>`<div class="border border-slate-800 rounded p-2 flex flex-wrap items-center gap-2 text-sm"><strong>${escapeHtml(r.agencyName)}</strong><span>${escapeHtml(r.agencyId)}</span><span>${escapeHtml(roles[r.role]||r.role)}</span><span class="text-xs text-slate-400">${r.active && r.expiresAt>Date.now()?'사용 가능':'폐기/만료'} · ${escapeHtml(new Date(r.expiresAt).toLocaleString('ko-KR'))}</span><button data-managed-replace="${escapeHtml(r.id)}" class="bg-blue-700 rounded px-3 py-2" ${busy?'disabled':''}>코드 변경</button>${r.replaces && r.active && r.expiresAt>Date.now() && state.agencyCodesList.some(old=>old.id===r.replaces&&old.active)?`<span class="text-blue-300">교체 진행 중</span><button data-managed-finish="${escapeHtml(r.id)}" class="bg-amber-800 rounded px-3 py-2" ${r.replaces===secureIdentity?.codeId?'disabled':''}>${r.replaces===secureIdentity?.codeId?'새 관리자 코드로 로그인 후 완료':'이전 코드 폐기'}</button>${state.pendingCodeFinish===r.id?`<span>새 코드 접속을 확인했나요? 이전 코드의 로그인 단말도 차단됩니다.</span><button data-managed-finish-confirm="${escapeHtml(r.id)}" class="bg-red-700 rounded px-3 py-2">교체 완료 확인</button><button id="managed-finish-cancel">취소</button>`:''}`:''}${r.active?`<button data-managed-revoke="${escapeHtml(r.id)}" class="ml-auto bg-red-950 rounded px-3 py-1" ${r.id===secureIdentity?.codeId?'disabled':''}>${r.id===secureIdentity?.codeId?'현재 관리자 코드':'폐기'}</button>${state.pendingCodeRevoke===r.id?`<span class="text-xs text-red-300">로그인 단말도 차단합니다.</span><button data-managed-confirm="${escapeHtml(r.id)}" class="bg-red-700 rounded px-3 py-1">폐기 확인</button><button id="managed-cancel-revoke" class="px-3 py-1">취소</button>`:''}`:''}</div>`).join('')||'<p class="text-sm text-slate-500">발급된 코드가 없습니다.</p>'}</div>
   </section>`;
 }
 
@@ -3931,13 +3934,25 @@ async function refreshManagedCodes() {
   render();
 }
 function bindAdminAgencyCodesEvents() {
-  for(const [id,key] of [['managed-agency-id','agencyId'],['managed-agency-name','agencyName'],['managed-role','role'],['managed-days','days']]){const el=document.getElementById(id);if(el)el.oninput=()=>{state.managedCodeDraft={...(state.managedCodeDraft||{}),[key]:el.value};};}
+  for(const [id,key] of [['managed-agency-id','agencyId'],['managed-agency-name','agencyName'],['managed-role','role'],['managed-days','days'],['managed-code','code']]){const el=document.getElementById(id);if(el)el.oninput=()=>{state.managedCodeDraft={...(state.managedCodeDraft||{}),[key]:el.value};};}
   const refresh=document.getElementById('managed-refresh');if(refresh)refresh.onclick=()=>void refreshManagedCodes();
   const create=document.getElementById('managed-create');if(create)create.onclick=async()=>{
-    const body={action:'create',agencyId:document.getElementById('managed-agency-id').value.trim(),agencyName:document.getElementById('managed-agency-name').value.trim(),role:document.getElementById('managed-role').value,days:Number(document.getElementById('managed-days').value)};
+    const body=state.managedReplaceId?{action:'replace',id:state.managedReplaceId,code:document.getElementById('managed-code').value,days:Number(document.getElementById('managed-days').value)}:{action:'create',code:document.getElementById('managed-code').value,agencyId:document.getElementById('managed-agency-id').value.trim(),agencyName:document.getElementById('managed-agency-name').value.trim(),role:document.getElementById('managed-role').value,days:Number(document.getElementById('managed-days').value)};
     if(state.managedCodeBusy)return;state.managedCodeBusy=true;create.disabled=true;create.textContent='발급 중...';state.managedCodeMessage='발급 중...';
-    try{state.issuedCode=await serverAccess('/api/admin/codes',body);state.managedCodeMessage='코드를 발급했습니다.';await refreshManagedCodes();}catch(e){state.managedCodeMessage=e.message;}finally{state.managedCodeBusy=false;render();}
+    try{state.issuedCode=await serverAccess('/api/admin/codes',body);state.managedCodeMessage=state.managedReplaceId?'새 코드로 접속을 확인한 뒤 이전 코드 폐기를 눌러 교체를 완료하세요.':'코드를 발급했습니다.';state.managedReplaceId=null;state.managedCodeDraft={};await refreshManagedCodes();}catch(e){state.managedCodeMessage=e.message;}finally{state.managedCodeBusy=false;render();}
   };
+  document.querySelectorAll('[data-managed-replace]').forEach(btn=>btn.onclick=()=>{
+    if(state.managedCodeBusy)return;
+    const record=state.agencyCodesList.find(r=>r.id===btn.dataset.managedReplace);if(!record)return;
+    state.managedReplaceId=record.id;state.managedCodeDraft={agencyId:record.agencyId,agencyName:record.agencyName,role:record.role,days:7,code:''};state.managedCodeMessage='새 코드를 입력하세요. 발급만으로 기존 코드가 폐기되지는 않습니다.';render();document.getElementById('managed-code')?.focus();
+  });
+  const cancelReplace=document.getElementById('managed-cancel-replace');if(cancelReplace)cancelReplace.onclick=()=>{if(state.managedCodeBusy)return;state.managedReplaceId=null;state.managedCodeDraft={};render();};
+  document.querySelectorAll('[data-managed-finish]').forEach(btn=>btn.onclick=()=>{state.pendingCodeFinish=btn.dataset.managedFinish;render();});
+  const finishCancel=document.getElementById('managed-finish-cancel');if(finishCancel)finishCancel.onclick=()=>{state.pendingCodeFinish=null;render();};
+  document.querySelectorAll('[data-managed-finish-confirm]').forEach(btn=>btn.onclick=async()=>{
+    if(state.managedCodeBusy)return;state.managedCodeBusy=true;btn.disabled=true;
+    try{await serverAccess('/api/admin/codes',{action:'finish-replace',id:btn.dataset.managedFinishConfirm});state.pendingCodeFinish=null;state.managedCodeMessage='코드 교체를 완료했습니다. 이전 코드는 사용할 수 없습니다.';await refreshManagedCodes();}catch(e){state.managedCodeMessage=e.message;}finally{state.managedCodeBusy=false;render();}
+  });
   document.querySelectorAll('[data-managed-revoke]').forEach(btn=>{btn.onclick=()=>{state.pendingCodeRevoke=btn.dataset.managedRevoke;render();};});
   const cancel=document.getElementById('managed-cancel-revoke');if(cancel)cancel.onclick=()=>{state.pendingCodeRevoke=null;render();};
   document.querySelectorAll('[data-managed-confirm]').forEach(btn=>{btn.onclick=async()=>{
@@ -4062,7 +4077,7 @@ function renderMciWorkspaceHeader(team, observerMode) {
 }
 function renderMciMore(observerMode) {
   return `<section class="workspace-page"><h2 class="text-xl font-bold">더보기</h2><p class="text-slate-400">보기 설정과 재난 관리</p><div class="workspace-actions">
-    ${!observerMode?'<button id="open-display-btn">전광판 열기</button><button id="admin-btn">내보내기 · 재난 관리</button>':''}
+    ${secureIdentity?.role==='admin'?'<button id="manage-codes-btn">관서 진입 코드 관리</button>':''}${!observerMode?'<button id="open-display-btn">전광판 열기</button><button id="admin-btn">내보내기 · 재난 관리</button>':''}
     <button id="briefing-toggle">${state.briefingMode?'개인정보 가림 켜짐':'개인정보 가림 꺼짐'}</button>
     <button data-mode="general" class="mode-btn">일반 재난 상황판으로</button>
     <button id="logout-btn">재난 목록으로</button>
@@ -4456,6 +4471,7 @@ function renderResetPanel() {
 }
 
 function bindMainEvents() {
+  const codesButton=document.getElementById('manage-codes-btn');if(codesButton)codesButton.onclick=()=>{leaveIncident();document.getElementById('managed-codes-panel')?.scrollIntoView({block:'start'});};
   const leaveButton=document.getElementById('logout-btn');
   if(leaveButton)leaveButton.onclick = () => {
     // V2: 재난방 나가기 → 로비로 (세션은 유지)
@@ -8315,7 +8331,7 @@ const HELP_CONTENT = {
         <h4 class="font-bold text-base mb-2">관서 코드 관리</h4>
         <p class="text-slate-300 mb-2"><strong class="text-purple-300">새 코드 발급</strong> 버튼:</p>
         <ul class="space-y-1.5 text-slate-300 ml-4 list-disc marker:text-purple-400">
-          <li><strong>진입 코드</strong> — 서버가 무작위로 생성하며 발급 직후 한 번 표시됩니다. 복사하여 대상자에게 전달하세요.</li>
+          <li><strong>진입 코드</strong> — 직접 지정하거나 빈칸으로 두어 자동 생성합니다. 발급 직후 한 번 표시됩니다. 복사하여 대상자에게 전달하세요.</li>
           <li><strong>표시명</strong> — 화면에 보일 짧은 이름 (예: 강남)</li>
           <li><strong>관서 ID</strong> — 영문·숫자·_·-로 입력합니다. 같은 관서에 추가 코드를 발급할 때는 같은 ID를 사용합니다.</li>
           <li><strong>역할</strong> — 일반 관서 · 관서 관찰자 · 표출 전용 · 관리자 · 본부 통합 관찰 중 선택합니다.</li><li><strong>유효기간</strong> — 1~30일. 폐기하면 이미 로그인한 단말도 접근이 차단됩니다.</li>

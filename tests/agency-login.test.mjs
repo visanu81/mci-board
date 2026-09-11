@@ -1,6 +1,6 @@
 import {test,before} from 'node:test';
 import assert from 'node:assert/strict';
-import {handleAgencyLogin} from '../security/agency-login.mjs';
+import {handleAgencyLogin,normalizeEntryCode} from '../security/agency-login.mjs';
 const code='test-only-code-128bits-minimum';
 let env,publicKey;
 const b64=v=>Buffer.from(v).toString('base64url');
@@ -45,3 +45,5 @@ test('valid code creates limited grant before returning verifiable custom token'
  const grant=JSON.parse(calls[1].options.body);assert.equal(grant.role,'normal');assert.equal(grant.agencyId,'a');assert.equal(grant.expiresAt,expiresAt);assert.ok(expiresAt<=Date.now()+12*3600000);assert.equal(calls[1].options.headers.Authorization,'Bearer fixture-oauth');
  assert.ok(!token.includes(code));
 });
+
+test('custom login normalization matches creation policy',()=>{assert.equal(normalizeEntryCode('  검증코드-1234  '.normalize('NFD')),'검증코드-1234');for(const code of ['1234567','test code','12345678\u200b',123])assert.throws(()=>normalizeEntryCode(code));});

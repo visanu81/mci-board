@@ -1,5 +1,5 @@
 import {closeIncident} from './incident-close.mjs';
-import {config,serviceToken,signJwt,boundedJson} from './agency-login.mjs';
+import {config,serviceToken,signJwt,boundedJson,normalizeEntryCode} from './agency-login.mjs';
 import {isActiveGrant} from '../secure-session.js';
 const enc=new TextEncoder();
 const reply=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
@@ -54,15 +54,32 @@ export async function handleAccessManagement(request,env,verify,transport=fetch)
   // Serialize code-list changes with Firebase ETags, including last-admin protection.
   const all=await db('serverCodes','GET',undefined,{'X-Firebase-ETag':'true'});if(!all.ok)throw Error('store');
   const records=await all.json()||{};
-  if(request.method==='GET')return reply({codes:Object.entries(records).map(([id,r])=>({id,agencyId:r.agencyId,agencyName:r.agencyName,role:r.role,active:r.active,expiresAt:r.expiresAt,createdAt:r.createdAt}))});
+  if(request.method==='GET')return reply({codes:Object.entries(records).map(([id,r])=>({id,agencyId:r.agencyId,agencyName:r.agencyName,role:r.role,active:r.active,expiresAt:r.expiresAt,createdAt:r.createdAt,replaces:r.replaces||null}))});
   const currentCode=records[grant.codeId];
   if(!currentCode?.active || currentCode.expiresAt<=Date.now())return reply({error:'관리자 코드가 만료되거나 폐기됐습니다.'},403);
   let code=null,id;
   if(input.action==='create'){
-   if(Object.keys(input).some(k=>!['action','agencyId','agencyName','role','days'].includes(k)) || !/^[a-z0-9_-]{1,50}$/.test(input.agencyId||'') || typeof input.agencyName!=='string' || !input.agencyName.trim() || input.agencyName.length>50 || !['normal','observer','display','admin','hq'].includes(input.role) || !Number.isInteger(input.days) || input.days<1 || input.days>30)return reply({error:'관서 ID·표시명·역할·유효기간(1~30일)을 확인하세요.'},400);
+   if(Object.keys(input).some(k=>!['action','agencyId','agencyName','role','days','code'].includes(k)) || !/^[a-z0-9_-]{1,50}$/.test(input.agencyId||'') || typeof input.agencyName!=='string' || !input.agencyName.trim() || input.agencyName.length>50 || !['normal','observer','display','admin','hq'].includes(input.role) || !Number.isInteger(input.days) || input.days<1 || input.days>30)return reply({error:'관서 ID·표시명·역할·유효기간(1~30일)을 확인하세요.'},400);
    if(Object.keys(records).length>=500)return reply({error:'코드 보관 한도에 도달했습니다.'},409);
-   code=randomCode();id=await hash(env.MCI_CODE_PEPPER,code);
+   try{code=input.code===undefined||input.code===''?randomCode():normalizeEntryCode(input.code);}catch{return reply({error:'진입 코드는 공백 없이 8~128자로 입력하세요.'},400);}
+   id=await hash(env.MCI_CODE_PEPPER,code);
+   if(records[id])return reply({error:'이미 사용된 코드입니다. 다른 코드를 입력하세요.'},409);
    records[id]={agencyId:input.agencyId,agencyName:input.agencyName.trim(),role:input.role,active:true,expiresAt:Date.now()+input.days*86400000,createdAt:Date.now(),createdByUid:payload.sub};
+  }else if(input.action==='replace'){
+   if(Object.keys(input).some(k=>!['action','id','code','days'].includes(k)) || !/^[A-Za-z0-9_-]{43}$/.test(input.id||'') || !Number.isInteger(input.days) || input.days<1 || input.days>30)return reply({error:'교체할 코드와 유효기간(1~30일)을 확인하세요.'},400);
+   const previous=records[input.id];if(!previous)return reply({error:'코드를 찾을 수 없습니다.'},404);
+   if(Object.values(records).some(r=>r.replaces===input.id && r.active && r.expiresAt>Date.now()))return reply({error:'이미 교체용 코드가 있습니다. 기존 교체를 완료하거나 새 코드를 폐기한 뒤 다시 시도하세요.'},409);
+   if(Object.keys(records).length>=500)return reply({error:'코드 보관 한도에 도달했습니다.'},409);
+   try{code=input.code===undefined||input.code===''?randomCode():normalizeEntryCode(input.code);}catch{return reply({error:'진입 코드는 공백 없이 8~128자로 입력하세요.'},400);}
+   id=await hash(env.MCI_CODE_PEPPER,code);if(records[id])return reply({error:'이미 사용된 코드입니다. 다른 코드를 입력하세요.'},409);
+   records[id]={agencyId:previous.agencyId,agencyName:previous.agencyName,role:previous.role,active:true,expiresAt:Date.now()+input.days*86400000,createdAt:Date.now(),createdByUid:payload.sub,replaces:input.id};
+  }else if(input.action==='finish-replace'){
+   if(Object.keys(input).some(k=>!['action','id'].includes(k)) || !/^[A-Za-z0-9_-]{43}$/.test(input.id||''))return reply({error:'교체할 코드를 확인하세요.'},400);
+   id=input.id;const replacement=records[id],previous=records[replacement?.replaces];
+   if(!replacement?.active || replacement.expiresAt<=Date.now() || !previous)return reply({error:'사용 가능한 교체용 코드가 없습니다.'},409);
+   if(replacement.replaces===grant.codeId)return reply({error:'새 관리자 코드로 다시 로그인한 뒤 교체를 완료하세요.'},409);
+   if(previous.role!==replacement.role || previous.agencyId!==replacement.agencyId)return reply({error:'교체 코드의 관서·권한을 확인하세요.'},409);
+   records[replacement.replaces]={...previous,active:false,revokedAt:Date.now(),revokedByUid:payload.sub};
   }else if(input.action==='revoke'){
    if(Object.keys(input).some(k=>!['action','id'].includes(k)) || !/^[A-Za-z0-9_-]{43}$/.test(input.id||''))return reply({error:'코드를 확인하세요.'},400);
    id=input.id;const record=records[id];if(!record)return reply({error:'코드를 찾을 수 없습니다.'},404);

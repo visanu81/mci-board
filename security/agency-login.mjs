@@ -1,5 +1,11 @@
 // Server-only login foundation. Not wired into the deployed Worker yet.
 // All bindings are required; absence never falls back to anonymous authorization.
+export function normalizeEntryCode(value) {
+  if(typeof value!=='string')throw Error('code');
+  const code=value.trim().normalize('NFC');
+  if(code.length<8 || code.length>128 || /[\s\p{C}]/u.test(code))throw Error('code');
+  return code;
+}
 const PROD_PROJECT = 'disester-f3669';
 const encoder = new TextEncoder();
 const response = (data, status = 200) => new Response(JSON.stringify(data), {status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
@@ -44,8 +50,7 @@ export async function handleAgencyLogin(request,env,transport=fetch) {
     if(!limit.success)return response({error:'잠시 후 다시 시도하세요.'},429);
     let body;try{body=await boundedJson(request);}catch{return response({error:'입력 내용을 확인하세요.'},400);}
     if(typeof body.code!=='string' || Object.keys(body).some(k=>k!=='code'))return response({error:'입력 내용을 확인하세요.'},400);
-    const code=body.code.trim().normalize('NFC');
-    if(code.length<16 || code.length>128)return response({error:'진입 코드를 확인하세요.'},401);
+    let code;try{code=normalizeEntryCode(body.code);}catch{return response({error:'진입 코드를 확인하세요.'},401);}
     const key=await crypto.subtle.importKey('raw',encoder.encode(env.MCI_CODE_PEPPER),{name:'HMAC',hash:'SHA-256'},false,['verify']);
     let match=null, codeId=null, accessToken=null;
     if(env.MCI_CODE_STORE==='database'){
