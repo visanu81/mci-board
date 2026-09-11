@@ -2382,8 +2382,11 @@ function renderAuth() {
           <p class="text-sm text-slate-500 mt-1">관서 코드를 입력하세요</p>
         </div>
         <div class="bg-slate-900 rounded-2xl border border-slate-800 p-5">
-          <input id="auth-input" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="발급받은 테스트 진입 코드"
-            class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-red-500 mb-3" />
+          <div class="flex gap-2 mb-3">
+            <input id="auth-input" type="password" aria-label="관서 진입 코드" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="발급받은 테스트 진입 코드"
+              class="flex-1 min-w-0 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-red-500" />
+            <button id="auth-code-toggle" type="button" aria-label="진입 코드 보기" aria-controls="auth-input" aria-pressed="false" class="shrink-0 min-h-[44px] px-3 rounded-lg bg-slate-800 text-sm text-slate-200">보기</button>
+          </div>
           <button id="auth-btn" class="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 font-bold text-sm tracking-wide transition-all">
             진입
           </button>
@@ -2404,10 +2407,13 @@ function renderAuth() {
 function bindAuthEvents() {
   if(POPOUT_DISPLAY){const close=document.getElementById('display-wait-close');if(close)close.onclick=()=>window.close();return;}
   const input=document.getElementById('auth-input'), btn=document.getElementById('auth-btn'), err=document.getElementById('auth-error');
+  const visibility=document.getElementById('auth-code-toggle');
+  const hideCode=()=>{input.type='password';if(visibility){visibility.textContent='보기';visibility.setAttribute('aria-label','진입 코드 보기');visibility.setAttribute('aria-pressed','false');}};
+  if(visibility)visibility.onclick=()=>{const show=input.type==='password';input.type=show?'text':'password';visibility.textContent=show?'가리기':'보기';visibility.setAttribute('aria-label',show?'진입 코드 가리기':'진입 코드 보기');visibility.setAttribute('aria-pressed',String(show));};
   if (startupError) { err.textContent=startupError; err.classList.remove('hidden'); }
   let pending=false;
   const submit=async()=>{
-    if(pending)return;pending=true;btn.disabled=true;
+    if(pending)return;hideCode();pending=true;btn.disabled=true;
     try { await authReady; if(!secureSession)throw Error(startupError || '인증 설정이 필요합니다.'); await secureSession.login(input.value.trim()); }
     catch(error){err.textContent=error.message;err.classList.remove('hidden');}
     finally{pending=false;btn.disabled=false;}
