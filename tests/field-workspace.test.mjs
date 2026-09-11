@@ -6,6 +6,20 @@ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const renderSource=html.slice(html.indexOf('function renderFieldSummary()'),html.indexOf('function renderPatientWorkspace('));
 const totalsSource=html.slice(html.indexOf('function getTotals()'),html.indexOf('// ==================== 렌더링'));
 const escapeHtml=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const displayInfoSource=html.slice(html.indexOf('function renderDisplayIncidentInfo('),html.indexOf('function renderDisplayMain()'));
+const displayInfo=new Function('escapeHtml',displayInfoSource+';return renderDisplayIncidentInfo;')(escapeHtml);
+test('display incident information escapes free text and uses entered occurrence time',()=>{
+  const output=displayInfo({datetime:'2026-09-11 14:30',location:'<img src=x>',summary:'<script>x</script>',cause:'<b>unknown</b>',startedAt:1});
+  assert(output.includes('2026-09-11 14:30'));assert(output.includes('&lt;img'));
+  assert(!output.includes('<script>'));assert(!output.includes('<b>'));
+  assert(displayInfo({startedAt:1}).includes('미입력'));
+});
+test('display incident rerender uses current information and clears removed values',()=>{
+  const detail={location:'old place',summary:'old summary'};
+  assert(displayInfo(detail).includes('old summary'));
+  detail.location='new place';detail.summary='';
+  const output=displayInfo(detail);assert(output.includes('new place'));assert(!output.includes('old summary'));assert(!output.includes('old place'));
+});
 function fixture(readOnly=true) {
   const state={fieldTab:'incident',briefingMode:true,incident:{location:'<img src=x onerror=alert(1)>',summary:'overview'},damages:{medical:{dead:20,severe:30}},mobilizations:{medical:{agencies:{fire:{p:3,v:2}},vehicles:{pump:2}}},actions:[{timestamp:1,content:'<script>bad</script>',author:'crew',teamId:'medical'}],casualties:[{name:'PRIVATE',triage:'urgent',cardNo:1}],mciCasualties:[{triage:'urgent'},{triage:'urgent'}]};
   let formCalls=0;

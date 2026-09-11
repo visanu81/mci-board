@@ -699,6 +699,17 @@
 .workspace-patients{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
 .workspace-patient{padding:16px;border:1px solid #334155;border-radius:14px;background:#111c2e;overflow-wrap:anywhere}
 .field-summary{padding-bottom:0}
+.display-incident-info{flex-shrink:0;margin-bottom:16px;padding:12px 16px;border:1px solid #475569;border-radius:12px;background:#111c2e;max-height:24vh;overflow:auto;font-size:clamp(16px,1.05vw,22px);line-height:1.5}
+.display-incident-facts{display:grid;grid-template-columns:minmax(180px,1fr) minmax(0,2fr) minmax(0,1fr);gap:8px 20px}
+.display-incident-facts>div{min-width:0;overflow-wrap:anywhere}
+.display-incident-info dt,.display-incident-label{color:#93c5fd;font-weight:700;font-size:.85em;margin-right:8px}
+.display-incident-info dt,.display-incident-info dd{display:inline}
+.display-incident-extra{margin-top:6px;overflow-wrap:anywhere;white-space:pre-wrap}
+.display-incident-overview{margin-top:8px;padding-top:8px;border-top:1px solid #334155;white-space:pre-wrap;overflow-wrap:anywhere}
+body.outdoor-mode .display-incident-info{background:#fff;color:#0f172a;border-color:#94a3b8}
+body.outdoor-mode .display-incident-info dt,body.outdoor-mode .display-incident-label{color:#1d4ed8}
+body.outdoor-mode .display-incident-overview{border-color:#cbd5e1}
+@media(max-width:900px){.display-incident-facts{grid-template-columns:minmax(0,1fr) minmax(0,2fr)}.display-incident-facts>div:last-child{grid-column:1/-1}}
 .field-facts{display:grid;gap:8px;margin-top:12px;font-size:14px}
 .field-facts>div{display:grid;grid-template-columns:84px minmax(0,1fr);gap:10px}
 .field-facts dt{color:#94a3b8}.field-facts dd{white-space:pre-wrap;overflow-wrap:anywhere}
@@ -2751,6 +2762,10 @@ function floorOfLocation(loc) {
   return '미분류';
 }
 
+function renderDisplayIncidentInfo(detail={}) {
+  const fields=[['발생일시',detail.datetime],['장소',detail.location],['대상',detail.target]];
+  return `<section class="display-incident-info" aria-label="재난 정보"><dl class="display-incident-facts">${fields.map(([label,value])=>`<div><dt>${label}</dt><dd>${escapeHtml(value || '미입력')}</dd></div>`).join('')}</dl>${detail.structure || detail.cause?`<p class="display-incident-extra">${detail.structure?`<span class="display-incident-label">건물구조</span>${escapeHtml(detail.structure)}`:''}${detail.structure&&detail.cause?' · ':''}${detail.cause?`<span class="display-incident-label">원인</span>${escapeHtml(detail.cause)}`:''}</p>`:''}<p class="display-incident-overview"><span class="display-incident-label">사고개요</span>${escapeHtml(detail.summary || '현장 정보에서 사고개요를 입력하면 여기에 표시됩니다.')}</p></section>`;
+}
 function renderDisplayMain() {
   // 인덱스(state.incidents)에서 재난 메타(title, type, agencyId, startedAt)를 우선 사용.
   // state.incident는 "사고 개요" 폼이 입력된 경우에만 값이 있어 보조로만 활용.
@@ -3000,6 +3015,8 @@ function renderDisplayMain() {
       </header>
 
       ${tvSettingsPanel}
+
+      ${renderDisplayIncidentInfo(incDetail)}
 
       <!-- 본문: 모드에 따라 [좌 요약 | 우 명단] 2단(list) 또는 [요약만 전체폭](summary) -->
       <div class="flex-1 min-h-0 ${isList ? 'flex flex-row gap-6' : 'flex flex-col'}">
