@@ -698,6 +698,22 @@
 .workspace-filters input,.workspace-filters select{min-height:44px;width:100%;min-width:0;background:#0b1220;border:1px solid #475569;border-radius:8px;padding:10px;color:#f1f5f9;font-size:16px}
 .workspace-patients{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
 .workspace-patient{padding:16px;border:1px solid #334155;border-radius:14px;background:#111c2e;overflow-wrap:anywhere}
+.field-summary{padding-bottom:0}
+.field-facts{display:grid;gap:8px;margin-top:12px;font-size:14px}
+.field-facts>div{display:grid;grid-template-columns:84px minmax(0,1fr);gap:10px}
+.field-facts dt{color:#94a3b8}.field-facts dd{white-space:pre-wrap;overflow-wrap:anywhere}
+.field-summary-text{font-size:14px;line-height:1.6;margin-top:10px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:4.8em;overflow:auto}
+.field-tabs{display:flex;flex-wrap:wrap;gap:8px}
+.field-tabs .is-current{background:#2563eb!important;color:#fff!important;border-color:#60a5fa}
+.field-timeline{display:grid;gap:12px;margin-top:14px}
+.field-timeline li{padding:8px 0;border-bottom:1px solid #334155;overflow-wrap:anywhere}
+.field-timeline p{white-space:pre-wrap;margin-top:4px;font-size:14px}
+.field-workspace input,.field-workspace textarea{font-size:16px!important;min-height:44px;min-width:0}
+.field-workspace label{font-size:14px!important}
+.field-workspace button{min-height:44px}
+.field-workspace #save-incident,.field-workspace #save-mobil,.field-workspace #save-damage,.field-workspace #add-action{background:#2563eb;color:#fff}
+body.outdoor-mode .field-facts dt{color:#475569}
+body.outdoor-mode .field-timeline li{border-color:#cbd5e1}
 .transport-editor{display:grid;gap:12px;border-color:#60a5fa}
 body.outdoor-mode .workspace-header,body.outdoor-mode .workspace-nav,body.outdoor-mode .workspace-patient{background:#fff;color:#0f172a;border-color:#94a3b8}
 body.outdoor-mode .workspace-filters input,body.outdoor-mode .workspace-filters select{background:#fff;color:#0f172a}
@@ -1298,6 +1314,7 @@ let state = {
   inputTab: 'incident',
   firebaseConnected: null, patientEditor:false, patientSearch:'', patientFilter:'all', transportSearch:'', transportFilter:'all', transportDraft:null, transportSaving:false, transportFeedback:'',
   mciTab: 'situation',              // 기본 MCI 탭: 통합 상황판
+  fieldTab: 'incident',
   mciInputMode: 'simple',
   // 재난 데이터 (현재 합류한 재난방 기준)
   incident: null,
@@ -4104,7 +4121,7 @@ function refreshWorkspaceConnection() {
 }
 function renderMciWorkspaceHeader(team, observerMode) {
   const incident=state.incidents.find(i=>i._key===state.currentIncidentId);
-  const tabs=observerMode?[['situation','상황판','layout-dashboard'],['more','더보기','menu']]:[['situation','상황판','layout-dashboard'],['casualty','환자 관리','users'],['transport','이송 관리','ambulance'],['more','더보기','menu']];
+  const tabs=observerMode?[['situation','상황판','layout-dashboard'],['field','현장 정보','clipboard-list'],['more','더보기','menu']]:[['situation','상황판','layout-dashboard'],['casualty','환자 관리','users'],['transport','이송 관리','ambulance'],['field','현장 정보','clipboard-list'],['more','더보기','menu']];
   return `<header class="workspace-header"><div class="workspace-heading"><div class="min-w-0"><div class="workspace-eyebrow">MCI · 테스트 환경</div><h1 class="text-lg font-bold truncate">${escapeHtml(incident?.title || '재난 상황판')}</h1><p class="text-xs text-slate-400">${escapeHtml(team.name)} · ${escapeHtml(state.user.name)}</p></div><span class="workspace-connection" data-connection-status role="status">${workspaceConnectionText()}</span></div>
   <nav class="workspace-nav" aria-label="MCI 주 메뉴">${tabs.map(([id,label,icon])=>`<button data-mci-tab="${id}" class="mci-tab-btn ${state.mciTab===id?'is-current':''}" ${state.mciTab===id?'aria-current="page"':''}><i data-lucide="${icon}" class="w-5 h-5"></i>${label}</button>`).join('')}</nav></header>`;
 }
@@ -4112,11 +4129,52 @@ function renderMciMore(observerMode) {
   return `<section class="workspace-page"><h2 class="text-xl font-bold">더보기</h2><p class="text-slate-400">보기 설정과 재난 관리</p><div class="workspace-actions">
     ${secureIdentity?.role==='admin'?'<button id="manage-codes-btn">관서 진입 코드 관리</button>':''}${!observerMode?'<button id="open-display-btn">전광판 열기</button><button id="admin-btn">내보내기 · 재난 관리</button>':''}
     <button id="briefing-toggle">${state.briefingMode?'개인정보 가림 켜짐':'개인정보 가림 꺼짐'}</button>
-    <button data-mode="general" class="mode-btn">일반 재난 상황판으로</button>
+    <button data-field-open="legacy">기존 일반재난 환자 기록 (${state.casualties.length}건)</button>
     <button id="logout-btn">재난 목록으로</button>
     <button id="workspace-outdoor" aria-pressed="${!!state.outdoorMode}">야외 모드 ${state.outdoorMode?'켜짐':'꺼짐'}</button>
     <button id="workspace-help">도움말 · 사용법</button>
   </div></section>`;
+}
+// Shared incident information uses the original paths; patient collections stay separate.
+function renderFieldSummary() {
+  const inc=state.incident || {};
+  return `<section class="workspace-page field-summary"><div class="workspace-patient"><div class="flex items-center justify-between gap-2"><h2 class="text-lg font-bold">재난 정보</h2><button class="workspace-button" data-field-open="incident">상세 보기</button></div><dl class="field-facts">${[['발생일시',inc.datetime],['장소',inc.location],['대상',inc.target]].map(([label,value])=>`<div><dt>${label}</dt><dd>${escapeHtml(value || '미입력')}</dd></div>`).join('')}</dl>${inc.summary?`<p class="field-summary-text">${escapeHtml(inc.summary)}</p>`:''}</div>${state.casualties.length?`<p class="text-sm text-amber-300">기존 일반재난 환자 ${state.casualties.length}건은 아래 MCI 환자 수에 포함되지 않습니다. <button class="workspace-button" data-field-open="legacy">기록 확인</button></p>`:''}</section>`;
+}
+function renderFieldTimeline(limit=0) {
+  const actions=[...state.actions].sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
+  const list=limit?actions.slice(0,limit):actions;
+  return `<ol class="field-timeline">${list.map(a=>`<li><div class="text-sm text-slate-400">${escapeHtml(a.timestamp?new Date(a.timestamp).toLocaleString('ko-KR'):'시각 미입력')} · ${escapeHtml(TEAMS.find(t=>t.id===a.teamId)?.name || a.teamId || '')} · ${escapeHtml(a.author || '')}</div><p>${escapeHtml(a.content || '')}</p></li>`).join('')||'<li class="text-slate-400">아직 등록된 조치사항이 없습니다.</li>'}</ol>`;
+}
+function renderFieldActivitySummary() {
+  const totals=getTotals();
+  return `<section class="workspace-page"><div class="workspace-patient"><div class="flex items-center justify-between gap-2"><h2 class="text-lg font-bold">동원 보고 요약</h2><button class="workspace-button" data-field-open="mobilization">동원 보기</button></div><p class="text-lg mt-3">인력 ${totals.totalP}명 · 장비 ${totals.totalV}대</p><p class="text-sm text-slate-400 mt-2">${Object.keys(state.mobilizations).length}개 직책 보고 합계 · 같은 인력·장비를 중복 보고하지 마세요.</p></div><div class="workspace-patient"><div class="flex items-center justify-between gap-2"><h2 class="text-lg font-bold">최근 조치사항</h2><button class="workspace-button" data-field-open="action">전체 보기</button></div>${renderFieldTimeline(3)}</div></section>`;
+}
+function renderFieldReports(kind) {
+  const records=kind==='mobilization'?state.mobilizations:state.damages;
+  return `<div class="workspace-patients">${Object.entries(records).map(([teamId,record])=>`<article class="workspace-patient"><h3 class="font-bold">${escapeHtml(TEAMS.find(t=>t.id===teamId)?.name || teamId)} 보고</h3><p class="text-sm text-slate-400">${escapeHtml(record._author || '')}</p>${kind==='mobilization'?`<dl class="field-facts">${AGENCIES.map(a=>`<div><dt>${escapeHtml(a.name)}</dt><dd>${Number(record.agencies?.[a.id]?.p)||0}명 / ${Number(record.agencies?.[a.id]?.v)||0}대</dd></div>`).join('')}</dl><p class="text-sm text-slate-400 mt-3">소방차량 종류별 내역 (위 장비 수에 추가 합산하지 않음)</p><dl class="field-facts">${VEHICLES.map(v=>`<div><dt>${escapeHtml(v.name)}</dt><dd>${Number(record.vehicles?.[v.id])||0}대</dd></div>`).join('')}</dl>`:`<dl class="field-facts">${[['dead','사망'],['severe','중상'],['mild','경상'],['etc','기타']].map(([key,label])=>`<div><dt>${label} 보고</dt><dd>${Number(record[key])||0}명</dd></div>`).join('')}${[['propRe','부동산'],['propMov','동산'],['propEtc','기타 재산']].map(([key,label])=>`<div><dt>${label}</dt><dd>${(Number(record[key])||0).toLocaleString()}천원</dd></div>`).join('')}</dl>`}</article>`).join('')||'<p class="text-slate-400">아직 등록된 보고가 없습니다.</p>'}</div>`;
+}
+function renderLegacyPatients() {
+  return `<p class="text-sm text-amber-300">기존 일반재난 환자 기록 ${state.casualties.length}건 · 읽기 전용입니다. MCI 환자 수에 합산하거나 자동 복사하지 않습니다. 같은 환자를 다시 등록하기 전에 기존 기록과 대조하세요.</p><div class="workspace-patients">${state.casualties.map(c=>`<article class="workspace-patient"><h3 class="font-bold">#${escapeHtml(String(c.cardNo || '?'))} · ${escapeHtml(state.briefingMode?maskName(c.name || ''):c.name || '미상')}</h3><dl class="field-facts">${[['분류',MCI_TRIAGE.find(t=>t.id===c.triage)?.name || c.triage],['발견장소',c.location],['증상',c.symptom],['병원',c.hospital],['출발',c.departTime || c.depart],['도착',c.arriveTime],['작성자',c.author]].map(([label,value])=>`<div><dt>${label}</dt><dd>${escapeHtml(value || '미입력')}</dd></div>`).join('')}</dl></article>`).join('')||'<p class="text-slate-400">기존 일반재난 환자 기록이 없습니다.</p>'}</div>`;
+}
+function renderFieldWorkspace(readOnly=false) {
+  const tabs=[['incident','재난 정보'],['mobilization','동원'],['action','조치사항'],['damage','피해 보고'],['legacy','기존 환자']];
+  const selected=tabs.some(([id])=>id===state.fieldTab)?state.fieldTab:'incident';
+  const inc=state.incident||{};
+  let content='';
+  if(selected==='incident')content=readOnly?`<div class="workspace-patient"><dl class="field-facts">${[['발생일시',inc.datetime],['장소',inc.location],['대상',inc.target],['건물구조',inc.structure],['원인',inc.cause],['사고개요',inc.summary]].map(([label,value])=>`<div><dt>${label}</dt><dd>${escapeHtml(value || '미입력')}</dd></div>`).join('')}</dl></div>`:renderIncidentForm();
+  if(selected==='mobilization')content=`<p class="text-sm text-slate-400">직책별 보고를 함께 봅니다. 입력 시 해당 직책의 값이 갱신됩니다. 다른 직책이 보고한 동일 인력·장비는 중복 입력하지 마세요.</p>${renderFieldReports('mobilization')}${!readOnly?`<h3 class="text-lg font-bold">내 직책 동원 입력</h3>${renderMobilForm()}`:''}`;
+  if(selected==='action')content=`${!readOnly?renderActionForm():''}<div class="workspace-patient"><h3 class="text-lg font-bold">전체 조치사항</h3>${renderFieldTimeline()}</div>`;
+  if(selected==='damage')content=`<p class="text-sm text-amber-300">직책별 수기 피해 보고입니다. 인명피해 보고는 환자 카드와 중복될 수 있어 MCI 환자 합계에 더하지 않습니다. 중상·경상 보고와 트리아지 등급은 자동 변환하지 않습니다.</p>${renderFieldReports('damage')}${!readOnly?`<h3 class="text-lg font-bold">내 직책 피해 보고 입력</h3>${renderDamageForm()}`:''}`;
+  if(selected==='legacy')content=renderLegacyPatients();
+  return `<section class="workspace-page field-workspace"><h2 class="text-xl font-bold">현장 정보</h2><p class="text-sm text-slate-400">같은 재난의 개요·동원·조치사항·피해 보고${readOnly?' · 읽기 전용':''}</p><nav class="field-tabs" aria-label="현장 정보 항목">${tabs.map(([id,label])=>`<button data-field-tab="${id}" class="workspace-button ${selected===id?'is-current':''}" ${selected===id?'aria-current="page"':''}>${label}</button>`).join('')}</nav>${content}</section>`;
+}
+function bindFieldWorkspace() {
+  document.querySelectorAll('[data-field-tab]').forEach(button=>{button.onclick=()=>{state.fieldTab=button.dataset.fieldTab;render();window.scrollTo({top:0});};});
+  if(isObserver())return;
+  if(state.fieldTab==='incident')bindIncidentEvents();
+  if(state.fieldTab==='mobilization')bindMobilEvents();
+  if(state.fieldTab==='action')bindActionEvents();
+  if(state.fieldTab==='damage')bindDamageEvents();
 }
 function renderPatientWorkspace(transport=false) {
   if(!transport && state.patientEditor) return `<div class="workspace-page mci-editor-return"><button id="patient-list-back" class="workspace-button">← 환자 목록</button><p class="text-slate-400">목록으로 이동해도 작성 중인 입력은 유지됩니다.</p></div>${renderMciCasualtyForm()}`;
@@ -4296,7 +4354,7 @@ function renderMain() {
       <main class="max-w-5xl mx-auto pb-20">
         ${state.mode === 'general'
           ? (state.view === 'dashboard' ? renderDashboard() : renderInput())
-          : (state.mciTab === 'situation' ? renderMciSituation() : state.mciTab === 'more' ? renderMciMore(observerMode) : renderPatientWorkspace(state.mciTab === 'transport'))}
+          : (state.mciTab === 'situation' ? renderFieldSummary()+renderMciSituation()+renderFieldActivitySummary() : state.mciTab === 'field' ? renderFieldWorkspace(observerMode) : state.mciTab === 'more' ? renderMciMore(observerMode) : renderPatientWorkspace(state.mciTab === 'transport'))}
         <footer class="px-4 py-6 mt-4 text-center">
           <div class="inline-flex items-center gap-2 text-[11px] text-slate-600 tracking-wider flex-wrap justify-center">
             <span class="w-8 h-px bg-slate-800"></span>
@@ -4506,6 +4564,7 @@ function renderResetPanel() {
 }
 
 function bindMainEvents() {
+  document.querySelectorAll('[data-field-open]').forEach(button=>{button.onclick=()=>{state.mciTab='field';state.fieldTab=button.dataset.fieldOpen;render();window.scrollTo({top:0});};});
   const outdoorButton=document.getElementById('workspace-outdoor');
   if(outdoorButton)outdoorButton.onclick=()=>{document.getElementById('outdoor-toggle')?.click();outdoorButton.textContent=`야외 모드 ${state.outdoorMode?'켜짐':'꺼짐'}`;outdoorButton.setAttribute('aria-pressed',String(!!state.outdoorMode));};
   const helpButton=document.getElementById('workspace-help');
@@ -4575,6 +4634,7 @@ function bindMainEvents() {
   if (state.adminModal) bindAdminModalEvents();
 
   if (state.mode === 'general' && state.view === 'input') bindInputEvents();
+  if (state.mode === 'mci' && state.mciTab === 'field') bindFieldWorkspace();
   if (state.mode === 'mci' && ['casualty','transport'].includes(state.mciTab)) {
     bindPatientWorkspace();
     if(state.mciTab === 'casualty' && state.patientEditor)bindMciCasualtyEvents();
@@ -5041,7 +5101,7 @@ function renderDamageForm() {
       </div>
       <button id="save-damage" class="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:bg-slate-700 font-bold text-sm tracking-wide transition-all">${teamName} 입력 저장</button>
       <div class="text-xs text-center min-h-[20px]">${saveStatusBar('damage')}</div>
-      <p class="text-[11px] text-slate-500 text-center">다른 반 입력과 자동 합산됩니다</p>
+      <p class="text-[11px] text-slate-500 text-center">${state.mode==='mci'?'내 직책의 수기 보고를 저장합니다. MCI 환자 합계에는 더하지 않습니다.':'다른 반 입력과 자동 합산됩니다'}</p>
     </div>
   `;
 }
@@ -6712,7 +6772,7 @@ function initSwipeTabNav() {
     if (Math.abs(dx) < 70) return;                     // 최소 스와이프 거리
     if (Math.abs(dx) < Math.abs(dy) * 1.5) return;     // 세로 스크롤 우세면 무시
     const dir = dx < 0 ? 1 : -1;                       // 왼쪽으로 밀면 다음 탭
-    const tabs = state.mode === 'mci' ? ['situation', 'casualty', 'transport', 'more'] : ['dashboard', 'input'];
+    const tabs = state.mode === 'mci' ? (isObserver()?['situation','field','more']:['situation', 'casualty', 'transport', 'field', 'more']) : ['dashboard', 'input'];
     const cur = state.mode === 'mci' ? state.mciTab : state.view;
     const ni = tabs.indexOf(cur) + dir;
     if (ni < 0 || ni >= tabs.length) return;           // 끝 탭에서는 그대로

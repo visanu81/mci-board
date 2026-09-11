@@ -11,7 +11,7 @@
     "test:display": "node --test tests/display-session.test.mjs",
     "test:conflict": "node --test tests/card-conflict.test.mjs",
     "test:lifecycle": "node --test tests/card-lifecycle.test.mjs",
-    "test:workspace": "node --test tests/workspace.test.mjs"
+    "test:workspace": "node --test tests/workspace.test.mjs tests/field-workspace.test.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.2",
