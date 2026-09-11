@@ -708,8 +708,35 @@ body.outdoor-mode .workspace-nav button.is-current{background:#dbeafe;color:#1d4
  .workspace-nav button{flex-direction:column;gap:3px;font-size:12px;min-height:60px;border-bottom:0;border-top:3px solid transparent}
  .workspace-nav button.is-current{border-top-color:#60a5fa}.mci-workspace main{padding-bottom:150px}
  .mci-workspace #outbox-badge{bottom:calc(76px + env(safe-area-inset-bottom))!important}
- .mci-workspace #mci-save-fab{bottom:calc(134px + env(safe-area-inset-bottom))!important}
- .mci-workspace #outdoor-toggle,.mci-workspace #help-btn{bottom:calc(76px + env(safe-area-inset-bottom))!important}
+ .mci-workspace:has(.mci-save-dock) #outbox-badge{bottom:calc(140px + env(safe-area-inset-bottom))!important}
+}
+
+/* Field input: explicit action area, larger controls, shared action color. */
+.mci-workspace #outdoor-toggle,.mci-workspace #help-btn{display:none}
+.mci-editor-return{padding:12px 16px 0;gap:6px}
+.mci-editor-return p{margin:0;font-size:12px}
+.mci-input-form label{font-size:14px!important;letter-spacing:normal!important}
+.mci-input-form input:not([type=checkbox]):not([type=file]),.mci-input-form textarea,.mci-input-form select{font-size:16px!important;min-height:44px}
+.mci-input-form button,.mci-input-form summary{min-height:44px;font-size:14px!important}
+.mci-input-form summary{align-items:center}
+.mci-input-form [class*="text-[10px]"],.mci-input-form [class*="text-[11px]"]{font-size:13px}
+.mci-input-form .mci-input-heading{flex-wrap:wrap;gap:8px}
+.mci-input-form #mci-mode-simple,.mci-input-form #mci-mode-full{padding:10px 14px}
+.mci-input-form #mci-mode-simple.bg-pink-600,.mci-input-form #mci-mode-full.bg-pink-600,
+.mci-input-form #mci-ocr-btn,.mci-input-form #mci-save-btn:not(:disabled),.mci-input-form #mci-save-fab{background:#2563eb!important;background-image:none!important;color:#fff!important}
+.mci-input-form [class*="text-pink-"]{color:#93c5fd!important}
+body.outdoor-mode .mci-input-form [class*="text-pink-"]{color:#1d4ed8!important}
+.mci-save-dock{position:sticky;bottom:12px;z-index:30;padding:10px;background:#0f172a;border:1px solid #475569;border-radius:12px;margin-top:12px}
+.mci-save-dock #mci-save-fab{position:static!important;width:100%;justify-content:center;border-radius:8px;min-height:48px;box-shadow:none!important}
+body.outdoor-mode .mci-save-dock{background:#fff;border-color:#94a3b8}
+@media(max-width:767px){
+ .mci-workspace main{padding-bottom:240px}
+ .mci-workspace .mci-save-dock{position:fixed;left:0;right:0;bottom:calc(60px + env(safe-area-inset-bottom));margin:0;padding:8px 16px;border-radius:0;border-width:1px 0 0}
+ .mci-input-form .mci-mode-heading{flex-wrap:wrap;padding:8px 12px;gap:8px}
+ .mci-input-form .mci-mode-heading>div:first-child{display:none}
+ .mci-input-form .mci-mode-heading>div:last-child{display:flex;width:100%}
+ .mci-input-form .mci-mode-heading button{flex:1}
+ .mci-workspace input,.mci-workspace textarea,.mci-workspace select{scroll-margin-block:130px 220px}
 }
 
 </style>
@@ -4087,10 +4114,12 @@ function renderMciMore(observerMode) {
     <button id="briefing-toggle">${state.briefingMode?'개인정보 가림 켜짐':'개인정보 가림 꺼짐'}</button>
     <button data-mode="general" class="mode-btn">일반 재난 상황판으로</button>
     <button id="logout-btn">재난 목록으로</button>
-  </div><p class="text-sm text-slate-400">야외 모드와 도움말은 화면 왼쪽 아래에서 열 수 있습니다.</p></section>`;
+    <button id="workspace-outdoor" aria-pressed="${!!state.outdoorMode}">야외 모드 ${state.outdoorMode?'켜짐':'꺼짐'}</button>
+    <button id="workspace-help">도움말 · 사용법</button>
+  </div></section>`;
 }
 function renderPatientWorkspace(transport=false) {
-  if(!transport && state.patientEditor) return `<div class="workspace-page"><button id="patient-list-back" class="workspace-button">← 환자 목록</button><p class="text-sm text-slate-400 mt-2">목록으로 이동해도 작성 중인 입력은 유지됩니다.</p></div>${renderMciCasualtyForm()}`;
+  if(!transport && state.patientEditor) return `<div class="workspace-page mci-editor-return"><button id="patient-list-back" class="workspace-button">← 환자 목록</button><p class="text-slate-400">목록으로 이동해도 작성 중인 입력은 유지됩니다.</p></div>${renderMciCasualtyForm()}`;
   const cards=state.mciCasualties.filter(c=>!isFieldOnly(state.user.teamId)||c.author===state.user.name);
   const filter=transport?state.transportFilter:state.patientFilter;
   const q=(transport?state.transportSearch:state.patientSearch).trim().toLowerCase();
@@ -4477,6 +4506,10 @@ function renderResetPanel() {
 }
 
 function bindMainEvents() {
+  const outdoorButton=document.getElementById('workspace-outdoor');
+  if(outdoorButton)outdoorButton.onclick=()=>{document.getElementById('outdoor-toggle')?.click();outdoorButton.textContent=`야외 모드 ${state.outdoorMode?'켜짐':'꺼짐'}`;outdoorButton.setAttribute('aria-pressed',String(!!state.outdoorMode));};
+  const helpButton=document.getElementById('workspace-help');
+  if(helpButton)helpButton.onclick=()=>document.getElementById('help-btn')?.click();
   const codesButton=document.getElementById('manage-codes-btn');if(codesButton)codesButton.onclick=()=>{leaveIncident();document.getElementById('managed-codes-panel')?.scrollIntoView({block:'start'});};
   const leaveButton=document.getElementById('logout-btn');
   if(leaveButton)leaveButton.onclick = () => {
@@ -5612,7 +5645,7 @@ function renderMciCasualtyForm() {
   }
 
   return `
-    <div class="px-4 py-4">
+    <div class="mci-input-form px-4 py-3">
       <!-- 2단 레이아웃: PC(lg+)는 좌측에 등록 카드 목록(누적·스크롤), 우측에 입력 폼.
            모바일은 기존처럼 폼 위 / 목록 아래 (order로 순서만 교체) -->
       <div class="flex flex-col lg:flex-row lg:items-start lg:gap-4">
@@ -5621,7 +5654,7 @@ function renderMciCasualtyForm() {
       <div class="order-1 lg:order-2 flex-1 min-w-0 space-y-4">
 
       <!-- 직책 + 모드 안내 -->
-      <div class="bg-slate-900 rounded-xl border border-slate-800 p-3 flex items-center justify-between gap-2">
+      <div class="mci-mode-heading bg-slate-900 rounded-xl border border-slate-800 p-3 flex items-center justify-between gap-2">
         <div class="flex items-center gap-2 min-w-0 flex-1">
           <i data-lucide="${TEAMS.find(t=>t.id===state.user.teamId)?.icon || 'user'}" class="w-4 h-4 flex-shrink-0" style="color:${TEAMS.find(t=>t.id===state.user.teamId)?.color}"></i>
           <span class="text-xs text-slate-300 truncate">
@@ -5705,7 +5738,7 @@ function renderMciCasualtyForm() {
 
       <!-- 입력 폼 -->
       <div class="bg-slate-900 rounded-2xl border ${isEditing ? 'border-amber-500' : 'border-slate-800'} ${inspected ? 'hidden' : ''}">
-        <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+        <div class="mci-input-heading px-4 py-3 border-b border-slate-800 flex items-center justify-between">
           <h3 class="text-sm font-bold flex items-center gap-2">
             <i data-lucide="${isEditing ? 'pencil' : 'user-round-plus'}" class="w-4 h-4 ${isEditing ? 'text-amber-400' : 'text-pink-400'}"></i>
             ${isEditing ? '카드 수정 중' : (inputMode === 'simple' ? '빠른 카드 추가' : '사상자 카드 추가')}
@@ -6005,12 +6038,12 @@ function renderMciCasualtyForm() {
           <div class="text-xs text-center min-h-[20px]">${saveStatusBar(state.mode === 'general' ? 'casualty' : 'mciCasualty')}</div>
 
           <!-- 플로팅 저장(빠른 수정용): 화면을 따라다님. 하단 저장과 동일 동작. 상세보기(hidden) 시 자동 숨김 -->
-          <button id="mci-save-fab" type="button"
+          <div class="mci-save-dock"><button id="mci-save-fab" type="button"
             class="fixed right-4 flex items-center gap-1.5 px-5 py-3 rounded-full font-bold text-sm text-white ${isEditing ? 'bg-amber-600 hover:bg-amber-700' : 'bg-pink-600 hover:bg-pink-700'} transition-colors"
             style="bottom:84px;z-index:30;box-shadow:0 6px 20px rgba(0,0,0,.5)"
             title="${isEditing ? '카드 수정 저장' : '사상자 카드 저장'}" aria-label="${isEditing ? '카드 수정 저장' : '사상자 카드 저장'}">
             <i data-lucide="${isEditing ? 'save' : 'check'}" class="w-4 h-4"></i>${isEditing ? '수정 저장' : '저장'}
-          </button>
+          </button></div>
         </div>
       </div>
 
