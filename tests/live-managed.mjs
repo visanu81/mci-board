@@ -46,6 +46,13 @@ try{
  };
  await assert.rejects(sender({notes:'first'},{notes:'stale overwrite'}),e=>e.code==='write_conflict');assert.equal((await (await read(cardPath,normal.user)).json()).notes,'last');pass('guarded sender blocks same-field stale edit on real Firebase');
  await sender({notes:'last'},{notes:'approved edit'});const protectedCard=await (await read(cardPath,normal.user)).json();assert.equal(protectedCard.notes,'approved edit');assert.equal(protectedCard.hospital,'가상 병원');pass('conditional whole-card save passes rules and preserves other fields');
+ const lifecyclePath=path+'/mciCasualties/lifecycle',creation={createdByUid:normal.user.uid,updatedByUid:normal.user.uid,timestamp:Date.now(),name:'가상 재전송',triage:'urgent',notes:'original'};let attempted=false;
+ const lifecycleGrant=await (await read('access/'+normal.user.uid,normal.user)).json();
+ const lifecycle=(method,expected)=>sendBoundOperation({path:lifecyclePath,method,payload:creation,expected,creationGuard:true,creationAttempted:attempted,securityContext:{uid:normal.user.uid,agencyId:tag,projectId:project}},{currentIdentity:()=>({...lifecycleGrant,uid:normal.user.uid}),currentUser:()=>normal.user,projectId:project,databaseURL:config.databaseURL,beforeCreate:async()=>{attempted=true;}});
+ await lifecycle('set');assert(attempted);pass('guarded creation succeeds on real Firebase');
+ assert((await read(lifecyclePath,peer.user,'PATCH',{notes:'colleague edit',updatedByUid:peer.user.uid})).ok);await lifecycle('set');assert.equal((await (await read(lifecyclePath,normal.user)).json()).notes,'colleague edit');pass('create retry preserves colleague edit');
+ await assert.rejects(lifecycle('remove',creation),e=>e.code==='write_conflict');const latestDelete=await (await read(lifecyclePath,normal.user)).json();await lifecycle('remove',latestDelete);await lifecycle('remove',latestDelete);assert.equal(await (await read(lifecyclePath,normal.user)).json(),null);pass('changed delete is reviewed and exact snapshot deletes idempotently');
+ await assert.rejects(lifecycle('set'),e=>e.code==='write_conflict');assert.equal(await (await read(lifecyclePath,normal.user)).json(),null);pass('create retry cannot resurrect deleted real card');
  const closing=await api('/api/admin/close',{incidentId:tag},admin.user);assert.equal(closing.status,200);pass('server closes and archives isolated incident');
  const closed=await (await read(path,admin.user)).json();assert(closed.closure && closed.closedAt);assert.equal(closed.title,'가상 재난');
  const savedArchive=await read('mci2/archives/close-'+closed.closure.id,admin.user);assert(savedArchive.ok);assert.equal((await savedArchive.json()).sourceIncidentId,tag);pass('closed original and archive both retained');

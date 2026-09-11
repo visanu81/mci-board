@@ -1392,7 +1392,7 @@ function outboxEnqueue({ kind, method, path, incidentId, payload, expected, maxT
   const opId = _newOpId();
   const now = Date.now();
   const entry = {
-    opId, seq: o.seq++, kind, method, path,
+    opId, seq: o.seq++, kind, method, path, creationGuard:true,
     securityContext: {projectId:firebaseConfig.projectId,uid:secureIdentity.uid,agencyId:secureIdentity.agencyId},
     incidentId: incidentId || null,
     status: 'pending', tries: 0,
@@ -1495,7 +1495,7 @@ async function _outboxSendOne(opId) {
     outboxMark(opId, { status: 'sending' });
   } catch { updateOutboxBadge(); return false; }
   try {
-    await sendBoundOperation(op, {currentIdentity:()=>secureIdentity,currentUser:()=>auth.currentUser,projectId:firebaseConfig.projectId,databaseURL:firebaseConfig.databaseURL});
+    await sendBoundOperation(op, {currentIdentity:()=>secureIdentity,currentUser:()=>auth.currentUser,projectId:firebaseConfig.projectId,databaseURL:firebaseConfig.databaseURL,beforeCreate:()=>outboxMark(opId,{creationAttempted:true})});
     outboxMark(opId, { status: 'sent', lastError: null });
     return true;
   } catch (e) {
@@ -1607,12 +1607,12 @@ function showConflictReview() {
   panel.style.cssText='position:fixed;inset:5vh 4vw;z-index:12000;background:#0f172a;color:#fff;border:2px solid #f59e0b;border-radius:16px;padding:20px;overflow:auto;max-width:760px;margin:auto;box-shadow:0 10px 40px #000';
   const labels={notes:'메모',hospital:'이송 병원',name:'이름',age:'연령',gender:'성별',triage:'중증도',symptom:'주증상',symptoms:'주증상',rr:'호흡수',pulse:'맥박',spo2:'산소포화도',cardPhoto:'분류표 사진',patientPhoto:'환자 사진',cardNo:'카드 번호',location:'발견 장소',departTime:'출발 시각',arriveTime:'도착 시각',notTransported:'미이송',notTransportedReason:'미이송 사유'};
   const text=(tag,value)=>{const el=document.createElement(tag);el.textContent=value;return el;};
-  panel.append(text('h2','동시 수정 확인'),text('p',op.lastError),text('p','서버 값 유지: 이번 기기의 수정 요청을 취소합니다. 내 입력 적용: 아래 입력을 다시 저장합니다.'));
+  panel.append(text('h2','동시 수정 확인'),text('p',op.lastError),text('p',op.method==='remove'?'서버 값 유지: 삭제를 취소합니다. 최신 카드 삭제: 아래 서버 기록을 삭제합니다.':'서버 값 유지: 이번 기기의 수정 요청을 취소합니다. 내 입력 적용: 아래 입력을 다시 저장합니다.'));
   const display=(key,value)=>/Photo$/.test(key)?(value?'사진 있음':'사진 없음'):value==null?'비어 있음':typeof value==='object'?JSON.stringify(value):String(value);
   const table=document.createElement('table');table.style.cssText='width:100%;table-layout:fixed;border-collapse:collapse;margin:16px 0;overflow-wrap:anywhere';
   const header=document.createElement('tr');for(const value of ['항목','서버 값','내 입력'])header.append(text('th',value));table.append(header);
-  for(const key of Object.keys(op.payload).filter(k=>!['updatedByUid','_updatedBy','_updatedTeamId','_updatedAt'].includes(k))){
-    const row=document.createElement('tr');for(const value of [labels[key]||key,op.conflictCurrent?display(key,op.conflictCurrent[key]):'최신 카드 확인 필요',display(key,op.payload[key])]){const cell=text('td',value);cell.style.cssText='padding:8px;border-bottom:1px solid #475569;vertical-align:top';row.append(cell);}table.append(row);
+  for(const key of [...new Set([...Object.keys(op.payload || op.expected || {}),...Object.keys(op.conflictCurrent || {})])].filter(k=>!['updatedByUid','_updatedBy','_updatedTeamId','_updatedAt'].includes(k))){
+    const row=document.createElement('tr');for(const value of [labels[key]||key,op.conflictCurrent?display(key,op.conflictCurrent[key]):'최신 카드 확인 필요',op.method==='remove'?'삭제 예정':display(key,op.payload[key])]){const cell=text('td',value);cell.style.cssText='padding:8px;border-bottom:1px solid #475569;vertical-align:top';row.append(cell);}table.append(row);
   }
   panel.append(table);
   const act=(label,run)=>{const button=text('button',label);button.style.cssText='padding:10px 14px;margin:4px;background:#334155;border-radius:8px';button.onclick=run;panel.append(button);};
@@ -1628,7 +1628,7 @@ function showConflictReview() {
     }catch(error){window.__mciShowOutboxStatus?.(error.message,'err');}
   }
   act('서버 값 유지',()=>resolve(false));
-  if(op.conflictCurrent)act('내 입력 적용',()=>resolve(true));
+  if(op.conflictCurrent)act(op.method==='remove'?'최신 카드 삭제':'내 입력 적용',()=>resolve(true));
   act('나중에 확인',()=>panel.remove());document.body.append(panel);
 }
 
@@ -1757,7 +1757,7 @@ function rebindIncidentRealtime() {
   // 사상자 (일반)
   _incidentUnsubFns.push(onValue(ref(db, `${base}/casualties`), snap => {
     const v = snap.val() || {};
-    const list = Object.entries(v).map(([k, val]) => ({ ...val, _key: k, ...(val.hospital && String(val.hospital).trim() ? { notTransported: false } : {}) }));
+    const list = Object.entries(v).map(([k, val]) => Object.defineProperty({ ...val, _key: k, ...(val.hospital && String(val.hospital).trim() ? { notTransported: false } : {}) },'_serverRecord',{value:val}));
     list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
     state.casualties = list;
     render();
@@ -1766,7 +1766,7 @@ function rebindIncidentRealtime() {
   _incidentUnsubFns.push(onValue(ref(db, `${base}/mciCasualties`), snap => {
     const v = snap.val() || {};
     // 정규화: 병원이 입력된 카드는 미이송이 아님(통계 정합) — 기존 모순 데이터도 즉시 교정
-    const list = Object.entries(v).map(([k, val]) => ({ ...val, _key: k, ...(val.hospital && String(val.hospital).trim() ? { notTransported: false } : {}) }));
+    const list = Object.entries(v).map(([k, val]) => Object.defineProperty({ ...val, _key: k, ...(val.hospital && String(val.hospital).trim() ? { notTransported: false } : {}) },'_serverRecord',{value:val}));
     list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
     state.mciCasualties = list;
     render();
@@ -1861,11 +1861,12 @@ async function saveCasualty(data, teamId, author, editKey, basePayload, baseReco
   }
 }
 
-async function deleteCasualty(key) {
+async function deleteCasualty(key, expected) {
   if (!assertCanWrite('사상자 카드 삭제')) return false;
   // 오프라인 안전 큐 경유 — 끊겨도 큐에 보관 후 재연결 시 자동 반영(차단성 alert 제거)
   const res = await durableWrite({
     kind: 'casualty', method: 'remove',
+    expected: expected || state.casualties.find(c=>c._key===key)?._serverRecord,
     path: incPath(`casualties/${key}`),
     incidentId: state.currentIncidentId,
   });
@@ -1930,11 +1931,12 @@ async function saveMciCasualty(data, teamId, author, editKey, basePayload, baseR
   }
 }
 
-async function deleteMciCasualty(key) {
+async function deleteMciCasualty(key, expected) {
   if (!assertCanWrite('MCI 사상자 카드 삭제')) return false;
   // 오프라인 안전 큐 경유 — 끊겨도 큐에 보관 후 재연결 시 자동 반영(차단성 alert 제거)
   const res = await durableWrite({
     kind: 'mci', method: 'remove',
+    expected: expected || state.mciCasualties.find(c=>c._key===key)?._serverRecord,
     path: incPath(`mciCasualties/${key}`),
     incidentId: state.currentIncidentId,
   });
@@ -5127,8 +5129,9 @@ function bindCasualtyEvents() {
   // 삭제 버튼
   document.querySelectorAll('.del-casualty').forEach(btn => {
     btn.onclick = async () => {
+      const expected = state.casualties.find(c=>c._key===btn.dataset.delCs)?._serverRecord;
       if (!confirm('이 사상자 정보를 삭제하시겠습니까?')) return;
-      await deleteCasualty(btn.dataset.delCs);
+      await deleteCasualty(btn.dataset.delCs,expected);
     };
   });
 }
@@ -5363,7 +5366,7 @@ function changedCardFields(data, baseline) {
 function currentCasualtyDraft() { return state.mode === 'general' ? csDraft : mciDraft; }
 function currentCasualtyList()  { return state.mode === 'general' ? state.casualties : state.mciCasualties; }
 function saveSelectedCasualty(...args) { return state.mode === 'general' ? saveCasualty(...args) : saveMciCasualty(...args); }
-function deleteSelectedCasualty(key)   { return state.mode === 'general' ? deleteCasualty(key)   : deleteMciCasualty(key); }
+function deleteSelectedCasualty(key, expected) { return state.mode === 'general' ? deleteCasualty(key,expected) : deleteMciCasualty(key,expected); }
 function resetCurrentDraft() { if (state.mode === 'general') resetCsDraft(); else resetMciDraft(); }
 
 // MCI 사상자 카드 입력 폼
@@ -6961,7 +6964,7 @@ function bindMciCasualtyEvents() {
         _editKey: btn.dataset.mciEdit,
       };
       editDraft._basePayload = JSON.parse(JSON.stringify(cardDraftPayload(editDraft)));
-      editDraft._baseRecord = JSON.parse(JSON.stringify(c));
+      editDraft._baseRecord = JSON.parse(JSON.stringify(c._serverRecord || c));
       if (state.mode === 'general') csDraft = editDraft; else mciDraft = editDraft;
       state.mciInputMode = 'full';   // 수정은 풀 카드로 — 생체징후·이송 등 상세 보완 단계
       state.inspectCardKey = null;   // 상세보기 닫고 수정 폼 표시
@@ -6979,7 +6982,7 @@ function bindMciCasualtyEvents() {
         return;
       }
       if (!confirm('이 사상자 카드를 삭제하시겠습니까?')) return;
-      await deleteSelectedCasualty(btn.dataset.mciDel);
+      await deleteSelectedCasualty(btn.dataset.mciDel,c?._serverRecord);
     };
   });
 
@@ -7968,7 +7971,7 @@ function bindMciCardDetailModalEvents() {
         _editKey: c._key,
       };
       editDraft._basePayload = JSON.parse(JSON.stringify(cardDraftPayload(editDraft)));
-      editDraft._baseRecord = JSON.parse(JSON.stringify(c));
+      editDraft._baseRecord = JSON.parse(JSON.stringify(c._serverRecord || c));
       mciDraft = editDraft;
       state.viewMciCardKey = null;
       state.mciTab = 'casualty';

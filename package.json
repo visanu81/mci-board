@@ -9,7 +9,8 @@
     "test:management": "node --test tests/access-management.test.mjs",
     "test:close": "node --test tests/incident-close.test.mjs",
     "test:display": "node --test tests/display-session.test.mjs",
-    "test:conflict": "node --test tests/card-conflict.test.mjs"
+    "test:conflict": "node --test tests/card-conflict.test.mjs",
+    "test:lifecycle": "node --test tests/card-lifecycle.test.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.2",

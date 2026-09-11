@@ -48,7 +48,7 @@ export function createSessionController({auth,db,sdk,onChange,fetcher=fetch,setT
     stop(){++epoch;clear();unsubscribeAuth?.();unsubscribeAuth=null;publish(null);}
   };
 }
-export async function sendBoundOperation(op,{currentIdentity,currentUser,projectId,databaseURL},fetcher=fetch) {
+export async function sendBoundOperation(op,{currentIdentity,currentUser,projectId,databaseURL,beforeCreate=async()=>{}},fetcher=fetch) {
   const identity=currentIdentity(),user=currentUser();
   if(!mayReplay(op,identity,projectId) || user?.uid!==identity.uid)throw Error('permission_denied: 로그인 문맥이 변경되었습니다.');
   const token=await user.getIdToken();
@@ -56,6 +56,32 @@ export async function sendBoundOperation(op,{currentIdentity,currentUser,project
   const url=new URL(op.path+'.json',databaseURL.endsWith('/')?databaseURL:databaseURL+'/');
   url.searchParams.set('auth',token);
   const method={set:'PUT',update:'PATCH',remove:'DELETE'}[op.method];if(!method)throw Error('unsupported operation');
+  if(['set','remove'].includes(op.method) && /\/(casualties|mciCasualties)\//.test(op.path)) {
+    const conflict=(message,current)=>Object.assign(Error(message),{code:'write_conflict',current});
+    const same=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
+    const signal=AbortSignal.timeout(12000);
+    const snapshot=await fetcher(url,{headers:{'X-Firebase-ETag':'true'},cache:'no-store',signal});
+    if(!snapshot.ok)throw Error(snapshot.status===401||snapshot.status===403?'permission_denied':'최신 카드 조회 실패');
+    const current=await snapshot.json(),etag=snapshot.headers.get('etag');
+    if(op.method==='set' && current){
+      if(typeof op.payload.createdByUid==='string' && Number.isFinite(op.payload.timestamp) && current.createdByUid===op.payload.createdByUid && current.timestamp===op.payload.timestamp)return;
+      throw conflict('같은 번호의 서버 기록이 있습니다. 새 카드로 다시 입력하세요. 기존 기록은 변경하지 않았습니다.');
+    }
+    if(op.method==='set' && (!op.creationGuard || op.creationAttempted))throw conflict('등록 요청 이후 서버에서 카드를 찾을 수 없습니다. 삭제 여부를 확인하고 필요하면 새 카드로 입력하세요.');
+    if(op.method==='remove'){
+      if(!current)return;
+      if(!op.expected)throw conflict('삭제 전 기록이 없습니다. 최신 카드를 확인한 뒤 다시 삭제하세요.');
+      const expected={...op.expected};delete expected._key;
+      if(!same(current,expected))throw conflict('삭제하려던 카드가 수정됐습니다. 최신 내용을 확인하고 삭제 여부를 다시 선택하세요.',current);
+    }
+    if(!etag)throw Error('서버 버전을 확인하지 못했습니다. 다시 시도하세요.');
+    if(op.method==='set')await beforeCreate();
+    if(!mayReplay(op,currentIdentity(),projectId) || currentUser()?.uid!==user.uid)throw Error('permission_denied: 로그인 문맥이 변경되었습니다.');
+    const saved=await fetcher(url,{method,headers:{'Content-Type':'application/json','if-match':etag},body:op.method==='remove'?undefined:JSON.stringify(op.payload),signal});
+    if(saved.status===412)throw Error('다른 저장이 먼저 반영됐습니다. 최신 기록을 다시 확인합니다.');
+    if(!saved.ok)throw Error(saved.status===401||saved.status===403?'permission_denied':'기록 전송 실패 ('+saved.status+')');
+    return;
+  }
   if(op.method==='update' && /\/(casualties|mciCasualties)\//.test(op.path)) {
     const metadata=new Set(['updatedByUid','_updatedBy','_updatedTeamId','_updatedAt']);
     const keys=Object.keys(op.payload).filter(key=>!metadata.has(key));
