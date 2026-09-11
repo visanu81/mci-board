@@ -1,12 +1,14 @@
-# 정적 자산으로 배포하지 않을 파일 (웹에서 직접 다운로드 불가)
-# ※ wrangler deploy는 로컬 폴더를 그대로 올리므로 .git 등 비공개 폴더를 반드시 제외할 것
+# 정적 자산으로 배포하지 않을 파일
 .git
 .gitignore
+.github/
 .wrangler
 worker.js
-wrangler.jsonc
+wrangler*.jsonc
 README.md
 firebase-database-rules.json
 .claude/
 .tmp/
+tests/
+docs/
 .assetsignore
