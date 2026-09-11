@@ -1,7 +1,7 @@
 # MCI 데이터 보존 수정 — mci2 검증 절차
 
 기준: main 84c6cbd969c30ec23d4eeb6a1db1bd6387bbbcfa.
-이 변경은 DB 접근 권한 강화 작업을 완료하지 않는다. Firebase 적용 규칙과 Cloudflare 설정은 아직 직접 확인하지 못했다.
+이 변경은 DB 접근 권한 강화 작업을 완료하지 않는다. 2026-09-11 Firebase 적용 규칙을 CLI로 읽어 auth != null 접근 조건을 확인했다. Cloudflare mci2 계정 접근과 배포 대상 설정도 확인했다.
 
 ## 변경 내용
 
@@ -20,8 +20,10 @@
 실행: `node tests/run.mjs` (외부 패키지 설치 불필요).
 
 실제 index.html에서 함수 본문을 추출하고 브라우저 저장소/Firebase 쓰기를 모의 구현한 회귀 검사다.
-수정본 17/17 통과. 이전 main에는 같은 검사 중 11개가 실패했다(일부는 새 수정 경로/환경 설정 유무를 확인하는 검사).
-실행 환경: 도구의 V8 JavaScript 런타임. 로컬 명령 실행 도구가 응답하지 않아 Node CLI에서의 실행은 아직 하지 못했다.
+수정본 Node 검사 19/19 통과. 이전 main에는 같은 검사 중 11개가 실패했다(일부는 새 수정 경로/환경 설정 유무를 확인하는 검사).
+실행 환경: Node.js v24.16.0. Windows CRLF 입력도 정규화하여 검사한다.
+
+실제 앱에 가상 Firebase를 연결한 로컬 브라우저에서 MCI/일반 재난 메모 수정 시 사진·원작성자 유지, 호흡수 0 표시, 저장 공간 부족 시 입력 유지·오류 안내를 확인했다. 실제 환자 데이터는 사용하지 않았다.
 실제 Firebase Emulator, 브라우저 화면, Workers 런타임, 모바일 현장 검증을 대체하지 않는다.
 
 ## 테스트 배포
@@ -29,7 +31,7 @@
 Cloudflare의 mci2 Worker에서 저장소 브랜치를 이번 수정 브랜치로 선택하고 다음 설정을 사용한다.
 운영 Worker mci의 브랜치와 배포 설정은 변경하지 않는다.
 
-- 배포 명령: `npx wrangler deploy --config wrangler.mci2.jsonc`
+- 배포 명령: `npx wrangler deploy --config wrangler.mci2.jsonc --keep-vars`
 - 배포 대상 Worker 이름: mci2
 - 브라우저 접속: https://mci2.visanu81.workers.dev
 - Firebase 경로: mci2/incidents, mci2/archives, mci2/config
@@ -37,7 +39,7 @@ Cloudflare의 mci2 Worker에서 저장소 브랜치를 이번 수정 브랜치�
 
 실행 전 현재 Cloudflare 빌드 명령이 index.html이나 DB_ROOT를 치환하고 있는지 확인하고,
 그 작업이 있다면 호스트 기반 경로 선택 코드와 충돌하지 않도록 제거/수정한다.
-이번 작업에서는 이 배포 명령을 실행하지 않았다.
+배포 전 dry-run 통과. 실제 배포 결과와 버전은 별도 검증 기록을 따른다.
 
 ## 현장 재현 검사 (가상 정보만 사용)
 

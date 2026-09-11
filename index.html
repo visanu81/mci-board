@@ -1342,7 +1342,7 @@ function incPath(suffix) {
 //  · 대상: 사상자 카드 6경로만(자주+incPath 격리+단일노드 멱등). 그 외(사고개요/동원/관서코드/백업)는 제외.
 //  · 오프라인에서 set()은 거부가 아니라 무한 대기(hang)하므로: 오프라인 저장은 발사만 하고 기다리지 않음(낙관적 화면 반영),
 //    전송엔 12초 타임아웃을 둬 재전송 루프가 멈추지 않게 함. (실패해도 멱등이라 재전송 안전)
-const OUTBOX_KEY = 'mci_outbox_v1';
+const OUTBOX_KEY = DB_ROOT ? 'mci2_outbox_v1' : 'mci_outbox_v1';
 const OUTBOX_MAX_OPS = 500;
 const OUTBOX_DEFAULT_MAX_TRIES = 8;
 const OUTBOX_SENT_TTL_MS = 60 * 1000;
@@ -6988,7 +6988,7 @@ function bindMciCasualtyEvents() {
   ['name','age','rr','pulse','bpSys','bpDia','spo2','temp','symptom','drugs','hospital','departTime','arriveTime','notes','location','handoverUnit','handoverTime'].forEach(k => {
     const el = document.getElementById('mci-' + k);
     if (el) {
-      el.value = _draft[k] || '';
+      el.value = _draft[k] ?? '';
       // OCR로 자동 채워진 필드 강조 (사용자가 수정하면 해제)
       if (mciOcrFlags[k]) el.classList.add('ocr-filled');
       el.oninput = (e) => {
