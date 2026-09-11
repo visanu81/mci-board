@@ -12,5 +12,15 @@
   },
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  "ratelimits": [
+    {
+      "name": "AUTH_RATE_LIMIT",
+      "namespace_id": "2026091101",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    }
   ]
 }

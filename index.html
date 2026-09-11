@@ -918,34 +918,69 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getDatabase, ref, set, get, onValue, remove, push, update, child
+  getDatabase, ref, set, get, onValue as firebaseOnValue, remove, push, update, child, query, orderByChild, equalTo
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 import {
-  getAuth, signInAnonymously, onAuthStateChanged
+  getAuth, signInWithCustomToken, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-// ==================== Firebase 설정 ====================
-const firebaseConfig = {
-  apiKey: "AIzaSyCocowQ4hwCPPvCVkGgvy4EGGi41-KwkNE",
-  authDomain: "disester-f3669.firebaseapp.com",
-  databaseURL: "https://disester-f3669-default-rtdb.firebaseio.com",
-  projectId: "disester-f3669",
-  storageBucket: "disester-f3669.firebasestorage.app",
-  messagingSenderId: "136688201837",
-  appId: "1:136688201837:web:737908cb5feb9313f24f64",
-  measurementId: "G-QFV3PBY1VB"
-};
+import { validateTestConfig, isActiveGrant, mayReplay, sendBoundOperation, createSessionController } from './secure-session.js';
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const auth = getAuth(app);
+// ==================== Firebase 설정 ====================
+let firebaseConfig, app, db, auth, secureSession;
+let secureIdentity = null, startupError = '', secureDraftBackup = null;
+const _globalUnsubFns = [];
+let _subscriptionGeneration = 0;
+function onValue(target, callback, onError) {
+  const generation = _subscriptionGeneration;
+  return firebaseOnValue(target, snap => {if(generation===_subscriptionGeneration && isActiveGrant(secureIdentity))callback(snap);}, error => {if(generation===_subscriptionGeneration)onError?.(error);});
+}
+function stopSecureSubscriptions() {
+  _subscriptionGeneration++;
+  _globalUnsubFns.splice(0).forEach(fn => fn());
+  _incidentUnsubFns.splice(0).forEach(fn => fn());
+}
+function onSecureIdentity(identity) {
+  const previous = secureIdentity;
+  const changed = previous?.uid !== identity?.uid || previous?.role !== identity?.role || previous?.agencyId !== identity?.agencyId;
+  secureIdentity = identity;
+  if (!changed) return;
+  stopSecureSubscriptions();
+  if (previous && !identity) {
+    secureDraftBackup = JSON.parse(JSON.stringify({ projectId: firebaseConfig.projectId, uid: previous.uid, incidentId: state.currentIncidentId, mciDraft, csDraft }));
+    try { localStorage.setItem('mci2_secure_draft_backup', JSON.stringify(secureDraftBackup)); } catch {}
+    startupError = '로그인이 종료됐습니다. 작성 중이던 카드 입력은 복구용으로 보관했습니다.';
+  }
+  state.incidents = []; state.archives = []; state.casualties = []; state.mciCasualties = [];
+  state.actions = []; state.incident = null; state.damages = {}; state.mobilizations = {};
+  if (!identity) {
+    state.session = null; state.authed = false; state.view2 = 'auth';
+    render(); return;
+  }
+  startupError = '';
+  state.session = {agencyId:identity.agencyId,agency:{id:identity.agencyId,name:identity.agencyName || identity.agencyId,role:identity.role},role:identity.role};
+  state.authed = true;
+  if (!previous || previous.uid !== identity.uid) {
+    resetMciDraft(); resetCsDraft();
+    state.currentIncidentId = null; state.user = null;
+    state.view2 = identity.role === 'admin' ? 'admin' : identity.role === 'observer' ? 'observer' : identity.role === 'display' ? 'display' : 'lobby';
+  }
+  bindRealtime(); render();
+}
+async function initializeSecureApp() {
+  const r = await fetch('/api/auth/config', {cache:'no-store'});
+  if (!r.ok) throw Error('테스트 인증 설정이 아직 완료되지 않았습니다.');
+  firebaseConfig = validateTestConfig(await r.json());
+  app = initializeApp(firebaseConfig); db = getDatabase(app); auth = getAuth(app);
+  secureSession = createSessionController({auth,db,sdk:{ref,onValue:firebaseOnValue,onAuthStateChanged,signInWithCustomToken,signOut},onChange:onSecureIdentity});
+}
 
 // ==================== 데이터 네임스페이스 ====================
 // 같은 소스를 두 Worker에 배포한다. 확인된 운영 호스트에서만 운영 경로를 사용한다.
 // mci2·미리보기·로컬 실행은 테스트 경로를 사용해 소스 복사 시 운영 데이터 접근을 막는다.
 // 운영 도메인을 추가할 때에는 이 허용 목록을 명시적으로 검토한다.
 const PRODUCTION_HOSTS = ['mci.visanu81.workers.dev'];
-const DB_ROOT = PRODUCTION_HOSTS.includes(location.hostname) ? '' : 'mci2';
+const DB_ROOT = 'mci2';
 const rootPath = (p) => (DB_ROOT ? `${DB_ROOT}/${p}` : p);
 
 // ==================== 표출 팝아웃 창 ====================
@@ -955,63 +990,10 @@ const rootPath = (p) => (DB_ROOT ? `${DB_ROOT}/${p}` : p);
 // (본 창의 로그인이 끊기지 않게). 표출 역할이라 쓰기도 차단됨(읽기 전용).
 const POPOUT_DISPLAY = new URLSearchParams(location.search).get('popout') === 'display';
 
-// ==================== Firebase 익명 인증 ====================
-// Database Rules에서 auth != null 요구 → 외부 직접 API 호출 차단.
-// 첫 페이지 로드 시 익명 사용자로 자동 로그인 (사용자 눈에는 안 보임).
-// 오프라인일 땐 5초 후 타임아웃 → 일반 진행 (캐시된 화면 표시).
-const authReady = new Promise((resolve) => {
-  let resolved = false;
-  const finish = (user) => {
-    if (resolved) return;
-    resolved = true;
-    resolve(user || null);
-  };
-  onAuthStateChanged(auth, (user) => {
-    if (user) {
-      console.log('[Auth] 익명 인증 완료');
-      finish(user);
-    }
-  });
-  signInAnonymously(auth).catch((err) => {
-    console.warn('[Auth] 익명 인증 실패 (네트워크?):', err.code);
-    finish(null);
-  });
-  // 안전망: 5초 안에 응답 없으면 일단 진행 (오프라인 캐시 시나리오)
-  setTimeout(() => finish(null), 5000);
-});
-
-// ==================== V2 진입 코드 매핑 ====================
-// 동두천119/양주119/... → 각 관서 로비 (소속 관서 재난만 보임)
-// 본부119                 → 통합 로비 (모든 재난 읽기 전용)
-// 한경승                  → 관리자 콘솔 (전권)
-//
-// V5: Firebase /config/agencyCodes 에서 동기화. 첫 부팅 시 비어있으면 아래 SEED로 채움.
-// AGENCY_CODES는 코드(로그인 문자열)→정보 맵 형태로 유지 (기존 호출부 호환).
-const DEFAULT_AGENCY_CODES_SEED = [
-  { code: "동두천119", id: 'dongduchun',  name: '동두천', role: 'normal'   },
-  { code: "양주119",   id: 'yangju',      name: '양주',   role: 'normal'   },
-  { code: "의정부119", id: 'uijeongbu',   name: '의정부', role: 'normal'   },
-  { code: "포천119",   id: 'pocheon',     name: '포천',   role: 'normal'   },
-  { code: "연천119",   id: 'yeoncheon',   name: '연천',   role: 'normal'   },
-  { code: "파주119",   id: 'paju',        name: '파주',   role: 'normal'   },
-  { code: "구리119",   id: 'guri',        name: '구리',   role: 'normal'   },
-  { code: "본부119",   id: 'headquarter', name: '본부',   role: 'observer' },
-  { code: "표출119",   id: 'display',     name: '표출',   role: 'display'  },
-  { code: "한경승",    id: 'admin',       name: '관리자', role: 'admin'    },
-];
-// 초기값 (Firebase 응답 전 로그인 가능하도록 SEED 기반)
-let AGENCY_CODES = Object.fromEntries(
-  DEFAULT_AGENCY_CODES_SEED.map(e => [e.code, { id: e.id, name: e.name, role: e.role }])
-);
-// 코드 → 관서 정보 조회 (NFC normalize로 한글 자모 분리 입력도 안전 처리)
-const findAgencyByCode = (code) => {
-  const norm = String(code || '').trim().normalize('NFC');
-  for (const k of Object.keys(AGENCY_CODES)) {
-    if (k.normalize('NFC') === norm) return AGENCY_CODES[k];
-  }
-  return null;
-};
-// (구버전 ACCESS_CODE는 P0-3에서 제거됨 — 이제 권한 기반 isAdmin() 체크 사용)
+// ==================== 서버 인증 ====================
+const authReady = initializeSecureApp().catch(error => { startupError = error.message; });
+// 진입 코드와 역할은 서버에서만 확인한다. 공개 SEED 또는 localStorage 역할을 사용하지 않는다.
+let AGENCY_CODES = {};
 
 // ==================== 병원 자동완성 프리셋 ====================
 // 경기북부 권역 주요 응급의료기관(시드). 실제 입력 시 datalist 자동완성으로 활용되며,
@@ -1075,6 +1057,9 @@ const canWrite   = () => !isObserver();   // 본부119/표출119는 모든 쓰�
 // === observer 쓰기 차단 헬퍼 (P0-1) ===
 // save/delete 함수에서 호출 → 본부 계정의 모든 쓰기 작업 차단
 function assertCanWrite(action = '저장') {
+  if (!isActiveGrant(secureIdentity) || !['normal','admin'].includes(secureIdentity.role)) {
+    alert('로그인과 쓰기 권한을 확인해주세요. 입력 내용은 유지됩니다.'); return false;
+  }
   if (isObserver()) {
     alert(`본부 계정은 ${action}/수정/삭제 권한이 없습니다 (읽기 전용)`);
     return false;
@@ -1090,7 +1075,7 @@ const canEditCard = (user, card) => {
   if (isAdmin())    return true;          // 관리자: 전권
   if (!user || !card) return false;
   if (isFieldOnly(user.teamId)) {
-    return card.author === user.name;
+    return card.createdByUid === secureIdentity?.uid;
   }
   return true;
 };
@@ -1342,7 +1327,7 @@ function incPath(suffix) {
 //  · 대상: 사상자 카드 6경로만(자주+incPath 격리+단일노드 멱등). 그 외(사고개요/동원/관서코드/백업)는 제외.
 //  · 오프라인에서 set()은 거부가 아니라 무한 대기(hang)하므로: 오프라인 저장은 발사만 하고 기다리지 않음(낙관적 화면 반영),
 //    전송엔 12초 타임아웃을 둬 재전송 루프가 멈추지 않게 함. (실패해도 멱등이라 재전송 안전)
-const OUTBOX_KEY = DB_ROOT ? 'mci2_outbox_v1' : 'mci_outbox_v1';
+const OUTBOX_KEY = 'mci2_secure_outbox_v1';
 const OUTBOX_MAX_OPS = 500;
 const OUTBOX_DEFAULT_MAX_TRIES = 8;
 const OUTBOX_SENT_TTL_MS = 60 * 1000;
@@ -1399,6 +1384,7 @@ function outboxEnqueue({ kind, method, path, incidentId, payload, maxTries }) {
   const now = Date.now();
   const entry = {
     opId, seq: o.seq++, kind, method, path,
+    securityContext: {projectId:firebaseConfig.projectId,uid:secureIdentity.uid,agencyId:secureIdentity.agencyId},
     incidentId: incidentId || null,
     status: 'pending', tries: 0,
     maxTries: maxTries || OUTBOX_DEFAULT_MAX_TRIES,
@@ -1487,18 +1473,15 @@ async function _outboxSendOne(opId) {
     if (!op) return false;
     if (op.status === 'sent') return true;
     if (op.status === 'sending') return false;
+    if (!navigator.onLine) return false;
+    if (!mayReplay(op, secureIdentity, firebaseConfig?.projectId)) {
+      outboxMark(opId, {status:'failed',lastError:'이전 로그인 또는 다른 환경의 기록입니다. 자동 전송하지 않습니다.'});
+      return false;
+    }
     outboxMark(opId, { status: 'sending' });
   } catch { updateOutboxBadge(); return false; }
   try {
-    const r = ref(db, op.path);
-    const write = op.method === 'remove' ? remove(r)
-      : op.method === 'update' ? update(r, op.payload)
-      : set(r, op.payload);
-    // 오프라인/서버 미도달 시 set은 무한 대기 → 타임아웃으로 끊어 재전송 루프 보호(멱등이라 재전송 안전)
-    await Promise.race([
-      write,
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), OUTBOX_SEND_TIMEOUT_MS)),
-    ]);
+    await sendBoundOperation(op, {currentIdentity:()=>secureIdentity,currentUser:()=>auth.currentUser,projectId:firebaseConfig.projectId,databaseURL:firebaseConfig.databaseURL});
     outboxMark(opId, { status: 'sent', lastError: null });
     return true;
   } catch (e) {
@@ -1626,8 +1609,12 @@ function handleSyncError(where) {
 }
 
 function bindRealtime() {
+  if (!isActiveGrant(secureIdentity)) return;
+  _globalUnsubFns.splice(0).forEach(fn => fn());
   // V2 — 인덱스: 진행 중 재난 목록 (로비/관찰자/관리자 모두 사용)
-  onValue(ref(db, rootPath('incidents')), snap => {
+  const incidentsRef = ref(db, rootPath('incidents'));
+  const visibleIncidents = secureIdentity.role === 'admin' ? incidentsRef : query(incidentsRef,orderByChild('agencyId'),equalTo(secureIdentity.agencyId));
+  _globalUnsubFns.push(onValue(visibleIncidents, snap => {
     const v = snap.val() || {};
     state.incidents = Object.entries(v).map(([k, val]) => ({ ...val, _key: k }));
     // P0-2: 사용자가 보고 있던 재난이 강제 종료(closedAt)되면 자동 이탈 + 알림
@@ -1654,125 +1641,32 @@ function bindRealtime() {
       }
     }
     render();
-  }, handleSyncError('재난 목록'));
+  }, handleSyncError('재난 목록')));
   // V2 — archives (글로벌, 종료된 재난 백업)
-  onValue(ref(db, rootPath('archives')), snap => {
+  if (secureIdentity.role === 'admin') _globalUnsubFns.push(onValue(ref(db, rootPath('archives')), snap => {
     const v = snap.val() || {};
     const list = Object.entries(v).map(([k, val]) => ({ ...val, _key: k }));
     list.sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0));
     state.archives = list;
     render();
-  }, handleSyncError('보관함'));
-  // V5 — 관서 코드: Firebase 동기화 + 비어있으면 SEED로 초기 1회 채움
-  onValue(ref(db, rootPath('config/agencyCodes')), snap => {
-    const v = snap.val();
-    if (!v || Object.keys(v).length === 0) {
-      // 첫 부팅 / 빈 상태 → SEED 푸시 (응답이 다시 와서 채워짐)
-      seedDefaultAgencyCodes();
-      return;
-    }
-    const list = Object.entries(v).map(([k, val]) => ({ ...val, _key: k }));
-    state.agencyCodesList = list;
-    // 코드(로그인 문자열) → 정보 맵 재구축 (기존 호출부 호환)
-    const map = {};
-    list.forEach(e => {
-      if (e && e.code) map[e.code] = { id: e.id, name: e.name, role: e.role };
-    });
-    AGENCY_CODES = map;
-    render();
-  }, handleSyncError('관서 코드'));
+  }, handleSyncError('보관함')));
   // 재난방별 구독은 rebindIncidentRealtime()에서 처리
   rebindIncidentRealtime();
 
   // Firebase 서버 실제 연결 상태 — 연결되면 오프라인 큐 자동 재전송(OS online보다 정확)
   if (!POPOUT_DISPLAY) {
-    onValue(ref(db, '.info/connected'), (s) => {
+    _globalUnsubFns.push(onValue(ref(db, '.info/connected'), (s) => {
       if (s.val() === true) replayOutbox();
       updateOutboxBadge();   // 연결 상태에 따라 배지 색 갱신
-    });
+    }));
   }
 }
 
-// V5 — Firebase /config/agencyCodes 가 비었을 때만 SEED 푸시 (멱등)
-async function seedDefaultAgencyCodes() {
-  try {
-    const r = await get(ref(db, rootPath('config/agencyCodes')));
-    if (r.exists() && Object.keys(r.val() || {}).length > 0) return; // 이미 채워짐
-    const updates = {};
-    DEFAULT_AGENCY_CODES_SEED.forEach(e => {
-      const k = push(ref(db, rootPath('config/agencyCodes'))).key;
-      updates[k] = e;
-    });
-    await set(ref(db, rootPath('config/agencyCodes')), updates);
-  } catch (e) {
-    console.error('seedDefaultAgencyCodes', e);
-  }
-}
-
-// V5 — 관서 코드 추가/수정
-// data: { code, id, name, role }, key가 있으면 수정 (id는 immutable)
-async function saveAgencyCode(key, data) {
-  try {
-    const code = (data.code || '').trim();
-    const name = (data.name || '').trim();
-    const role = data.role;
-    if (!code) throw new Error('진입 코드를 입력하세요');
-    if (code.length > 30) throw new Error('진입 코드는 30자 이하로 입력하세요');
-    if (!name) throw new Error('표시명을 입력하세요');
-    if (!['normal', 'observer', 'display', 'admin'].includes(role)) throw new Error('역할이 잘못되었습니다');
-
-    // 코드 중복 체크 (다른 entry에 이미 같은 code가 있으면 차단)
-    const dupCode = state.agencyCodesList.find(e => e.code === code && e._key !== key);
-    if (dupCode) throw new Error(`이미 사용 중인 진입 코드입니다: ${code}`);
-
-    if (key) {
-      // 수정: id는 변경 불가
-      const existing = state.agencyCodesList.find(e => e._key === key);
-      if (!existing) throw new Error('대상 코드를 찾을 수 없습니다');
-      // 마지막 admin을 다른 역할로 강등 차단
-      if (existing.role === 'admin' && role !== 'admin') {
-        const adminCount = state.agencyCodesList.filter(e => e.role === 'admin').length;
-        if (adminCount <= 1) throw new Error('마지막 admin 코드의 역할은 변경할 수 없습니다');
-      }
-      await update(ref(db, rootPath(`config/agencyCodes/${key}`)), {
-        code, id: existing.id, name, role,
-      });
-    } else {
-      // 추가: id 검증/자동 생성
-      let id = (data.id || '').trim();
-      if (!id) {
-        id = 'auto_' + Math.random().toString(36).slice(2, 10);
-      }
-      if (!/^[a-zA-Z0-9_]+$/.test(id)) throw new Error('id는 영문·숫자·언더스코어만 사용 가능합니다');
-      const dupId = state.agencyCodesList.find(e => e.id === id);
-      if (dupId) throw new Error(`이미 사용 중인 id입니다: ${id}`);
-      const newRef = push(ref(db, rootPath('config/agencyCodes')));
-      await set(newRef, { code, id, name, role });
-    }
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, reason: e.message };
-  }
-}
-
-// V5 — 관서 코드 삭제 (마지막 admin은 차단)
-async function deleteAgencyCode(key) {
-  try {
-    const target = state.agencyCodesList.find(e => e._key === key);
-    if (!target) throw new Error('대상 코드를 찾을 수 없습니다');
-    if (target.role === 'admin') {
-      const adminCount = state.agencyCodesList.filter(e => e.role === 'admin').length;
-      if (adminCount <= 1) throw new Error('마지막 admin 코드는 삭제할 수 없습니다');
-    }
-    await remove(ref(db, rootPath(`config/agencyCodes/${key}`)));
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, reason: e.message };
-  }
-}
-
+async function saveAgencyCode() { alert('새 진입 코드는 테스트 인증 설정에서 발급합니다.'); return false; }
+async function deleteAgencyCode() { alert('권한 회수는 테스트 인증 설정에서 처리합니다.'); return false; }
 // V2 — 재난방 변경 시 재구독 (currentIncidentId 기준)
 function rebindIncidentRealtime() {
+  if (!isActiveGrant(secureIdentity)) return;
   // 이전 재난방 구독 해제
   _incidentUnsubFns.forEach(fn => { try { fn(); } catch {} });
   _incidentUnsubFns = [];
@@ -1929,7 +1823,7 @@ async function saveCasualty(data, teamId, author, editKey, basePayload) {
         kind: 'casualty', method: 'update',
         path: incPath(`casualties/${editKey}`),
         incidentId: state.currentIncidentId,
-        payload: { ...changedCardFields(data, basePayload), _updatedBy: author, _updatedTeamId: teamId, _updatedAt: Date.now() },
+        payload: { ...changedCardFields(data, basePayload), updatedByUid: secureIdentity.uid, _updatedBy: author, _updatedTeamId: teamId, _updatedAt: Date.now() },
       });
     } else {
       // 신규: push 키를 미리 확정(오프라인에서도 생성) → 멱등 set (재전송돼도 중복 카드 없음)
@@ -1938,7 +1832,7 @@ async function saveCasualty(data, teamId, author, editKey, basePayload) {
         kind: 'casualty', method: 'set',
         path: incPath(`casualties/${newKey}`),
         incidentId: state.currentIncidentId,
-        payload: { timestamp: Date.now(), ...data, teamId, author },
+        payload: { timestamp: Date.now(), ...data, teamId, author, createdByUid: secureIdentity.uid, updatedByUid: secureIdentity.uid },
       });
     }
     // 서버 미확정(오프라인/실패)이면 '전송 대기'로 정직하게 표시 — 데이터는 큐에 보존됨
@@ -1997,7 +1891,7 @@ async function saveMciCasualty(data, teamId, author, editKey, basePayload) {
         kind: 'mci', method: 'update',
         path: incPath(`mciCasualties/${editKey}`),
         incidentId: state.currentIncidentId,
-        payload: { ...changedCardFields(data, basePayload), _updatedBy: author, _updatedTeamId: teamId, _updatedAt: Date.now() },
+        payload: { ...changedCardFields(data, basePayload), updatedByUid: secureIdentity.uid, _updatedBy: author, _updatedTeamId: teamId, _updatedAt: Date.now() },
       });
     } else {
       // 신규: push 키를 미리 확정 → 멱등 set (재전송돼도 중복 카드 없음)
@@ -2006,7 +1900,7 @@ async function saveMciCasualty(data, teamId, author, editKey, basePayload) {
         kind: 'mci', method: 'set',
         path: incPath(`mciCasualties/${newKey}`),
         incidentId: state.currentIncidentId,
-        payload: { timestamp: Date.now(), ...data, teamId, author },
+        payload: { timestamp: Date.now(), ...data, teamId, author, createdByUid: secureIdentity.uid, updatedByUid: secureIdentity.uid },
       });
     }
     // 서버 미확정(오프라인/실패)이면 '전송 대기'로 정직하게 표시 — 데이터는 큐에 보존됨
@@ -2499,7 +2393,7 @@ function renderAuth() {
           <p class="text-sm text-slate-500 mt-1">관서 코드를 입력하세요</p>
         </div>
         <div class="bg-slate-900 rounded-2xl border border-slate-800 p-5">
-          <input id="auth-input" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="관서명 + 119 (예시: 동두천119)"
+          <input id="auth-input" type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="발급받은 테스트 진입 코드"
             class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-red-500 mb-3" />
           <button id="auth-btn" class="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 font-bold text-sm tracking-wide transition-all">
             진입
@@ -2519,33 +2413,21 @@ function renderAuth() {
 }
 
 function bindAuthEvents() {
-  const input = document.getElementById('auth-input');
-  const btn = document.getElementById('auth-btn');
-  const err = document.getElementById('auth-error');
-  const submit = () => {
-    const raw = (input.value || '').trim();
-    // 보안: 진입 코드는 절대 로그에 남기지 않음 (디버그용 console.log 제거)
-    const agency = findAgencyByCode(raw);
-    if (agency) {
-      state.session = { agencyId: agency.id, agency: agency, role: agency.role };
-      state.authed = true;
-      // 진입 후 기본 뷰 결정
-      if      (agency.role === 'admin')    state.view2 = 'admin';
-      else if (agency.role === 'observer') state.view2 = 'observer';
-      else if (agency.role === 'display')  state.view2 = 'display';
-      else                                 state.view2 = 'lobby';
-      localStorage.setItem('disaster_session', JSON.stringify(state.session));
-      localStorage.setItem('disaster_view2',   state.view2);
-      localStorage.setItem('disaster_authed', '1');
-      render();
-    } else {
-      err.textContent = '관서 코드가 올바르지 않습니다 (예시: 동두천119)';
-      err.classList.remove('hidden');
-    }
+  const input=document.getElementById('auth-input'), btn=document.getElementById('auth-btn'), err=document.getElementById('auth-error');
+  if (startupError) { err.textContent=startupError; err.classList.remove('hidden'); }
+  let pending=false;
+  const submit=async()=>{
+    if(pending)return;pending=true;btn.disabled=true;
+    try { await authReady; if(!secureSession)throw Error(startupError || '인증 설정이 필요합니다.'); await secureSession.login(input.value.trim()); }
+    catch(error){err.textContent=error.message;err.classList.remove('hidden');}
+    finally{pending=false;btn.disabled=false;}
   };
-  btn.onclick = submit;
-  input.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
-  input.focus();
+  btn.onclick=submit;input.onkeydown=e=>{if(e.key==='Enter')submit();};input.focus();
+  if (secureDraftBackup) {
+    const download=document.createElement('button');download.type='button';download.textContent='작성 중이던 카드 입력 내려받기';download.className='w-full text-sm text-amber-300 py-2';
+    download.onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(secureDraftBackup,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='mci2-draft-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+    err.parentNode.append(download);
+  }
 }
 
 function renderUserSetup() {
@@ -2656,7 +2538,8 @@ function renderV2Header(title, subtitle, opts = {}) {
 
 function bindV2HeaderEvents() {
   const lo = document.getElementById('v2-logout-btn');
-  if (lo) lo.onclick = () => {
+  if (lo) lo.onclick = async () => {
+    await secureSession?.logout();
     localStorage.removeItem('disaster_session');
     localStorage.removeItem('disaster_view2');
     localStorage.removeItem('disaster_currentIncidentId');
@@ -3615,8 +3498,9 @@ function bindDisplayEvents() {
   // 로그아웃 (picker · main 공통) — 팝아웃에서는 localStorage(본 창 세션)를 건드리지 않고 창만 닫음
   ['display-logout', 'display-logout-picker'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.onclick = () => {
+    if (el) el.onclick = async () => {
       if (POPOUT_DISPLAY) { window.close(); return; }
+      await secureSession?.logout();
       localStorage.removeItem('disaster_session');
       localStorage.removeItem('disaster_view2');
       localStorage.removeItem('disaster_currentIncidentId');
@@ -4266,6 +4150,7 @@ async function createIncident(title, type, opts = {}) {
     const incidentId = newRef.key;
     const data = {
       agencyId: opts.agencyId || state.session.agencyId,
+      createdByUid: secureIdentity.uid,
       title: title,
       type: type,
       startedAt: Date.now(),
@@ -8799,34 +8684,8 @@ async function boot() {
   // 세션 복원 (P0: 새로고침 시 로비로 빠지지 않게)
   // session/view2/currentIncidentId 모두 복원하지 않으면 view2='auth'로 떨어져 로그인 다시 받음.
   // 명시적 "반 변경" / "로그아웃" 버튼으로만 세션 종료.
-  if (POPOUT_DISPLAY) {
-    // 표출 팝아웃: 세션 복원/저장 없이 메모리에서만 display 모드로 부팅 (읽기 전용)
-    state.session = { agencyId: 'display', agency: { id: 'display', name: '표출', role: 'display' }, role: 'display' };
-    state.authed = true;
-    state.view2 = 'display';
-    state.currentIncidentId = new URLSearchParams(location.search).get('incident') || null;
-    document.title = 'MCI 상황판 — 표출';
-  } else {
-  try {
-    const sessRaw = localStorage.getItem('disaster_session');
-    if (sessRaw) state.session = JSON.parse(sessRaw);
-  } catch {}
-  const v2 = localStorage.getItem('disaster_view2');
-  if (v2) state.view2 = v2;
-  const incId = localStorage.getItem('disaster_currentIncidentId');
-  if (incId) state.currentIncidentId = incId;
-
-  if (localStorage.getItem('disaster_authed') === '1') {
-    state.authed = true;
-  }
-  const u = localStorage.getItem('disaster_user');
-  if (u) {
-    try {
-      state.user = JSON.parse(u);
-      if (state.user) state.mciInputMode = defaultInputMode(state.user.teamId);
-    } catch {}
-  }
-  }
+  try { secureDraftBackup=JSON.parse(localStorage.getItem('mci2_secure_draft_backup') || 'null'); } catch {}
+  state.session=null;state.authed=false;state.view2='auth';
   initOutdoorToggle();
   initHelpModal();
   initCameraModal();
@@ -8838,7 +8697,7 @@ async function boot() {
   // 익명 인증 대기 — Firebase Rules가 auth!=null 요구하므로 인증 후 데이터 구독.
   // 오프라인이거나 5초 안에 응답 없으면 일단 진행 (캐시 화면 표시).
   await authReady;
-  bindRealtime();
+  secureSession?.start();
   render();
 
   // 오프라인 안전 큐: 부팅 시 미전송분 재전송 + 배지 + 온/오프라인 이벤트 + 주기 점검

@@ -1,3 +1,4 @@
+import { mayReplay } from '../secure-session.js';
 // Production-source regression tests. No Firebase/network access or patient data.
 export async function runSafetyTests(html) {
   html = html.replace(/\r\n/g, '\n');
@@ -40,13 +41,13 @@ export async function runSafetyTests(html) {
       };`;
     const api = new Function('localStorage', 'navigator', 'window', 'ref', 'set', 'update', 'remove', 'push',
       'db', 'state', 'incPath', 'assertCanWrite', 'setSaveStatus', 'clearSaveStatus', 'setTimeout',
-      'POPOUT_DISPLAY', 'authReady', 'updateOutboxBadge', source)(
+      'POPOUT_DISPLAY', 'authReady', 'updateOutboxBadge', 'secureIdentity', 'firebaseConfig', 'mayReplay', 'auth', 'sendBoundOperation', source)(
       storage, { onLine: options.online !== false },
       { __mciShowOutboxStatus: (m) => notices.push(m) },
       (db, path) => path, remoteWrite('set'), remoteWrite('update'), remoteWrite('remove'),
       () => ({ key: 'new-card' }), {}, { currentIncidentId: 'test', casualties: [], mciCasualties: [] },
       (suffix) => 'mci2/incidents/test/' + suffix, () => true,
-      (key, value) => { statuses[key] = value; }, () => {}, () => 0, false, Promise.resolve(), () => {});
+      (key, value) => { statuses[key] = value; }, () => {}, () => 0, false, Promise.resolve(), () => {}, {uid:'fixture-uid',agencyId:'a',active:true,environment:'test',role:'normal',expiresAt:Date.now()+3600000}, {projectId:'mci2-fixture'}, mayReplay, {currentUser:{uid:'fixture-uid'}}, op => remoteWrite(op.method)(op.path,op.payload));
     return { ...api, raw: () => raw, writes, statuses, notices, storageKeys };
   }
   const card = () => ({ cardNo: 1, name: 'TEST', triage: 'urgent', hospital: '', notes: '' });
@@ -174,16 +175,16 @@ export async function runSafetyTests(html) {
     }
     assert(list.includes("if (state.mode === 'general') csDraft = editDraft; else mciDraft = editDraft;"), 'general mode edits MCI draft');
   });
-  await test('Production routing defaults all other hosts to test data', () => {
+  await test('Secured build always uses test namespace', () => {
     const config = between('const PRODUCTION_HOSTS =', '// ==================== 표출 팝아웃');
     const root = new Function('location', config + '; return DB_ROOT;');
-    equal(root({ hostname: 'mci.visanu81.workers.dev' }), '', 'production route incorrect');
+    equal(root({ hostname: 'mci.visanu81.workers.dev' }), 'mci2', 'secure build reached production namespace');
     for (const hostname of ['mci2.visanu81.workers.dev', 'localhost', 'preview.example', 'mci.visanu81.workers.dev.evil.example']) {
       equal(root({ hostname }), 'mci2', 'non-production host reached production data');
     }
   });
-  await test('Both deployments retain their existing outbox storage keys', async () => {
-    for (const [dbRoot, key] of [['', 'mci_outbox_v1'], ['mci2', 'mci2_outbox_v1']]) {
+  await test('Secure build isolates its queue from both legacy deployments', async () => {
+    for (const [dbRoot, key] of [['', 'mci2_secure_outbox_v1'], ['mci2', 'mci2_secure_outbox_v1']]) {
       const x = harness({ dbRoot });
       assert(await x.saveMciCasualty(card(), 'medical', 'tester'), 'save failed');
       assert(x.storageKeys.length > 0 && x.storageKeys.every(value => value === key), 'legacy outbox key changed');

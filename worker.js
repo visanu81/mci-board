@@ -1,3 +1,5 @@
+import { handleAgencyLogin } from './security/agency-login.mjs';
+import { validateTestConfig, isActiveGrant } from './secure-session.js';
 /* =============================================================================
    MCI 통합 상황판 — Cloudflare Worker
    역할:
@@ -16,7 +18,6 @@
    Name: ANTHROPIC_API_KEY, Value: (Anthropic 키)
    ============================================================================= */
 
-const FIREBASE_PROJECT_ID = 'disester-f3669';
 const FIREBASE_JWK_URL =
   'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
 
@@ -97,6 +98,14 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.pathname === '/api/auth/config') {
+      try {
+        const firebase = validateTestConfig({firebase:JSON.parse(env.FIREBASE_WEB_CONFIG || 'null')});
+        if (firebase.projectId !== env.FIREBASE_PROJECT_ID) throw Error('project mismatch');
+        return new Response(JSON.stringify({firebase}), {headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
+      } catch { return jsonResponse({error:'테스트 로그인이 아직 설정되지 않았습니다.'},503); }
+    }
+    if (url.pathname === '/api/auth/login') return handleAgencyLogin(request,env);
     if (url.pathname === '/api/ocr') {
       if (request.method !== 'POST') {
         return jsonResponse({ error: 'POST 요청만 지원합니다' }, 405);
@@ -104,7 +113,7 @@ export default {
       try {
         return await handleOcr(request, env);
       } catch (err) {
-        return jsonResponse({ error: '서버 오류: ' + (err && err.message ? err.message : '알 수 없음') }, 500);
+        return jsonResponse({ error: '요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.' }, 500);
       }
     }
 
@@ -125,8 +134,21 @@ async function handleOcr(request, env) {
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
   if (!token) return jsonResponse({ error: '인증 토큰이 없습니다' }, 401);
 
-  const payload = await verifyFirebaseToken(token);
+  const payload = await verifyFirebaseToken(token, env.FIREBASE_PROJECT_ID);
   if (!payload) return jsonResponse({ error: '인증에 실패했습니다. 앱을 새로고침 후 다시 시도해주세요.' }, 401);
+
+  if (payload.mci_env !== 'test') return jsonResponse({error:'테스트 접근 권한이 없습니다.'},403);
+  let grant;
+  try {
+    const cfg=validateTestConfig({firebase:JSON.parse(env.FIREBASE_WEB_CONFIG || 'null')});
+    if(cfg.projectId!==env.FIREBASE_PROJECT_ID)throw Error('project');
+    const grantUrl=new URL('access/'+encodeURIComponent(payload.sub)+'.json',cfg.databaseURL);
+    grantUrl.searchParams.set('auth',token);
+    const r=await fetch(grantUrl,{signal:AbortSignal.timeout(10000)});
+    if(!r.ok)throw Error('grant');
+    grant=await r.json();
+  }catch{return jsonResponse({error:'접근 권한을 확인할 수 없습니다.'},403);}
+  if(!isActiveGrant(grant) || !['normal','admin'].includes(grant.role))return jsonResponse({error:'분석 권한이 없습니다.'},403);
 
   // 2) 사용자별 호출 제한 (남용 방지 — 인스턴스 메모리 기준 best-effort)
   if (!checkRateLimit(payload.user_id || payload.sub)) {
@@ -237,7 +259,8 @@ function b64urlToJson(s) {
   return JSON.parse(new TextDecoder().decode(b64urlToBytes(s)));
 }
 
-async function verifyFirebaseToken(token) {
+async function verifyFirebaseToken(token, projectId) {
+  if (!/^mci2-[a-z0-9-]+$/.test(projectId || '')) return null;
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
@@ -246,11 +269,11 @@ async function verifyFirebaseToken(token) {
     const now = Math.floor(Date.now() / 1000);
 
     if (header.alg !== 'RS256' || !header.kid) return null;
-    if (payload.aud !== FIREBASE_PROJECT_ID) return null;
-    if (payload.iss !== 'https://securetoken.google.com/' + FIREBASE_PROJECT_ID) return null;
-    if (typeof payload.exp !== 'number' || payload.exp < now) return null;
+    if (payload.aud !== projectId) return null;
+    if (payload.iss !== 'https://securetoken.google.com/' + projectId) return null;
+    if (typeof payload.exp !== 'number' || payload.exp <= now) return null;
     if (typeof payload.iat !== 'number' || payload.iat > now + 300) return null;
-    if (!payload.sub) return null;
+    if (typeof payload.sub !== 'string' || !payload.sub || payload.sub.length > 128) return null;
 
     const jwks = await getFirebaseJwks();
     const jwk = jwks.find((k) => k.kid === header.kid);
