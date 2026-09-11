@@ -14,15 +14,21 @@ export async function runSafetyTests(html) {
     if (a < 0 || b < 0) throw new Error('Source boundary missing: ' + start);
     return html.slice(a, b);
   };
+  const lockQueues = new Map();
+  const locks = {request(name, options, callback) {
+    const pending = (lockQueues.get(name) || Promise.resolve()).catch(()=>{}).then(callback);
+    lockQueues.set(name,pending);
+    return pending;
+  }};
   function harness(options = {}) {
-    let raw = options.raw ?? null;
+    const shared = options.shared || {raw:options.raw ?? null};
     const writes = [], statuses = {}, notices = [], storageKeys = [];
     const storage = {
-      getItem() { if (options.readError) throw new Error('SecurityError'); return raw; },
+      getItem() { if (options.readError) throw new Error('SecurityError'); return shared.raw; },
       setItem(key, value) {
         storageKeys.push(key);
         if (options.quota || (options.evictSent && value.includes('"status":"sent"'))) throw new Error('QuotaExceededError');
-        raw = value;
+        shared.raw = value;
       }
     };
     const remoteWrite = (method) => (r, value) => {
@@ -43,14 +49,46 @@ export async function runSafetyTests(html) {
     const api = new Function('localStorage', 'navigator', 'window', 'ref', 'set', 'update', 'remove', 'push',
       'db', 'state', 'incPath', 'assertCanWrite', 'setSaveStatus', 'clearSaveStatus', 'setTimeout',
       'POPOUT_DISPLAY', 'authReady', 'updateOutboxBadge', 'secureIdentity', 'firebaseConfig', 'mayReplay', 'auth', 'sendBoundOperation', source)(
-      storage, { onLine: options.online !== false },
+      storage, { onLine: options.online !== false, locks: options.noLocks ? undefined : locks },
       { __mciShowOutboxStatus: (m) => notices.push(m) },
       (db, path) => path, remoteWrite('set'), remoteWrite('update'), remoteWrite('remove'),
       () => ({ key: 'new-card' }), {}, { currentIncidentId: 'test', casualties: [], mciCasualties: [] },
       (suffix) => 'mci2/incidents/test/' + suffix, () => true,
-      (key, value) => { statuses[key] = value; }, () => {}, () => 0, false, Promise.resolve(), () => {}, {uid:'fixture-uid',agencyId:'a',active:true,environment:'test',role:'normal',expiresAt:Date.now()+3600000}, {projectId:'mci2-fixture'}, mayReplay, {currentUser:{uid:'fixture-uid'}}, op => remoteWrite(op.method)(op.path,op.payload));
-    return { ...api, raw: () => raw, writes, statuses, notices, storageKeys };
+      (key, value) => { statuses[key] = value; }, () => {}, () => 0, false, Promise.resolve(), () => {}, {uid:'fixture-uid',agencyId:'a',active:true,environment:'test',role:'normal',expiresAt:Date.now()+3600000}, {projectId:'mci2-fixture'}, mayReplay, {currentUser:{uid:'fixture-uid'}}, options.sender || (op => remoteWrite(op.method)(op.path,op.payload)));
+    return { ...api, raw: () => shared.raw, writes, statuses, notices, storageKeys };
   }
+  await test('two tabs retain all simultaneous enqueues with unique sequence numbers',async()=>{
+    const shared={raw:null};const a=harness({shared,online:false}),b=harness({shared,online:false});
+    await Promise.all(Array.from({length:80},(_,i)=>(i%2?a:b).outboxEnqueue({kind:'action',method:'set',path:'mci2/incidents/test/actions/'+i,payload:{text:String(i)}})));
+    const ops=Object.values(JSON.parse(shared.raw).ops);
+    assert(ops.length===80,'concurrent save lost');
+    assert(new Set(ops.map(x=>x.seq)).size===80,'sequence collision');
+  });
+  await test('another tab can enqueue during network send without retrying the active operation',async()=>{
+    const shared={raw:null};let release,started;const gate=new Promise(r=>release=r),ready=new Promise(r=>started=r);const sent=[];
+    const a=harness({shared,sender:async op=>{sent.push(op.opId);started();await gate;}});
+    const b=harness({shared,sender:async op=>{sent.push(op.opId);}});
+    const first=a.saveIncident({title:'first'});await ready;
+    await b.outboxEnqueue({kind:'action',method:'set',path:'mci2/incidents/test/actions/second',payload:{text:'second'}});
+    assert(Object.keys(JSON.parse(shared.raw).ops).length===2,'enqueue waited for network or lost record');
+    const retry=b.replayOutbox({manual:true});
+    await Promise.resolve();assert(sent.length===1,'active send duplicated');
+    release();await Promise.all([first,retry]);
+    assert(sent.length===2 && new Set(sent).size===2,'duplicate delivery or lost operation');
+    assert(Object.values(JSON.parse(shared.raw).ops).every(x=>x.status==='sent'),'completion overwrote new input');
+  });
+  await test('closed tab sending state recovers once the send lock is available',async()=>{
+    const shared={raw:null};const a=harness({shared,online:false});
+    const id=await a.outboxEnqueue({kind:'action',method:'set',path:'mci2/incidents/test/actions/recovered',payload:{text:'retained'}});
+    const queue=JSON.parse(shared.raw);queue.ops[id].status='sending';shared.raw=JSON.stringify(queue);
+    const b=harness({shared});await b.replayOutbox();
+    assert(b.writes.length===1 && JSON.parse(shared.raw).ops[id].status==='sent','interrupted send not recovered');
+  });
+  await test('unsupported browser preserves input without network writes',async()=>{
+    const x=harness({noLocks:true});assert(await x.saveIncident({title:'keep'})===false,'unsafe save accepted');
+    assert(x.raw()===null && x.writes.length===0,'storage or server changed');
+    assert(x.notices.length>0,'unsupported browser not explained');
+  });
   for (const [label, save, status] of [
     ['incident', x=>x.saveIncident({title:'fixture'}), 'incident'],
     ['damage', x=>x.saveDamage('medical',{dead:0},'tester'), 'damage'],
@@ -75,7 +113,7 @@ export async function runSafetyTests(html) {
   await test('an earlier failed save blocks newer writes to the same record',async()=>{
     const x=harness();
     const operation={kind:'incident',method:'set',path:'mci2/incidents/test/incident',payload:{title:'older'}};
-    const id=x.outboxEnqueue(operation);
+    const id=await x.outboxEnqueue(operation);
     const queue=JSON.parse(x.raw());queue.ops[id].status='failed';
     const y=harness({raw:JSON.stringify(queue)});
     assert(await y.saveIncident({title:'newer'}), 'newer edit was not retained');
@@ -84,7 +122,7 @@ export async function runSafetyTests(html) {
     equal(y.writes.map(w=>w.value.title),['older','newer'],'retry order reversed');
   });
   await test('manual replay never bypasses a conflict decision',async()=>{
-    const x=harness();const id=x.outboxEnqueue({kind:'casualty',method:'update',path:'mci2/incidents/test/casualties/one',expected:{notes:'before'},payload:{notes:'mine'}});
+    const x=harness();const id=await x.outboxEnqueue({kind:'casualty',method:'update',path:'mci2/incidents/test/casualties/one',expected:{notes:'before'},payload:{notes:'mine'}});
     const queue=JSON.parse(x.raw());queue.ops[id].status='failed';queue.ops[id].errorCode='write_conflict';queue.ops[id].conflictCurrent={notes:'colleague'};
     const y=harness({raw:JSON.stringify(queue)});await y.replayOutbox({manual:true});assert(y.writes.length===0,'conflict was silently resent');
     equal(JSON.parse(y.raw()).ops[id].payload,{notes:'mine'},'input lost');
@@ -137,7 +175,7 @@ export async function runSafetyTests(html) {
   await test('Cleanup and replay preserve a corrupt queue', async () => {
     const raw = '{"broken"';
     const x = harness({ raw });
-    x.outboxCleanup();
+    await x.outboxCleanup();
     await x.replayOutbox({ manual: true });
     equal(x.raw(), raw, 'maintenance overwrote corrupt data');
     assert(x.writes.length === 0, 'maintenance sent corrupt data');
@@ -160,7 +198,7 @@ export async function runSafetyTests(html) {
     const data = JSON.parse(restarted.raw());
     Object.values(data.ops).forEach(op => { op.updatedAt = Date.now() - 20000; });
     const boot = harness({ raw: JSON.stringify(data) });
-    boot.outboxCleanup();
+    await boot.outboxCleanup();
     await boot.replayOutbox();
     assert(boot.writes.length === 1, 'persisted record not replayed');
     equal(boot.writes[0].path, entries[0].path, 'replay created a different card');

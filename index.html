@@ -1383,17 +1383,29 @@ function _outboxSave(o) {
   }
   _outboxStorageError = '';
 }
+// All cooperating tabs take send before store; never wait for send while holding store.
+function _outboxLock(kind, run) {
+  if (!navigator.locks?.request) {
+    _outboxStorageError = '이 브라우저는 안전한 미전송함 저장을 지원하지 않습니다. 최신 Chrome 또는 Edge를 사용해주세요.';
+    return Promise.reject(new Error(_outboxStorageError));
+  }
+  return navigator.locks.request(OUTBOX_KEY + ':' + kind, {mode:'exclusive'}, run);
+}
 function _newOpId() {
   return `op_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
-function outboxEnqueue({ kind, method, path, incidentId, payload, expected, maxTries }) {
+async function outboxEnqueue({ kind, method, path, incidentId, payload, expected, maxTries }) {
+  const securityContext = {projectId:firebaseConfig.projectId,uid:secureIdentity.uid,agencyId:secureIdentity.agencyId};
+  payload = method === "remove" ? undefined : JSON.parse(JSON.stringify(payload ?? {}));
+  expected = expected ? JSON.parse(JSON.stringify(expected)) : undefined;
+  return _outboxLock("store", () => {
   const o = _outboxLoad(true);
   if (Object.keys(o.ops).length >= OUTBOX_MAX_OPS) _outboxEvictForSpace(o);
   const opId = _newOpId();
   const now = Date.now();
   const entry = {
     opId, seq: o.seq++, kind, method, path, creationGuard:true,
-    securityContext: {projectId:firebaseConfig.projectId,uid:secureIdentity.uid,agencyId:secureIdentity.agencyId},
+    securityContext,
     incidentId: incidentId || null,
     status: 'pending', tries: 0,
     maxTries: maxTries || OUTBOX_DEFAULT_MAX_TRIES,
@@ -1408,17 +1420,23 @@ function outboxEnqueue({ kind, method, path, incidentId, payload, expected, maxT
   _outboxSave(o);
   updateOutboxBadge();
   return opId;
+  });
 }
-function outboxMark(opId, patch) {
+async function outboxMark(opId, patch, expectedUpdatedAt) {
+  return _outboxLock("store", () => {
   const o = _outboxLoad(true);
-  if (!o.ops[opId]) return;
-  Object.assign(o.ops[opId], patch, { updatedAt: Date.now() });
+  if (!o.ops[opId] || (expectedUpdatedAt !== undefined && (o.ops[opId].updatedAt !== expectedUpdatedAt || o.ops[opId].status !== "failed" || !mayReplay(o.ops[opId],secureIdentity,firebaseConfig?.projectId)))) return false;
+  Object.assign(o.ops[opId], patch, { updatedAt: Math.max(Date.now(), o.ops[opId].updatedAt + 1) });
   _outboxSave(o);
   updateOutboxBadge();
+  return true;
+  });
 }
-function outboxRemove(opId) {
+async function outboxRemove(opId) {
+  return _outboxLock("send", () => _outboxLock("store", () => {
   const o = _outboxLoad(true);
   if (o.ops[opId]) { delete o.ops[opId]; _outboxSave(o); updateOutboxBadge(); }
+  }));
 }
 function outboxPendingCount() {   // 자동 재전송 대상(진행 중 포함) — 배지·interval 기준. failed 제외(공회전 방지)
   return Object.values(_outboxLoad().ops).filter(x => x.status === 'pending' || x.status === 'sending').length;
@@ -1439,7 +1457,8 @@ function _outboxEvictForSpace(o) {
     window.__mciShowOutboxStatus('미전송 항목이 매우 많습니다 — 연결을 확인하세요', 'err');
   }
 }
-function outboxCleanup() {
+async function outboxCleanup() {
+  return _outboxLock("send", () => _outboxLock("store", () => {
   let o;
   try { o = _outboxLoad(true); } catch { return; }
   const now = Date.now();
@@ -1450,10 +1469,11 @@ function outboxCleanup() {
     // 24시간 강등은 '실제 전송을 시도했는데(tries>0) 오래 실패한' 것만. 한 번도 못 보낸 순수 오프라인 데이터는
     // 절대 강등하지 않음 → 재연결 시 자동 재전송 기회를 박탈하지 않음.
     else if (x.status === 'pending' && (x.tries || 0) > 0 && now - x.updatedAt > OUTBOX_STALE_MS) { x.status = 'failed'; x.lastError = '24시간 경과(재시도 실패)'; changed = true; }
-    // 앱 재시작 등으로 'sending'에 멈춘 항목 복구(15초 이상 경과분만 → 진행 중인 건 안 건드림)
-    else if (x.status === 'sending' && now - x.updatedAt > 15000) { x.status = 'pending'; changed = true; }
+    // 전송 잠금을 획득했으므로 살아 있는 다른 탭의 전송은 없다. 중단된 전송만 복구한다.
+    else if (x.status === 'sending') { x.status = 'pending'; changed = true; }
   }
   if (changed) { try { _outboxSave(o); } catch { /* 기존 기록 유지, 배지로 알림 */ } }
+  }));
 }
 
 // 현장 입력은 기기 보관 후 저장 당시 계정으로 전송한다.
@@ -1462,7 +1482,7 @@ async function durableWrite({ kind, method, path, incidentId, payload, expected 
   if (!path) return { ok: false, queued: false };   // incPath null 방어(재난방 미선택)
   let opId;
   try {
-    opId = outboxEnqueue({ kind, method, path, incidentId, payload, expected });
+    opId = await outboxEnqueue({ kind, method, path, incidentId, payload, expected });
   } catch (error) {
     updateOutboxBadge();
     window.__mciShowOutboxStatus?.(error.message, 'err');
@@ -1477,26 +1497,29 @@ async function durableWrite({ kind, method, path, incidentId, payload, expected 
 }
 
 async function _outboxSendOne(opId) {
+  return _outboxLock("send", () => _outboxSendLocked(opId));
+}
+async function _outboxSendLocked(opId) {
   let op;
   try {
     op = _outboxLoad(true).ops[opId];
     if (!op) return false;
     if (op.status === 'sent') return true;
-    if (op.status === 'sending') return false;
+    if (op.status !== 'pending') return false;
     if (!navigator.onLine) return false;
     if (!mayReplay(op, secureIdentity, firebaseConfig?.projectId)) {
-      outboxMark(opId, {status:'failed',lastError:'이전 로그인 또는 다른 환경의 기록입니다. 자동 전송하지 않습니다.'});
+      await outboxMark(opId, {status:'failed',lastError:'이전 로그인 또는 다른 환경의 기록입니다. 자동 전송하지 않습니다.'});
       return false;
     }
     // Earlier unsent edits on this record must finish before a newer edit.
     const earlier = Object.values(_outboxLoad(true).ops).some(x =>
       x.opId !== opId && x.path === op.path && x.seq < op.seq && !['sent','discarded'].includes(x.status));
     if (earlier) return false;
-    outboxMark(opId, { status: 'sending' });
+    await outboxMark(opId, { status: 'sending' });
   } catch { updateOutboxBadge(); return false; }
   try {
     await sendBoundOperation(op, {currentIdentity:()=>secureIdentity,currentUser:()=>auth.currentUser,projectId:firebaseConfig.projectId,databaseURL:firebaseConfig.databaseURL,beforeCreate:()=>outboxMark(opId,{creationAttempted:true})});
-    outboxMark(opId, { status: 'sent', lastError: null });
+    await outboxMark(opId, { status: 'sent', lastError: null });
     return true;
   } catch (e) {
     const msg = (e && (e.code || e.message)) ? (e.code || e.message) : String(e);
@@ -1509,7 +1532,7 @@ async function _outboxSendOne(opId) {
     const failed = e.code==='write_conflict' || permDenied || tries >= (cur.maxTries || OUTBOX_DEFAULT_MAX_TRIES);
     const backoff = Math.min(60000, 1000 * Math.pow(2, tries));
     try {
-      outboxMark(opId, {
+      await outboxMark(opId, {
         status: failed ? 'failed' : 'pending',
         tries, lastError: e.message || msg, errorCode:e.code || null, conflictCurrent:e.current || null, nextAttemptAt: Date.now() + backoff,
       });
@@ -1529,13 +1552,16 @@ async function replayOutbox(opts) {
   try {
     try { await authReady; } catch {}   // 인증 후 전송(Rules가 auth!=null 요구)
     // 수동 재전송: failed/멈춘 sending도 되살려 한 번 더 시도
+    await outboxCleanup();
     if (manual) {
+      await _outboxLock("send", () => _outboxLock("store", () => {
       const o = _outboxLoad(true);
       let ch = false;
       Object.values(o.ops).forEach(x => {
-        if (x.errorCode!=='write_conflict' && (x.status === 'failed' || x.status === 'sending')) { x.status = 'pending'; x.tries = 0; x.nextAttemptAt = 0; x.lastError = null; ch = true; }
+        if (x.errorCode!=='write_conflict' && x.status === 'failed') { x.status = 'pending'; x.tries = 0; x.nextAttemptAt = 0; x.lastError = null; ch = true; }
       });
       if (ch) _outboxSave(o);
+      }));
     }
     const now = Date.now();
     const ops = Object.values(_outboxLoad(true).ops)
@@ -1548,7 +1574,7 @@ async function replayOutbox(opts) {
       if (ok) sentN++;
       else if (!navigator.onLine) break;   // 도중 끊기면 중단(나머지는 다음 트리거에)
     }
-    outboxCleanup();
+    await outboxCleanup();
     if (sentN > 0 && window.__mciShowOutboxStatus) window.__mciShowOutboxStatus(`미전송 ${sentN}건 전송 완료`, 'ok');
   } catch (error) {
     window.__mciShowOutboxStatus?.(error.message || '미전송함을 확인해주세요.', 'err');
@@ -1557,6 +1583,12 @@ async function replayOutbox(opts) {
     updateOutboxBadge();
   }
 }
+window.addEventListener?.('storage', event => {
+  if (event.key === OUTBOX_KEY || event.key === null) {
+    updateOutboxBadge();
+    document.getElementById('conflict-review')?.remove();
+  }
+});
 window.__mciReplayOutbox = replayOutbox;   // 디버그/IIFE용 노출
 
 // 미전송 배지(우하단) — pending>0일 때만. [지금 재전송] 버튼 포함. 비차단(alert 금지).
@@ -1616,14 +1648,14 @@ function showConflictReview() {
   }
   panel.append(table);
   const act=(label,run)=>{const button=text('button',label);button.style.cssText='padding:10px 14px;margin:4px;background:#334155;border-radius:8px';button.onclick=run;panel.append(button);};
-  function resolve(keepMine){
+  async function resolve(keepMine){
     try{
       const current=_outboxLoad(true).ops[op.opId];
       if(!current || current.updatedAt!==op.updatedAt || !mayReplay(current,secureIdentity,firebaseConfig?.projectId)){panel.remove();return;}
       if(keepMine){
         if(!op.conflictCurrent)return;
-        outboxMark(op.opId,{expected:op.conflictCurrent,status:'pending',errorCode:null,conflictCurrent:null,lastError:null,tries:0,nextAttemptAt:0});
-      }else outboxMark(op.opId,{status:'discarded',lastError:'사용자가 서버 값을 유지했습니다.'});
+        await outboxMark(op.opId,{expected:op.conflictCurrent,status:'pending',errorCode:null,conflictCurrent:null,lastError:null,tries:0,nextAttemptAt:0},op.updatedAt);
+      }else await outboxMark(op.opId,{status:'discarded',lastError:'사용자가 서버 값을 유지했습니다.'},op.updatedAt);
       panel.remove();updateOutboxBadge();if(keepMine)replayOutbox();
     }catch(error){window.__mciShowOutboxStatus?.(error.message,'err');}
   }
@@ -8464,7 +8496,7 @@ async function boot() {
 
   // 오프라인 안전 큐: 부팅 시 미전송분 재전송 + 배지 + 온/오프라인 이벤트 + 주기 점검
   if (!POPOUT_DISPLAY) {
-    outboxCleanup();
+    outboxCleanup().catch(error => window.__mciShowOutboxStatus?.(error.message, "err"));
     updateOutboxBadge();
     if (navigator.onLine) replayOutbox();
     window.addEventListener('online', () => { updateOutboxBadge(); replayOutbox(); });

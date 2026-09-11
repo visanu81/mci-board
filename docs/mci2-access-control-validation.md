@@ -110,3 +110,14 @@ Cloudflare 후보 cf953653에서도 실제 검증 21개가 통과했고 정리 �
 이 보호는 새 앱의 카드 저장 경로에 적용되며 구버전·직접 REST 쓰기를 새 서버 규칙으로 차단하는 변경은 아니다. 여러 탭의 미전송함 동시 갱신, 카드 외 입력의 충돌 보호, 실물 휴대전화/두 창 검증은 남았다. 서비스 트래픽은 전환하지 않았다.
 
 최종 후보 ffec15df-459e-4160-886a-b4cdb8c7389a / v101-card-lifecycle 업로드 완료. HTML·secure-session.js·sw.js가 로컬과 정확히 일치함을 확인했다.
+
+
+## 2026-09-11 — Multiple-tab outbox protection (v102-multitab-outbox)
+
+All cooperating tabs now use same-origin Web Locks: a short store lock protects localStorage read/modify/write, and a separate send lock serializes delivery, manual retry, and interrupted-send recovery. Network requests do not hold the store lock, so new input can be retained while another tab waits for Firebase. Enqueue captures the payload and original account before waiting. Conflict choices compare the displayed revision inside the store lock; storage events refresh the badge and dismiss stale comparisons. Unsupported browsers reject the save visibly and retain the form.
+
+Validation: 36 source-based safety checks, 41 session/worker/config checks, 10 card-conflict checks, and 12 lifecycle checks pass (99 total). Shared-storage/lock-manager fixtures exercise 80 simultaneous enqueues, enqueue during a stalled send, manual retry from a second instance, and recovery after an interrupted sender. These are deterministic fixtures, not a real two-window browser test.
+
+Limitations: old tabs that do not implement these locks must be closed/reloaded before use. Web Locks coordinate the same browser origin/storage context only. Conditional card writes continue to handle cross-device conflicts. This commit is not uploaded or promoted; the existing preview remains ffec15df-459e-4160-886a-b4cdb8c7389a (v101). Serving mci2 and production mci remain unchanged.
+
+Lock semantics: https://www.w3.org/TR/web-locks/
