@@ -106,7 +106,7 @@ export default {
         return new Response(JSON.stringify({firebase}), {headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
       } catch { return jsonResponse({error:'테스트 로그인이 아직 설정되지 않았습니다.'},503); }
     }
-    if (['/api/admin/codes','/api/auth/display'].includes(url.pathname)) return handleAccessManagement(request,env,verifyFirebaseToken);
+    if (['/api/admin/codes','/api/admin/close','/api/auth/display'].includes(url.pathname)) return handleAccessManagement(request,env,verifyFirebaseToken);
     if (url.pathname === '/api/auth/login') return handleAgencyLogin(request,env);
     if (url.pathname === '/api/ocr') {
       if (request.method !== 'POST') {

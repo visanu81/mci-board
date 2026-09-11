@@ -127,3 +127,51 @@ for(const field of ['incident','damages/medical','mobilizations/medical','action
  test(field+': read-only replay denied',()=>assertFails(set(at('reader','mci2/incidents/a/'+field),{fixture:'blocked'})));
  test(field+': closed incident replay denied',()=>assertFails(set(at('alice','mci2/incidents/closed/'+field),{fixture:'blocked'})));
 }
+
+test('freeze blocks admin and normal writes including parent overwrites and deletion',async()=>{
+ await env.withSecurityRulesDisabled(ctx=>set(ref(ctx.database(),'mci2/incidents/frozen'),{...record('a','alice'),closure:{id:'fixture',at:now,by:'admin'}}));
+ for(const uid of ['alice','admin']){
+  await assertFails(update(at(uid,'mci2/incidents/frozen/mciCasualties/one'),{notes:'late',updatedByUid:uid}));
+  await assertFails(set(at(uid,'mci2/incidents/frozen/incident'),{location:'late'}));
+  await assertFails(remove(at(uid,'mci2/incidents/frozen/closure')));
+  await assertFails(remove(at(uid,'mci2/incidents/frozen')));
+  await assertFails(set(at(uid,'mci2/incidents/frozen'),record('a',uid)));
+ }
+});
+test('client admin cannot forge freeze or close markers',async()=>{
+ await assertFails(update(at('admin','mci2/incidents/a'),{closure:{id:'forged'}}));
+ await assertFails(update(at('admin','mci2/incidents/a'),{closedAt:now}));
+});
+test('client admin cannot edit or reopen completed incident',async()=>{
+ await assertFails(remove(at('admin','mci2/incidents/closed/closedAt')));
+ await assertFails(update(at('admin','mci2/incidents/closed/incident'),{location:'late'}));
+});
+test('closure archive cannot be overwritten or deleted by client admin',async()=>{
+ await env.withSecurityRulesDisabled(ctx=>set(ref(ctx.database(),'mci2/archives/close-fixture'),{closureId:'fixture',data:'original'}));
+ await assertFails(remove(at('admin','mci2/archives/close-fixture')));
+ await assertFails(set(at('admin','mci2/archives/close-fixture'),{data:'replacement'}));
+ await assertFails(remove(at('admin','mci2/archives')));
+});
+
+// Exercise the real REST ETag implementation and security rules together on loopback only.
+import {closeIncident} from '../security/incident-close.mjs';
+test('REST close retries concurrent entry and freezes writes before archive',async()=>{
+ const id='rest-close';
+ await env.withSecurityRulesDisabled(ctx=>set(ref(ctx.database(),'mci2/incidents/'+id),record('a','alice')));
+ let race=true,checkedFrozen=false;
+ const server=async(path,method='GET',body,headers={})=>{
+  if(method==='PUT' && path==='mci2/incidents/'+id && race){race=false;await assertSucceeds(update(at('alice',path+'/mciCasualties/one'),{notes:'arrived before freeze',updatedByUid:'alice'}));}
+  if(path.startsWith('mci2/archives/')){
+   await assertFails(update(at('alice','mci2/incidents/'+id+'/mciCasualties/one'),{notes:'too late',updatedByUid:'alice'}));checkedFrozen=true;
+  }
+  return fetch('http://127.0.0.1:19000/'+path+'.json?ns='+projectId,{method,headers:{Authorization:'Bearer owner','Content-Type':'application/json',...headers},body:body===undefined?undefined:JSON.stringify(body)});
+ };
+ const first=await closeIncident({incidentId:id},server,'admin',async()=>true);
+ if(first.status!==409)throw Error('Expected real ETag conflict: '+first.status+' '+await first.text());
+ const second=await closeIncident({incidentId:id},server,'admin',async()=>true);
+ if(second.status!==200)throw Error('Close failed: '+await second.text());
+ if(!checkedFrozen)throw Error('Freeze not checked');
+ const source=(await get(at('admin','mci2/incidents/'+id))).val();
+ const archived=(await get(at('admin','mci2/archives/close-'+source.closure.id))).val();
+ if(archived.data.mciCasualties[0].notes!=='arrived before freeze' || source.mciCasualties.one.notes!=='arrived before freeze')throw Error('Lost record');
+});

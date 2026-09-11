@@ -25,3 +25,6 @@ test('cannot issue display for another agency',async()=>assert.equal((await fixt
 test('observer cannot issue delegated display',async()=>assert.equal((await fixture({role:'observer'}).call({incidentId:'own'},'/api/auth/display')).status,403));
 test('display role cannot forge delegation role',async()=>assert.equal((await fixture().call({incidentId:'own',role:'admin'},'/api/auth/display')).status,400));
 test('HQ cannot manage codes',async()=>assert.equal((await fixture({role:'hq'}).call()).status,403));
+
+test('normal cannot invoke close endpoint',async()=>assert.equal((await fixture({role:'normal'}).call({incidentId:'own'},'/api/admin/close')).status,403));
+test('foreign origin cannot invoke close endpoint',async()=>assert.equal((await fixture().call({incidentId:'own'},'/api/admin/close','https://other.invalid')).status,403));

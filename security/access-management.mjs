@@ -1,3 +1,4 @@
+import {closeIncident} from './incident-close.mjs';
 import {config,serviceToken,signJwt,boundedJson} from './agency-login.mjs';
 import {isActiveGrant} from '../secure-session.js';
 const enc=new TextEncoder();
@@ -29,11 +30,19 @@ export async function handleAccessManagement(request,env,verify,transport=fetch)
    if(!request.headers.get('Content-Type')?.startsWith('application/json'))return reply({error:'JSON 요청이 필요합니다.'},415);
    try{input=await boundedJson(request);}catch{return reply({error:'입력 내용을 확인하세요.'},400);}
   }
+  if(path==='/api/admin/close'){
+   if(request.method!=='POST')return reply({error:'POST 요청이 필요합니다.'},405);
+   return closeIncident(input,db,payload.sub,async()=>{
+    const latest=await transport(url,{signal:AbortSignal.timeout(10000)});
+    if(!latest.ok)return false;const current=await latest.json();
+    return isActiveGrant(current) && current.role==='admin' && current.codeId===grant.codeId;
+   });
+  }
   if(path==='/api/auth/display'){
    if(request.method!=='POST')return reply({error:'POST 요청이 필요합니다.'},405);
    if(Object.keys(input).some(k=>k!=='incidentId') || !/^[a-zA-Z0-9_-]{1,128}$/.test(input.incidentId||''))return reply({error:'재난을 선택하세요.'},400);
    const ir=await db('mci2/incidents/'+input.incidentId);if(!ir.ok)throw Error('incident');const incident=await ir.json();
-   if(!incident || incident.closedAt || (grant.role!=='admin' && incident.agencyId!==grant.agencyId))return reply({error:'표출할 재난의 권한이 없습니다.'},403);
+   if(!incident || incident.closedAt || incident.closure || (grant.role!=='admin' && incident.agencyId!==grant.agencyId))return reply({error:'표출할 재난의 권한이 없습니다.'},403);
    const uid='mci2-'+crypto.randomUUID(),seconds=Math.floor(Date.now()/1000),expiresAt=Math.min(grant.expiresAt,Date.now()+12*3600000);
    const child={agencyId:incident.agencyId,agencyName:grant.agencyName,role:'display',environment:'test',active:true,expiresAt,parentUid:payload.sub,incidentId:input.incidentId,...(grant.codeId?{codeId:grant.codeId}:{})};
    const saved=await db('access/'+uid,'PUT',child);if(!saved.ok)throw Error('grant');

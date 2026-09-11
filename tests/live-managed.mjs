@@ -33,6 +33,11 @@ try{
  assert.notEqual(display.user.uid,normal.user.uid);assert.equal(normal.auth.currentUser.uid,normal.user.uid);pass('display auth leaves parent identity intact');
  assert((await read(path,display.user)).ok);assert([401,403].includes((await read(path,display.user,'PATCH',{title:'forbidden'})).status));pass('display reads assigned incident and cannot write');
  const q=new URL(config.databaseURL+'/mci2/incidents.json');q.searchParams.set('auth',await display.user.getIdToken());q.searchParams.set('orderBy',JSON.stringify('agencyId'));q.searchParams.set('equalTo',JSON.stringify(tag));assert([401,403].includes((await fetch(q)).status));pass('scoped display cannot enumerate agency incidents');
+ const closing=await api('/api/admin/close',{incidentId:tag},admin.user);assert.equal(closing.status,200);pass('server closes and archives isolated incident');
+ const closed=await (await read(path,admin.user)).json();assert(closed.closure && closed.closedAt);assert.equal(closed.title,'가상 재난');
+ const savedArchive=await read('mci2/archives/close-'+closed.closure.id,admin.user);assert(savedArchive.ok);assert.equal((await savedArchive.json()).sourceIncidentId,tag);pass('closed original and archive both retained');
+ assert([401,403].includes((await read(path,admin.user,'PATCH',{title:'forbidden'})).status));assert([401,403].includes((await read(path,normal.user,'PATCH',{title:'forbidden'})).status));pass('closed incident rejects both admin and normal direct writes');
+ assert.equal((await api('/api/admin/close',{incidentId:tag},admin.user)).status,200);pass('duplicate close is idempotent');
  controller=createSessionController({auth:normal.auth,db:normal.db,sdk:{...authSDK,...dbSDK},onChange:()=>{}});controller.start();await waitFor(()=>controller.current());
  const revoke=await api('/api/admin/codes',{action:'revoke',id:code.id},admin.user);assert.equal(revoke.status,200);pass('administrator revokes issued code');
  await waitFor(()=>controller.current()===null);pass('code revocation immediately clears subscribed session');
@@ -43,6 +48,8 @@ finally{
  controller?.stop();for(const user of users)try{await authSDK.deleteUser(user);}catch{cleanupErrors.push('auth');}
  for(const app of apps){dbSDK.goOffline(dbSDK.getDatabase(app));await deleteApp(app);}
  await requireAuth({project,...cliAuth.getGlobalDefaultAccount()});const cli=new Client({urlPrefix:config.databaseURL});
- for(const p of [path,...[...uids].map(x=>'access/'+x),...createdCodes.map(x=>'serverCodes/'+x)])try{await cli.delete('/'+p+'.json');}catch{cleanupErrors.push(p);}
+ let closureArchive;
+ try{const own=await cli.get('/'+path+'.json');if(own.body?.closure?.id)closureArchive='mci2/archives/close-'+own.body.closure.id;}catch{cleanupErrors.push('closure-lookup');}
+ for(const p of [...(closureArchive?[closureArchive]:[]),path,...[...uids].map(x=>'access/'+x),...createdCodes.map(x=>'serverCodes/'+x)])try{await cli.delete('/'+p+'.json');}catch{cleanupErrors.push(p);}
  const result={project,remote:remote||null,checks,passed:!process.exitCode,cleanupErrors,at:new Date().toISOString()};fs.writeFileSync(remote?'.tmp/auth-setup/managed-edge-result.json':'.tmp/auth-setup/managed-validation-result.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));if(cleanupErrors.length)process.exitCode=1;
 }

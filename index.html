@@ -1063,6 +1063,10 @@ function assertCanWrite(action = '저장') {
   if (!isActiveGrant(secureIdentity) || !['normal','admin'].includes(secureIdentity.role)) {
     alert('로그인과 쓰기 권한을 확인해주세요. 입력 내용은 유지됩니다.'); return false;
   }
+  const selected = state.incidents.find(i=>i._key===state.currentIncidentId);
+  if (selected?.closure || selected?.closedAt) {
+    alert('종료 처리 중이거나 종료된 재난입니다. 입력 내용은 유지됩니다.'); return false;
+  }
   if (isObserver()) {
     alert(`본부 계정은 ${action}/수정/삭제 권한이 없습니다 (읽기 전용)`);
     return false;
@@ -2085,36 +2089,7 @@ function downloadJson() {
 
 // ==================== 초기화 ====================
 async function archiveAndReset(label) {
-  if (!assertCanWrite('재난 종료/초기화')) return { ok: false, reason: '권한 없음' };
-  const snap = buildSnapshot();
-  // 데이터가 비어있으면 백업 안 함
-  const hasData = snap.incident || Object.keys(snap.damages).length || Object.keys(snap.mobilizations).length
-    || snap.actions.length || snap.casualties.length || snap.mciCasualties.length;
-
-  try {
-    if (hasData) {
-      // 1. archives에 백업
-      const archiveRef = push(ref(db, rootPath('archives')));
-      await set(archiveRef, {
-        label: label || (snap.incident?.location || '미상 재난'),
-        archivedAt: Date.now(),
-        archivedBy: snap.exportedBy,
-        data: snap,
-      });
-    }
-    // 2. 현재 데이터 모두 삭제
-    await Promise.all([
-      remove(ref(db, incPath('incident'))),
-      remove(ref(db, incPath('damages'))),
-      remove(ref(db, incPath('mobilizations'))),
-      remove(ref(db, incPath('actions'))),
-      remove(ref(db, incPath('casualties'))),
-      remove(ref(db, incPath('mciCasualties'))),
-    ]);
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, reason: e.message };
-  }
+  return adminForceCloseIncident(state.currentIncidentId, {label});
 }
 
 async function deleteArchive(key) {
@@ -2123,87 +2098,15 @@ async function deleteArchive(key) {
   catch (e) { alert('삭제 실패: ' + e.message); return false; }
 }
 
-// ==================== 관리자 전용: 임의 재난 강제 종료 ====================
-// archiveAndReset이 state.currentIncidentId 기준으로 동작하는 것과 달리,
-// admin이 콘솔에서 어떤 재난방에든 들어가지 않고 직접 closedAt 마킹 + 데이터 백업·삭제까지 처리.
+// 종료는 서버에서 수정 잠금 → 백업 → 종료 확정 순서로 처리한다.
 async function adminForceCloseIncident(incidentId, opts = {}) {
+  if (secureIdentity?.role !== 'admin') return {ok:false,reason:'관리자 권한이 필요합니다.'};
+  if (!navigator.onLine) return {ok:false,reason:'재난 종료는 인터넷 연결 후 실행하세요.'};
   try {
-    const inc = state.incidents.find(i => i._key === incidentId);
-    if (!inc) throw new Error('재난을 찾을 수 없습니다');
-
-    const base = rootPath(`incidents/${incidentId}`);
-    // 1. 재난방 데이터 일괄 fetch
-    const [incData, damages, mobilizations, actions, casualties, mciCasualties] = await Promise.all([
-      get(ref(db, `${base}/incident`)),
-      get(ref(db, `${base}/damages`)),
-      get(ref(db, `${base}/mobilizations`)),
-      get(ref(db, `${base}/actions`)),
-      get(ref(db, `${base}/casualties`)),
-      get(ref(db, `${base}/mciCasualties`)),
-    ]);
-
-    const actionsObj       = actions.val() || {};
-    const casualtiesObj    = casualties.val() || {};
-    const mciCasualtiesObj = mciCasualties.val() || {};
-
-    const adminName = state.session?.agency?.name || 'admin';
-    const snap = {
-      incident: incData.val(),
-      damages: damages.val() || {},
-      mobilizations: mobilizations.val() || {},
-      actions:        Object.entries(actionsObj).map(([k,v])       => ({ ...v, _key: k })),
-      casualties:     Object.entries(casualtiesObj).map(([k,v])    => ({ ...v, _key: k })),
-      mciCasualties:  Object.entries(mciCasualtiesObj).map(([k,v]) => ({ ...v, _key: k })),
-      exportedAt: Date.now(),
-      exportedBy: `관리자 강제 종료 (${adminName})`,
-      // 인덱스 메타 정보 — 단독 archive에서도 재난 식별이 가능하도록
-      _incidentMeta: {
-        title: inc.title,
-        type: inc.type,
-        agencyId: inc.agencyId,
-        startedAt: inc.startedAt,
-      },
-    };
-
-    const hasData = snap.incident
-      || Object.keys(snap.damages).length
-      || Object.keys(snap.mobilizations).length
-      || snap.actions.length
-      || snap.casualties.length
-      || snap.mciCasualties.length;
-
-    // 2. 데이터 있으면 archives에 백업
-    if (hasData) {
-      const archiveRef = push(ref(db, rootPath('archives')));
-      await set(archiveRef, {
-        label: `${inc.title || '제목 없음'} · 관리자 강제 종료${opts.note ? ' · ' + opts.note : ''}`,
-        archivedAt: Date.now(),
-        archivedBy: snap.exportedBy,
-        data: snap,
-        sourceIncidentId: incidentId,
-      });
-    }
-
-    // 3. 인덱스에 closedAt 마킹 (로비/콘솔 목록에서 제외됨)
-    await update(ref(db, base), {
-      closedAt: Date.now(),
-      closedBy: adminName,
-    });
-    // 4. 서브데이터 일괄 삭제 (저장공간 정리)
-    await Promise.all([
-      remove(ref(db, `${base}/incident`)),
-      remove(ref(db, `${base}/damages`)),
-      remove(ref(db, `${base}/mobilizations`)),
-      remove(ref(db, `${base}/actions`)),
-      remove(ref(db, `${base}/casualties`)),
-      remove(ref(db, `${base}/mciCasualties`)),
-    ]);
-
-    return { ok: true, archived: hasData };
-  } catch (e) {
-    console.error('adminForceCloseIncident', e);
-    return { ok: false, reason: e.message };
-  }
+    const pending=Object.values(_outboxLoad(true).ops).some(x=>x.incidentId===incidentId && x.status!=='sent');
+    if(pending)return {ok:false,reason:'이 기기에 미전송 기록이 있습니다. 미전송함을 먼저 확인하세요.'};
+    return await serverAccess('/api/admin/close',{incidentId,...(opts.label?{label:opts.label}:{})});
+  } catch(error) { return {ok:false,reason:error.message}; }
 }
 
 function downloadArchiveExcel(archive) {
@@ -3690,7 +3593,7 @@ function renderAdminArchivesPanel() {
                       백업자: ${escapeHtml(ar.archivedBy || '-')}${agencyName ? ` · 관서: ${escapeHtml(agencyName)}` : ''}
                     </div>
                   </div>
-                  <button data-del-archive="${ar._key}" class="del-archive text-slate-600 hover:text-red-400 p-1 flex-shrink-0" title="백업 삭제" aria-label="백업 삭제">
+                  <button ${ar.closureId ? 'hidden disabled' : ''} data-del-archive="${ar._key}" class="del-archive text-slate-600 hover:text-red-400 p-1 flex-shrink-0" title="백업 삭제" aria-label="백업 삭제">
                     <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                   </button>
                 </div>
@@ -3764,7 +3667,7 @@ function renderAdminConsole() {
                   <div class="text-xs text-slate-500 mt-1">${escapeHtml(agencyName)} · ${escapeHtml(inc.type || '재난')} · 시작 ${fmtTime(new Date(inc.startedAt))}</div>
                 </button>
                 <button class="admin-force-close px-3 rounded-lg bg-red-950/50 hover:bg-red-900/60 border border-red-800/60 text-xs text-red-200 font-bold flex items-center gap-1 transition" data-id="${inc._key}" data-title="${escapeHtml(inc.title || '제목 없음')}" title="이 재난을 백업하고 강제 종료합니다">
-                  <i data-lucide="square-x" class="w-3.5 h-3.5"></i>종료
+                  <i data-lucide="square-x" class="w-3.5 h-3.5"></i>${inc.closure ? '종료 재시도' : '종료'}
                 </button>
               </div>`;
             }).join('')}
@@ -3870,7 +3773,7 @@ function bindAdminConsoleEvents() {
       const id    = btn.dataset.id;
       const title = btn.dataset.title || '제목 없음';
       const resultEl = document.getElementById('admin-close-result');
-      if (!confirm(`"${title}" 재난을 강제 종료하시겠습니까?\n\n· 현재 데이터(사고개요·피해·동원·사상자·조치사항)는 자동으로 archives에 백업됩니다.\n· 종료 후 일반 사용자에게는 더 이상 보이지 않습니다.\n· 이 작업은 되돌릴 수 없습니다.`)) return;
+      if (!confirm(`"${title}" 재난을 강제 종료하시겠습니까?\n\n· 서버에 도착한 기록을 잠근 뒤 백업합니다. 각 기기의 미전송 기록을 먼저 확인하세요.\n· 종료 후 일반 사용자에게는 더 이상 보이지 않습니다.\n· 이 작업은 되돌릴 수 없습니다.`)) return;
       btn.disabled = true;
       btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>종료 중...';
       if (window.lucide) window.lucide.createIcons();
@@ -3899,7 +3802,7 @@ async function serverAccess(path,body) {
   if(!user || user.uid!==uid)throw Error('다시 로그인해주세요.');
   const token=await user.getIdToken();
   if(auth.currentUser?.uid!==uid || secureIdentity?.uid!==uid)throw Error('로그인이 변경되었습니다.');
-  const r=await fetch(path,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});
+  const r=await fetch(path,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(45000)});
   const result=await r.json();if(!r.ok)throw Error(result.error||'서버 연결에 실패했습니다.');
   if(secureIdentity?.uid!==uid)throw Error('로그인이 변경되었습니다.');
   return result;
@@ -4280,7 +4183,7 @@ function renderArchivesPanel() {
                 <div class="text-[11px] text-slate-500 mono">${date.toLocaleString('ko-KR')}</div>
                 <div class="text-[10px] text-slate-600 mt-0.5">백업자: ${escapeHtml(ar.archivedBy || '-')}</div>
               </div>
-              <button data-del-archive="${ar._key}" class="del-archive text-slate-600 hover:text-red-400 p-1" title="백업 삭제" aria-label="백업 삭제">
+              <button ${ar.closureId ? 'hidden disabled' : ''} data-del-archive="${ar._key}" class="del-archive text-slate-600 hover:text-red-400 p-1" title="백업 삭제" aria-label="백업 삭제">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
               </button>
             </div>
@@ -4329,11 +4232,11 @@ function renderResetPanel() {
         <label class="text-[11px] text-slate-400 block mb-1">확인을 위해 <span class="text-red-400 font-bold">초기화</span> 를 정확히 입력하세요</label>
         <input id="reset-confirm" type="text" placeholder="초기화"
           class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
-        <p class="text-[10px] text-slate-600 mt-1">⚠ 실행하면 현재 재난 데이터가 백업되고 초기화됩니다. 되돌릴 수 없음.</p>
+        <p class="text-[10px] text-slate-600 mt-1">⚠ 실행하면 현재 재난을 백업하고 종료합니다. 원본은 보존되며 새 재난은 로비에서 생성합니다.</p>
       </div>
 
       <button id="execute-reset" class="w-full py-3 rounded-xl bg-red-700 hover:bg-red-600 font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2">
-        <i data-lucide="refresh-cw" class="w-4 h-4"></i>백업 후 새 재난 시작
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>현재 재난 백업 후 종료
       </button>
       <div id="reset-result" class="text-xs text-center min-h-[20px]"></div>
     </div>
@@ -4470,12 +4373,12 @@ function bindAdminModalEvents() {
         resultEl.innerHTML = '<span class="text-red-400">"초기화" 를 정확히 입력해주세요</span>';
         return;
       }
-      if (!confirm(`정말로 현재 재난 데이터를 백업하고 초기화하시겠습니까?\n\n라벨: ${label || '(빈 값)'}\n\n이 작업은 되돌릴 수 없습니다.`)) return;
+      if (!confirm(`현재 재난을 백업하고 종료하시겠습니까?\n\n라벨: ${label || '(빈 값)'}\n\n이 작업은 되돌릴 수 없습니다.`)) return;
 
       resultEl.innerHTML = '<span class="text-amber-400">처리 중...</span>';
       const r = await archiveAndReset(label);
       if (r.ok) {
-        resultEl.innerHTML = '<span class="text-emerald-400">✓ 백업 완료, 초기화되었습니다</span>';
+        resultEl.innerHTML = '<span class="text-emerald-400">✓ 백업 및 종료 완료. 새 재난은 로비에서 생성하세요.</span>';
         // 폼 임시 데이터도 초기화
         formDrafts = { incident: null, damage: null, mobil: { agencies: null, vehicles: null }, action: '' };
         casualtyDraft = { name: '', age: '', gender: '', triage: '', symptom: '', hospital: '', depart: '', _editKey: null };
@@ -4483,7 +4386,8 @@ function bindAdminModalEvents() {
         resetCsDraft();
         setTimeout(() => {
           state.adminModal = false;
-          state.view = 'dashboard';
+          state.currentIncidentId = null;
+          state.view2 = 'lobby';
           render();
         }, 1500);
       } else {
@@ -8210,11 +8114,11 @@ const HELP_CONTENT = {
         <p class="text-slate-300">진행 중 재난 옆 <span class="bg-red-950 text-red-200 px-2 py-0.5 rounded text-xs font-bold">종료</span> 버튼:</p>
         <ol class="list-decimal list-inside space-y-1 text-slate-300 marker:text-red-400 marker:font-bold mt-1">
           <li>확인 다이얼로그 → 진행</li>
-          <li>현재 데이터(사고·피해·동원·사상자·조치) 자동 백업</li>
-          <li>인덱스에 closedAt 마킹 → 일반 사용자에게 더는 안 보임</li>
-          <li>서브데이터 삭제 (저장공간 회수)</li>
+          <li>각 기기 미전송 확인 → 서버 기록 수정 잠금 → 자동 백업</li>
+          <li>백업 성공 후 종료 확정 → 진행 중 목록에서 제외</li>
+          <li>원본 데이터 보존</li>
         </ol>
-        <p class="text-[11px] text-red-300 mt-2">⚠ 되돌릴 수 없음. 백업은 archives에서 다운로드 가능.</p>
+        <p class="text-[11px] text-red-300 mt-2">중간 실패 시 같은 재난의 종료를 재시도하세요. 종료 백업은 백업 이력에서 다운로드할 수 있습니다.</p>
       </section>
 
       <section class="bg-slate-950 rounded-xl p-4 border border-slate-800">
@@ -8222,7 +8126,7 @@ const HELP_CONTENT = {
         <ul class="space-y-1.5 text-slate-300 ml-4 list-disc marker:text-emerald-400">
           <li>각 백업 항목: 라벨·시각·백업자·관서·데이터 요약 표시</li>
           <li><span class="bg-emerald-800 text-white px-2 py-0.5 rounded text-xs font-bold">엑셀로 다운로드</span> — 5개 시트 종합 보고서</li>
-          <li>🗑 — 영구 삭제 (확인 필요)</li>
+          <li>종료 백업은 보호되어 삭제할 수 없습니다. 구형 백업만 삭제할 수 있습니다.</li>
         </ul>
       </section>
 
@@ -8380,7 +8284,7 @@ const HELP_CONTENT = {
           재난 종료 후 데이터는 어디 있나요?
         </summary>
         <div class="px-4 pb-3 pt-1 text-slate-300 border-t border-slate-800">
-          관리자가 강제 종료하거나 일반 사용자가 "관리 → 새 재난 시작"을 누르면 자동 백업됩니다. 관리자 콘솔의 <strong>백업 이력</strong> 패널에서 엑셀로 다운로드 가능.
+          관리자가 종료하면 서버에 도착한 기록을 잠근 뒤 자동 백업합니다. 원본도 보존합니다. 관리자 콘솔의 <strong>백업 이력</strong> 패널에서 엑셀로 다운로드 가능.
         </div>
       </details>
 
